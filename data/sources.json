@@ -26,8 +26,8 @@
     ]
   },
   "settings": {
-    "johnshall_proxy_node_name": "韩国KR",
-    "openai_node_name": "日本JP"
+    "johnshall_proxy_node_name": "🇸🇬 新加坡2",
+    "openai_node_name": "Oracle🇯🇵东京-Argo"
   },
   "sources": {
     "acl4ssr": {
