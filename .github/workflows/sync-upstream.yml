@@ -35,7 +35,7 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Generate verified Shadowrocket config
-        run: python scripts/build.py
+        run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
       - name: Commit only when upstream changes
         run: |
           git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json
@@ -47,3 +47,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: sync Johnshall and OpenAI rules"
           git push origin HEAD:main
+      - name: Telegram report after successful Actions run
+        if: success()
+        continue-on-error: true
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: '6256134040'
+        run: python scripts/notify_telegram.py --report-file "$RUNNER_TEMP/sync-report.json"

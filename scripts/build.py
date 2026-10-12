@@ -372,11 +372,72 @@ def write_if_changed(path: Path, content: str) -> None:
         path.write_text(content, encoding="utf-8")
 
 
+
+UPSTREAM_SIZE_GUARDS = {
+    "voice_prefixes": (0.70, 2.00),
+    "automatic_openai_domains": (0.75, 2.00),
+    "johnshall_lines": (0.85, 1.50),
+    "mapped_proxy_to_johnshall_node": (0.85, 1.50),
+    "retained_ad_rules": (0.85, 1.50),
+}
+
+
+def validate_upstream_change(stats: dict[str, int], old_state: dict | None) -> None:
+    """Compare with the last published snapshot; reject implausible changes."""
+    if old_state is None:
+        return
+    old_stats = old_state.get("statistics")
+    if not isinstance(old_stats, dict):
+        raise ValueError("Previous source statistics missing")
+    anomalies = []
+    for key, (minimum, maximum) in UPSTREAM_SIZE_GUARDS.items():
+        before, after = old_stats.get(key), stats.get(key)
+        if (type(before) is not int or type(after) is not int
+                or before <= 0 or after <= 0):
+            raise ValueError(f"Invalid baseline/current statistics: {key}")
+        if after < before * minimum or after > before * maximum:
+            anomalies.append(f"{key}: {before} -> {after}, allowed {minimum:.0%}-{maximum:.0%}")
+    if anomalies:
+        raise ValueError(
+            "UPSTREAM ANOMALY: publication blocked; last good config retained. "
+            + "; ".join(anomalies)
+        )
+
+
+def active_auto_rules(text: str) -> set[str]:
+    return {row.strip() for row in text.splitlines()
+            if row.strip() and not row.lstrip().startswith("#")}
+
+
+def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
+                     after_auto: str, config_changed: bool) -> dict:
+    old_state = old_state or {}
+    old_sources = old_state.get("sources", {})
+    old_stats = old_state.get("statistics", {})
+    old_rules, new_rules = active_auto_rules(before_auto), active_auto_rules(after_auto)
+    return {
+        "changed_sources": sorted(
+            key for key, source in current["sources"].items()
+            if old_sources.get(key, {}).get("sha256") != source["sha256"]
+        ),
+        "config_changed": config_changed,
+        "settings_changed": old_state.get("settings") != current["settings"],
+        "statistics": current["statistics"],
+        "stat_deltas": {
+            k: v - old_stats[k] for k, v in current["statistics"].items()
+            if type(v) is int and type(old_stats.get(k)) is int
+        },
+        "auto_added": sorted(new_rules - old_rules),
+        "auto_removed": sorted(old_rules - new_rules),
+    }
+
+
 def run():
     args = argparse.ArgumentParser()
     args.add_argument("--upstream-file", type=Path)
     args.add_argument("--voice-file", type=Path)
     args.add_argument("--domain-dir", type=Path)
+    args.add_argument("--report-file", type=Path)
     opt = args.parse_args()
     settings = load_settings()
     original = opt.upstream_file.read_bytes() if opt.upstream_file else fetch(BASE_URL, 1_000_000)
@@ -404,11 +465,11 @@ def run():
         set(emitted_auto) & set(emitted_manual)
     )
     stats["auto_total_ip_and_domain_rules"] = len(ips) + len(emitted_auto)
-    # Validation has now succeeded, so publish all outputs.
-    write_if_changed(CONFIG, built)
-    # Exactly ONE generated public/OpenAI automatic rule source:
-    # official destination Voice IPs plus maintained public geosite/domain lists.
-    # This list is policy-free: the standalone .conf binds both layers to the OpenAI node.
+    state_path = ROOT / "data/sources.json"
+    old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
+    validate_upstream_change(stats, old_state)
+
+    # Both OpenAI sources remain independent; do not change routing semantics.
     automatic_source = (
         "# OpenAI automatic rules: official Voice destination IPs + public domains\n"
         "# No node name here: route is supplied while merging into .conf\n"
@@ -417,11 +478,21 @@ def run():
         + "# Dedicated first-party and explicitly verified hosted domains\n"
         + "\n".join(emitted_auto) + "\n"
     )
-    write_if_changed(ROOT / "rules/openai-auto.list", automatic_source)
-    state = {"sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
-                         for name, (url, data) in source_data.items()},
-             "settings": settings, "statistics": stats}
-    write_if_changed(ROOT / "data/sources.json", json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    auto_path = ROOT / "rules/openai-auto.list"
+    old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
+    source_state = {
+        "sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
+                    for name, (url, data) in source_data.items()},
+        "settings": settings, "statistics": stats,
+    }
+    changed = not CONFIG.exists() or CONFIG.read_text(encoding="utf-8") != built
+    report = make_sync_report(old_state, source_state, old_auto, automatic_source, changed)
+    # All validation is complete before touching generated output files.
+    write_if_changed(CONFIG, built)
+    write_if_changed(auto_path, automatic_source)
+    write_if_changed(state_path, json.dumps(source_state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    if opt.report_file:
+        write_if_changed(opt.report_file, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(stats, ensure_ascii=False))
     print(f"Saved {CONFIG} ({len(built.encode())} bytes)")
 

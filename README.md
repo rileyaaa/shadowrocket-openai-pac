@@ -64,3 +64,19 @@ python scripts/build.py
 ```
 
 构建失败时不会提交不完整结果；成功时只提交更新的完整 `.conf`、自动列表和数据源校验信息。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf` 和自动 `.list`**，否则下次同步会覆盖。
+
+## GitHub Actions 成功后 Telegram 推送
+
+**Telegram 没有单独的每日定时任务**：原 Actions 每天 11:30 检查上游，但只在某次 Actions 的测试、生成和提交步骤成功后立即发一次报告。此行为适用于定时、手动、修改配置触发的 Actions。**没有上游变化也会发送检查成功、无变化。** 构建失败不会发送误导性的成功通知。
+
+报告记录：触发来源、变化的上游、规则数量与变化量、新增和删除的自动规则示例及 Actions 运行链接。相同摘要也写入 Actions Summary。
+
+在私有仓库 Settings → Secrets and variables → Actions → New repository secret 创建名为 TELEGRAM_BOT_TOKEN 的 Secret，存放从 BotFather 获得的 Bot Token。目标 Chat ID 已在工作流环境变量 TELEGRAM_CHAT_ID 中设置。先向自己的机器人发送 /start，确保它可以发消息。即使是私有仓库也**不要直接将 Bot Token 提交到任何项目文件或 Git 历史**。若旧 Token 曾在聊天中暴露，建议撤销旧 Token 并换新后再放入 Secret。
+
+未设置 Secret 时，Actions 同步正常，摘要照样生成，但 Telegram 步骤会提示未配置并跳过发送。Telegram 发送暂时失败最多重试 3 次；发送异常不影响已经成功发布的配置。
+
+## 上游异常保护
+
+每次与已发布的 data/sources.json 数量对比：Voice IP 下降超过 30% 或增长超过 100%，自动 OpenAI 域名下降超过 25% 或增长超过 100%，Johnshall 规则行数、原 Proxy 映射、广告拦截数量下降超过 15% 或增长超过 50% 时，拒绝本次发布；这些比例是审查阈值，不代表真实上游永远不会出现合理的大变更。
+
+触发保护时构建失败，旧的完整 .conf 保留不变，不会发送“成功”消息。核实合法变更后再调整阈值。原有双层 OpenAI 规则结构和 Johnshall 分流架构不变。
