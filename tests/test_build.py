@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from urllib.parse import quote
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import build
@@ -21,6 +22,43 @@ class BuildTest(unittest.TestCase):
         self.assertFalse(any("IP-ASN" in rule for rule in
                              build.parse_domain_list(typed, "typed")))
 
+    def test_automatic_openai_filter_does_not_override_other_websites(self):
+        raw = [
+            "DOMAIN-SUFFIX,openai.com",
+            "DOMAIN-SUFFIX,chatgpt.com",
+            "DOMAIN-SUFFIX,oaistatic.com",
+            "DOMAIN-SUFFIX,oaiusercontent.com",
+            "DOMAIN-SUFFIX,oaistatsig.com",
+            "DOMAIN-SUFFIX,sora.com",
+            "DOMAIN-SUFFIX,chat.com",
+            "DOMAIN-SUFFIX,crixet.com",
+            "DOMAIN-SUFFIX,chatgpt.site",
+            "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+            "DOMAIN,openaiassets.blob.core.windows.net",
+            "DOMAIN,openaiapi-site.azureedge.net",
+            "DOMAIN-SUFFIX,auth0.com",
+            "DOMAIN-SUFFIX,stripe.com",
+            "DOMAIN-SUFFIX,intercom.io",
+            "DOMAIN-SUFFIX,sentry.io",
+            "DOMAIN-SUFFIX,statsig.com",
+            "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-KEYWORD,openai",
+            "DOMAIN,static.cloudflareinsights.com",
+            "DOMAIN-SUFFIX,algolia.net",
+        ]
+        result = build.filter_auto_domains(raw)
+        self.assertIn("DOMAIN-SUFFIX,chatgpt.com", result)
+        self.assertIn("DOMAIN,openaiassets.blob.core.windows.net", result)
+        for shared in (
+            "DOMAIN-SUFFIX,auth0.com", "DOMAIN-SUFFIX,stripe.com",
+            "DOMAIN-SUFFIX,intercom.io", "DOMAIN-SUFFIX,sentry.io",
+            "DOMAIN-SUFFIX,statsig.com", "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-KEYWORD,openai", "DOMAIN,static.cloudflareinsights.com",
+            "DOMAIN-SUFFIX,algolia.net",
+        ):
+            with self.subTest(shared=shared):
+                self.assertNotIn(shared, result)
+
     def test_voice(self):
         doc = json.dumps({"prefixes": [
             {"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 6)
@@ -31,10 +69,13 @@ class BuildTest(unittest.TestCase):
 
     def test_manual_full(self):
         rules = build.parse_manual(build.ROOT / "config/manual-openai.rules")
-        self.assertGreater(len(rules), 40)
+        self.assertGreater(len(rules), 20)
         self.assertIn("DOMAIN-SUFFIX,openai.com", rules)
-        self.assertIn("DOMAIN-SUFFIX,prodregistryv2.org", rules)
-        self.assertIn("AND,((PROTOCOL,UDP),(DST-PORT,3478))", rules)
+        self.assertIn("DOMAIN-SUFFIX,chatgpt.com", rules)
+        self.assertIn("DOMAIN,cdn.openaimerge.com", rules)
+        self.assertNotIn("DOMAIN-SUFFIX,prodregistryv2.org", rules)
+        self.assertNotIn("DOMAIN-SUFFIX,statsig.com", rules)
+        self.assertNotIn("AND,((PROTOCOL,UDP),(DST-PORT,3478))", rules)
 
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
@@ -46,8 +87,8 @@ class BuildTest(unittest.TestCase):
     def test_exact_node_name_and_dns_escaping(self):
         settings = {"jp_node_name": "🇯🇵 东京 JP 01", "kr_node_name": "🇰🇷 首尔 KR 02"}
         dns = build.render_dns(settings)
-        self.assertIn("#proxy=%F0%9F%87%AF%F0%9F%87%B5%20%E4%B8%9C%E4%BA%AC%20JP%2001", dns)
-        self.assertNotIn("#proxy=JP\n", dns)
+        self.assertIn("#proxy=" + quote(settings["kr_node_name"], safe=""), dns)
+        self.assertNotIn("#proxy=" + quote(settings["jp_node_name"], safe=""), dns)
 
     def test_settings_fail_closed(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -92,7 +133,7 @@ class BuildTest(unittest.TestCase):
         self.assertIn("IP-CIDR,8.8.4.0/24,东京日本-1,no-resolve", output)
         self.assertIn("DOMAIN-SUFFIX,openai.com,东京日本-1", output)
         self.assertIn("DOMAIN-SUFFIX,proxy42.example,首尔韩国-2", output)
-        self.assertIn("#proxy=%E4%B8%9C%E4%BA%AC%E6%97%A5%E6%9C%AC-1", output)
+        self.assertIn("#proxy=" + quote("首尔韩国-2", safe=""), output)
         self.assertNotIn(",Proxy\n", output)
         self.assertEqual(counts["mapped_proxy_to_kr"], 10001)
         self.assertEqual(counts["retained_ad_rules"], 20001)
