@@ -187,6 +187,47 @@ class BuildTest(unittest.TestCase):
                           "AND,((PROTOCOL,UDP),(DST-PORT,3478))"):
             self.assertNotIn(forbidden, active)
 
+    def test_shared_vendor_hosts_require_exact_verified_approval(self):
+        for unsafe in (
+            "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
+            "DOMAIN-SUFFIX,openaicom.imgix.net",
+            "DOMAIN-SUFFIX,azureedge.net",
+            "DOMAIN-SUFFIX,workos.com",
+            "DOMAIN-SUFFIX,stripe.com",
+            "DOMAIN,cdn.workos.com",
+            "DOMAIN,challenges.cloudflare.com",
+            "DOMAIN-WILDCARD,*.workos.com",
+            "DOMAIN-KEYWORD,openai",
+        ):
+            with self.subTest(unsafe=unsafe):
+                self.assertFalse(build.is_openai_specific_rule(unsafe))
+        for safe in (
+            "DOMAIN,openaiapi-site.azureedge.net",
+            "DOMAIN,openaicom.imgix.net",
+            "DOMAIN,openai.qualtrics.com",
+            "DOMAIN,openai-api.arkoselabs.com",
+            "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+            "DOMAIN-SUFFIX,openai.com",
+        ):
+            with self.subTest(safe=safe):
+                self.assertTrue(build.is_openai_specific_rule(safe))
+
+        # Shared third-party rules stay commented, and accidentally
+        # enabling a broad/shared line aborts generation safely.
+        existing = (build.ROOT / "config/manual-openai.rules").read_text(
+            encoding="utf-8"
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "manual.rules"
+            for bad in (
+                "DOMAIN-SUFFIX,workos.com",
+                "DOMAIN,cdn.workos.com",
+                "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
+            ):
+                path.write_text(existing + "\n" + bad + "\n", encoding="utf-8")
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    build.parse_manual(path)
+
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
             "jp_node_name": "日本JP",
@@ -239,10 +280,17 @@ class BuildTest(unittest.TestCase):
             upstream,
             ["IP-CIDR,8.8.4.0/24"],
             ["DOMAIN-SUFFIX,chatgpt.com"],
-            ["DOMAIN-SUFFIX,openai.com"],
+            ["DOMAIN-SUFFIX,openai.com", "DOMAIN-SUFFIX,chatgpt.com"],
             settings=settings,
         )
         self.assertNotIn("[Proxy Group]", output)
+        # Manual/automatic duplicate is intentional: independent layers.
+        same_rule = "DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns"
+        self.assertEqual(output.count(same_rule), 2)
+        self.assertLess(
+            output.index("# [2] Independent OpenAI auto layer"),
+            output.index("# [3] Independent manual OpenAI fallback layer"),
+        )
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns", output)
         self.assertIn("IP-CIDR,8.8.4.0/24,东京日本-1,no-resolve", output)
         self.assertIn("DOMAIN-SUFFIX,openai.com,东京日本-1,force-remote-dns", output)
