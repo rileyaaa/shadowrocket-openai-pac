@@ -39,12 +39,67 @@ dns-direct-fallback-proxy = false
 hijack-dns = 8.8.8.8:53,8.8.4.4:53,1.1.1.1:53,1.0.0.1:53,223.5.5.5:53,223.6.6.6:53
 """
 DNS_KEYS = {line.partition("=")[0].strip() for line in DNS.splitlines() if "=" in line and not line.startswith("#")}
-GROUPS = """[Proxy Group]
-# Import the HY/airport subscription separately; choose actual Japanese/Korean nodes.
-# JP has NO KR/DIRECT failover. Check group selection after first import.
-JP = select,policy-regex-filter=(?i)(日本|东京|東京|大阪|Japan|Tokyo|Osaka|JP)
-KR = select,policy-regex-filter=(?i)(韩国|韓國|首尔|首爾|Korea|Seoul|KR)
-"""
+# Used only when the corresponding exact node name has not been configured.
+DEFAULT_NODE_FILTERS = {
+    "jp": "(?i)(日本|东京|東京|大阪|Japan|Tokyo|Osaka|JP)",
+    "kr": "(?i)(韩国|韓國|首尔|首爾|Korea|Seoul|KR)",
+}
+SETTINGS_PATH = ROOT / "config/user-settings.json"
+SETTING_KEYS = {"jp_node_name", "kr_node_name", "jp_policy_name", "kr_policy_name"}
+RESERVED_POLICIES = {
+    "DIRECT", "PROXY", "REJECT", "REJECT-DROP", "REJECT-NO-DROP",
+    "FINAL", "PASS", "GLOBAL", "SYSTEM", "NONE",
+}
+
+
+def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
+    """Read node names from versioned user config, not from generated output."""
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(data, dict) or set(data) != SETTING_KEYS:
+        raise ValueError(f"Expected exactly these settings: {sorted(SETTING_KEYS)}")
+    for key, value in data.items():
+        if not isinstance(value, str):
+            raise ValueError(f"{key} must be a string")
+        if value != value.strip():
+            raise ValueError(f"{key} has leading/trailing whitespace")
+        if any(ord(c) < 32 or c in {",", "=", "#", "\\"} for c in value):
+            raise ValueError(f"{key} contains unsafe Shadowrocket syntax characters")
+        if key.endswith("_policy_name") and not value:
+            raise ValueError(f"{key} cannot be empty")
+    jp, kr = data["jp_policy_name"], data["kr_policy_name"]
+    if jp.casefold() == kr.casefold():
+        raise ValueError("JP and KR policy names cannot be identical")
+    if jp.upper() in RESERVED_POLICIES or kr.upper() in RESERVED_POLICIES:
+        raise ValueError("Policy names cannot override Shadowrocket built-in actions")
+    if any(node and node.casefold() in {jp.casefold(), kr.casefold()}
+           for node in (data["jp_node_name"], data["kr_node_name"])):
+        raise ValueError("Node names must not collide with JP/KR policy names")
+    if data["jp_node_name"] and data["jp_node_name"] == data["kr_node_name"]:
+        raise ValueError("JP and KR must not point to the same exact node")
+    return data
+
+
+def render_groups(settings: dict[str, str]) -> str:
+    lines = [
+        "[Proxy Group]",
+        "# Auto-generated from config/user-settings.json.",
+        "# Exact node name (when set) takes precedence over the country regex.",
+        "# No KR/DIRECT option is added to the OpenAI policy.",
+    ]
+    for prefix in ("jp", "kr"):
+        group = settings[f"{prefix}_policy_name"]
+        node = settings[f"{prefix}_node_name"]
+        if node:
+            # One explicitly named node, preselected by Shadowrocket.
+            lines.append(f"{group} = select,{node},policy-select-name={node}")
+        else:
+            lines.append(f"{group} = select,policy-regex-filter={DEFAULT_NODE_FILTERS[prefix]}")
+    return "\n".join(lines) + "\n"
+
+
+def render_dns(settings: dict[str, str]) -> str:
+    return DNS.replace("#proxy=JP", f"#proxy={settings['jp_policy_name']}")
+
 
 
 def fetch(url: str, minimum: int = 50) -> bytes:
@@ -142,7 +197,10 @@ def split_base(source: str):
             source[matches[2].start():].strip("\n"))
 
 
-def generate(base: str, ips: list[str], domains: list[str], manual: list[str]):
+def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None):
+    settings = settings if settings is not None else load_settings()
+    jp_policy = settings["jp_policy_name"]
+    kr_policy = settings["kr_policy_name"]
     if len(base.encode()) < 1_000_000 or len(base.splitlines()) < 50_000:
         raise ValueError("Johnshall config is unexpectedly small")
     banner, general, original_rules, tail = split_base(base)
@@ -155,7 +213,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str]):
         if not line.lstrip().startswith("#") and line.strip():
             if re.search(r",reject(?:,|$)", line, re.I):
                 before_ads += 1
-            line, count = PROXY_POLICY.subn(",KR", line)
+            line, count = PROXY_POLICY.subn(lambda _: f",{kr_policy}", line)
             converted += count
         changed.append(line)
     if converted < 10000 or before_ads < 20000:
@@ -165,21 +223,21 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str]):
     if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
         raise ValueError("Unconverted original Proxy rule found")
     # IP rule priority first. This only covers official voice IPs, NOT all of OpenAI.
-    jp_ip_rules = [f"{rule},JP,no-resolve" for rule in ips]
-    jp_auto_domains = [f"{rule},JP" for rule in domains]
-    jp_manual = [f"{rule},JP" for rule in manual]
+    jp_ip_rules = [f"{rule},{jp_policy},no-resolve" for rule in ips]
+    jp_auto_domains = [f"{rule},{jp_policy}" for rule in domains]
+    jp_manual = [f"{rule},{jp_policy}" for rule in manual]
     result = (
         banner + "# Automatically generated from Johnshall; do not edit output directly.\n"
         + "# Source: rileyaaa/shadowrocket-openai-pac, daily checked by GitHub Actions.\n"
-        + "# JP = OpenAI, KR = other original Proxy, original REJECT/DIRECT kept.\n\n"
-        + "[General]\n" + "\n".join(general_lines) + "\n\n" + DNS + "\n"
-        + GROUPS + "\n"
+        + f"# {jp_policy} = OpenAI, {kr_policy} = other original Proxy, original REJECT/DIRECT kept.\n\n"
+        + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
+        + render_groups(settings) + "\n"
         + "[Rule]\n"
         + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
         + "# [2] OpenAI automatically maintained domain rules\n" + "\n".join(jp_auto_domains) + "\n\n"
         + "# [3] Complete custom HY ACL fallback, including broad UDP/3478\n"
         + "\n".join(jp_manual) + "\n\n"
-        + "# [4] Johnshall complete original rules, Proxy policies mapped to KR\n"
+        + "# [4] Johnshall complete original rules, Proxy policies mapped to configured KR policy\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
     )
     assert result.count("[Rule]") == 1
@@ -200,6 +258,7 @@ def run():
     args.add_argument("--voice-file", type=Path)
     args.add_argument("--domain-dir", type=Path)
     opt = args.parse_args()
+    settings = load_settings()
     original = opt.upstream_file.read_bytes() if opt.upstream_file else fetch(BASE_URL, 1_000_000)
     voice_raw = opt.voice_file.read_bytes() if opt.voice_file else fetch(VOICE_URL)
     source_data = {"johnshall": (BASE_URL, original), "voice": (VOICE_URL, voice_raw)}
@@ -211,13 +270,14 @@ def run():
     ips = parse_voice(voice_raw)
     domains = list(dict.fromkeys(rule for one in lists for rule in one))
     manual = parse_manual(ROOT / "config/manual-openai.rules")
-    built, stats = generate(original.decode("utf-8-sig"), ips, domains, manual)
+    built, stats = generate(original.decode("utf-8-sig"), ips, domains, manual, settings=settings)
     # Validation has now succeeded, so publish all outputs.
     write_if_changed(CONFIG, built)
     write_if_changed(ROOT / "rules/openai-auto-domains.list", "# Automatically synced from three domain sources\n" + "\n".join(domains) + "\n")
     write_if_changed(ROOT / "rules/openai-voice-ips.list", "# Official ChatGPT Voice IP ranges only\n" + "\n".join(ips) + "\n")
     state = {"sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
-                         for name, (url, data) in source_data.items()}, "statistics": stats}
+                         for name, (url, data) in source_data.items()},
+             "settings": settings, "statistics": stats}
     write_if_changed(ROOT / "data/sources.json", json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     print(json.dumps(stats, ensure_ascii=False))
     print(f"Saved {CONFIG} ({len(built.encode())} bytes)")
