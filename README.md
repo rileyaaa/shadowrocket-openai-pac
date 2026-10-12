@@ -58,7 +58,7 @@ FINAL,direct
 
 **自动模块与手工模块绝不互相去重。** 即使自动模块已有 `DOMAIN-SUFFIX,openai.com`，手工模块也会独立保留 `DOMAIN-SUFFIX,openai.com`。Shadowrocket 运行时先匹配上面的自动层；手工层是在自动层未命中时的下一层兜底。这样任一上游删除、变更或暂时漏收条目，都不会改变手工层的独立性。
 
-当前（2026-10-12）自动域名原始筛选有 **22 条**、内部清理后 **19 条**；手工有效规则有 **22 条**，手工内部没有需要移除的父子域冗余，所以完整输出 **22 条**。最终配置里自动层和手工层加起来会有 **41 条域名规则**，包括跨层故意保留的重复项，并不是出错。
+当前（2026-10-12）经过专属域名安全筛选后，自动域名有 **20 条**、层内去重后输出 **19 条**；手工有效规则有 **22 条**，手工内部没有需要移除的父子域冗余，所以完整输出 **22 条**。最终配置里自动层和手工层加起来会有 **41 条域名规则**，包括跨层故意保留的重复项，并不是出错。
 
 手工内部精简例子：
 
@@ -79,7 +79,7 @@ OpenAI 官方的网络清单是**允许访问清单**，不等于其中每个第
 - 已启用：`DOMAIN,openai-api.arkoselabs.com`、`DOMAIN,openai.qualtrics.com`、`DOMAIN,cdn.openaimerge.com`、专门的 ChatGPT Web PubSub 主机模式、OpenAI 专用 Azure/Cloudflare 主机；
 - 仅作参考、暂不自动走 JP：`cdn.workos.com`、`frontend-apps-multi-region.workos.com`、`challenges.cloudflare.com`、`js.stripe.com`、`*.intercom.io`、通用 LiveKit 域名等。它们即便写成精确的 `DOMAIN,cdn.workos.com`，也可能被非 OpenAI 客户共享。
 
-原则是：第三方服务必须能证明某个**具体主机或子域是 OpenAI 专属**，才加入 JP 的精确 `DOMAIN` 规则；否则沿用 Johnshall 原分流。无法仅凭 SNI/域名确认一个共享主机上的 HTTPS 请求究竟由 ChatGPT 还是其他网站发起；同一个主机按来源网站分别使用 JP/KR 通常需要 HTTPS 请求级识别（涉及解密/MITM），本项目不默认启用这种复杂且可能影响安全和隐私的方式。请勿把公司整段后缀或全局 UDP/3478 强制送 JP。
+原则是：第三方服务必须能证明某个**具体主机或子域是 OpenAI 专属**，才加入 JP 的精确 `DOMAIN` 规则；否则沿用 Johnshall 原分流。生成器现在还会检查：已批准的第三方主机也只能写成 `DOMAIN,具体主机`，不能改为 `DOMAIN-SUFFIX,具体主机`，避免匹配不必要的子域；新确认的第三方专属主机需要先加入 `scripts/build.py` 的 `OPENAI_SPECIFIC_HOSTS` 清单。无法仅凭 SNI/域名确认一个共享主机上的 HTTPS 请求究竟由 ChatGPT 还是其他网站发起；同一个主机按来源网站分别使用 JP/KR 通常需要 HTTPS 请求级识别（涉及解密/MITM），本项目不默认启用这种复杂且可能影响安全和隐私的方式。请勿把公司整段后缀或全局 UDP/3478 强制送 JP。
 
 **限制：** 共享第三方主机可能被 OpenAI 和别的网站同时使用，纯域名/IP 分流无法精确识别它究竟服务哪一个应用。为了优先保持 Johnshall 原始行为，本项目不劫持这些共享域名；部分 OpenAI 登录、语音或其他第三方依赖可能因此仍按照原规则走 KR/DIRECT。官方 Voice IP 清单不是 OpenAI 全业务 IP 清单，未来未知新域名也可能漏判。
 
