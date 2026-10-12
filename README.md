@@ -51,7 +51,7 @@ DNS：直连用阿里加密 DoH `https://dns.alidns.com/dns-query`；Google 加�
 
 工作流：[`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml)。
 
-- 每天 10:30（Asia/Taipei）尝试同步；GitHub Actions 实际执行可能延迟。
+- Johnshall 上游计划每天 **07:00（Asia/Taipei；23:00 UTC）** 构建规则（[上游 release.yml](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/blob/release/.github/workflows/release.yml)）。本仓库安排每天 **08:00（Asia/Taipei；00:00 UTC）** 同步，比上游计划时间晚一小时；GitHub Actions 实际执行仍可能延迟。
 - 编辑 `config/user-settings.json` 或 `config/manual-openai.rules` 后自动触发新构建；也可以在 Actions 页手动运行。
 - 获取 Johnshall 上游、OpenAI 官方 Voice IP、三份自动域名源，校验后才写出完整配置。
 - 只有内容变化才提交新生成文件；某个源下载或校验失败，则保留上一版，不发布不完整配置。
