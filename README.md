@@ -1,6 +1,20 @@
 # Shadowrocket · OpenAI 专用出口 + Johnshall 原样分流
 
-基于 [Johnshall 上游](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever) 的完整 Shadowrocket 配置，每天同步：**明确识别的 OpenAI 目的地走专用节点**；其他 Johnshall 原本 `Proxy` 的流量走另一个指定节点。DIRECT / REJECT / 最后直连保留原规则。节点所在国家可随时更换，不与配置文件名和变量名绑定。
+## V1.0 稳定基线：最高优先级与验收原则
+
+> **第一目标：尽最大可能让所有 OpenAI、ChatGPT、Codex、语音、登录验证及相关依赖流量走你指定的 OpenAI 节点。**
+
+此原则是本项目后续规则设计、上游更新、审查、测试和故障排查的**最高优先级**。在不改变用户明确指定的两个节点名称的前提下：
+
+1. **覆盖优先**：官方明确使用的 OpenAI / ChatGPT / Codex 服务，以及 API、登录验证、WebSocket、语音、文件上传、静态资源等网络依赖，优先路由至 `openai_node_name` 指定节点。已确认的官方共享第三方依赖也纳入手工兜底，而不是仅因为其他产品同样使用该域名就排除。
+2. **不以节点性能决定收录**：节点延迟、地区、线路质量和出口优化由用户负责，不作为取消或拒绝 OpenAI 相关分流规则的理由。
+3. **保持分流边界可验证**：当官方确认的是某个精确主机，就使用精确主机；当官方明确给出通配子域或语音目的 IP 范围，再按相应范围覆盖。共享目标被纳入后，其他使用同一目标的应用也可能走 OpenAI 专用节点，这是覆盖优先所接受的副作用。没有依据时不扩大为整个供应商域名、所有 IP/ASN 或全局 UDP 端口规则。
+4. **其余流量保留 Johnshall**：未被 OpenAI 专用层匹配的连接继续遵循 Johnshall 原有的 `Proxy` / `DIRECT` / `REJECT` 与最终直连规则，不新增无关策略组，不擅自改变两个实际节点名称。
+5. **持续审查而非冻结域名**：定期同步官方 Voice 目的 IP 和上游域名源；上游新增却被筛选排除的候选规则报告给用户审核。OpenAI 推出新主机、修改基础设施或存在纯域名规则无法辨别的共享请求时，结合官方资料与 Shadowrocket 连接日志继续补齐。
+
+**版本定位**：截至 2026-10-12，现有双节点架构、两层 OpenAI 规则、自动更新、异常保护、测试及成功后 Telegram 报告构成 **V1.0 稳定基线**，可以长期按此架构使用。所谓“终版”指**核心架构和上述分流优先级定版**，不表示域名清单从此不更新，更不能宣称静态规则已数学保证未来所有 OpenAI 连接 100% 命中指定节点。实际设备上的登录、Voice、Codex 和上传行为仍应以 Shadowrocket 连接记录验收。
+
+基于 [Johnshall 上游](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever) 的完整 Shadowrocket 配置，每天同步：**尽最大可能将 OpenAI 本身及官方确认的共享网络依赖送至 OpenAI 专用节点**；其他 Johnshall 原本 `Proxy` 的流量走另一个指定节点。DIRECT / REJECT / 最后直连保留原规则。节点所在国家可随时更换，不与配置文件名和变量名绑定。
 
 ## 小火箭完整配置订阅
 
@@ -23,7 +37,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 | 顺序 | 唯一来源 | 维护方式和内容 |
 |---|---|---|
 | 1. 自动优先 | [`rules/openai-auto.list`](rules/openai-auto.list) | GitHub Actions 每天从官方 ChatGPT Voice **目标 IP** 和多个公共 OpenAI geosite / Shadowrocket / ACL4SSR 域名文件下载、筛选、层内去重后自动生成 |
-| 2. 手工兜底 | [`config/manual-openai.rules`](config/manual-openai.rules) | 独立保留你原 HY 的第一方与专属第三方主机规则；只在**手工文件内部**有确定父子域包含关系时才去重，**不和自动层去重** |
+| 2. 手工兜底 | [`config/manual-openai.rules`](config/manual-openai.rules) | 独立保留第一方、专属第三方及官方确认的共享网络依赖规则；只在**手工文件内部**有确定父子域包含关系时才去重，**不和自动层去重** |
 | 3. 非 OpenAI | Johnshall 原始规则 | `Proxy` 改为 `johnshall_proxy_node_name` 指定的实际节点；其他原始规则及相对顺序全部保留；未匹配 `FINAL,direct` |
 
 在最终完整 `.conf` 中，自动层先放官方 Voice 目的 IP，再放自动域名，之后才放独立手工兜底，最后放 Johnshall 原规则。**最终仍只有一个可直接订阅的 `.conf` 文件**。不需要用户再导入两份列表。
@@ -117,7 +131,7 @@ python scripts/build.py
 
 LiveKit 官方网络说明：`*.host.livekit.cloud` 主要涉及 UDP/3478 TURN，`*.turn.livekit.cloud` 主要涉及 TCP/443 TURN/TLS（https://docs.livekit.io/deploy/admin/firewall/）。本项目没有新增 `DOMAIN-SUFFIX,livekit.cloud`、通用 UDP/3478 或 IP/ASN 一刀切规则。原官方 ChatGPT Voice 目标 IP、其他 OpenAI 分流与 Johnshall 剩余规则不变。
 
-启用后应在 Shadowrocket 里测试 ChatGPT Voice 和可能使用 LiveKit 的其他实时通话软件。如果其他应用出现通话故障、延迟增大或出口误路由，可撤销这两项例外恢复原策略。
+启用后应在 Shadowrocket 里测试 ChatGPT Voice 和可能使用 LiveKit 的其他实时通话软件。如果发现其他应用也经这两个共享子域使用 LiveKit，这属于覆盖优先时已接受的分流范围；仅在证实业务功能受到影响且需要重新界定覆盖范围时才按连接日志复核，不因延迟或节点地区不同直接取消 OpenAI 相关规则。
 
 
 ## OpenAI 连接覆盖优先：官方网络依赖（2026-10-12）
