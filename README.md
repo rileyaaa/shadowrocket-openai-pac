@@ -10,7 +10,51 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 
 在小火箭「配置」页点击 `+` 导入地址，启用该配置；首页「全局路由」选择 **配置**，不要选「代理」。需要先在小火箭中导入你自己的 Hysteria 2/机场节点订阅。此仓库 **不包含任何代理节点或账号**。
 
-配置自动创建 `JP` / `KR` 策略组，分别从现有节点名称中筛选日本和韩国节点。**首次导入后一定进入策略组，确认 JP 绑定到你的“日本JP”节点、KR 绑定到“韩国KR”节点。** 未命中正则或未选中节点时无法正常代理。JP 不包含 KR/DIRECT，避免被意外切换到韩国或直连。
+配置默认创建 `JP` / `KR` 策略组。你可以在 `config/user-settings.json` **直接填入实际节点的完整名称**，生成器就会明确绑定相应节点；未填写时保留日本/韩国关键词筛选模式。首次导入后仍应在小火箭内确认两组实际指向的节点。JP 组不包含 KR/DIRECT 作为备用，避免 OpenAI 在 JP 故障时被意外切到其他出口。
+
+## 只改一个文件：自定义日本 / 韩国节点名称
+
+以后换节点，**只需要编辑 [`config/user-settings.json`](config/user-settings.json)，不要修改生成出来的 `.conf`**。
+
+仓库当前的默认配置：
+
+```json
+{
+  "jp_node_name": "",
+  "kr_node_name": "",
+  "jp_policy_name": "JP",
+  "kr_policy_name": "KR"
+}
+```
+
+- **`jp_node_name`**：填写小火箭节点订阅里**日本节点的完整名称**，包括空格、旗帜 emoji 和编号（必须与客户端一致）。
+- **`kr_node_name`**：填写韩国节点的完整名称。
+- **`jp_policy_name` / `kr_policy_name`**：策略组显示名称，通常无需更改，保持 `JP`、`KR` 最省心；如需修改，脚本会同步更新全部 JP/KR 分流规则与 Google DoH 的 `#proxy=` 引用。
+- 两个节点名保持空字符串 `""`：延续原来的**国家关键词正则筛选**，你可在小火箭中手动选择具体节点。**建议填完整节点名**，减少选错线路的可能。
+- 节点名称中如果包含英文逗号 `,`、`=`、`#` 或换行，当前生成器会阻止构建并提示错误，避免产生无效 Shadowrocket 配置。不可把 JP 和 KR 指向同一个节点。
+
+例如，你的订阅节点叫“🇯🇵 东京 A-01”和“🇰🇷 首尔 B-02”，那么改成：
+
+```json
+{
+  "jp_node_name": "🇯🇵 东京 A-01",
+  "kr_node_name": "🇰🇷 首尔 B-02",
+  "jp_policy_name": "JP",
+  "kr_policy_name": "KR"
+}
+```
+
+此时生成文件的策略组会变成：
+
+```ini
+[Proxy Group]
+JP = select,🇯🇵 东京 A-01,policy-select-name=🇯🇵 东京 A-01
+KR = select,🇰🇷 首尔 B-02,policy-select-name=🇰🇷 首尔 B-02
+```
+
+**如何生效：** 打开上面的配置文件链接 → 点击 GitHub 铅笔编辑 → 修改后 **Commit changes** 到 `main` → GitHub Actions 自动触发构建并提交新的完整 `.conf` → 在 iPhone 小火箭里刷新配置订阅。以后再修改，只重复这一个文件的操作即可，后续每天上游更新也会继续使用你的新节点名称。
+
+仓库是公开的，**只填写节点备注名称，不要写代理订阅链接、密码、token 或服务器凭据**。如果你的机场里存在重名节点，单靠名称可能无法明确区分；请先给节点设置唯一备注或在小火箭中检查实际选中项。
 
 ## 分流优先级
 
@@ -42,7 +86,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - 也支持在仓库 **Actions → Sync Johnshall + OpenAI rules → Run workflow** 手动执行。
 - 下载 Johnshall 上游完整 `.conf`、OpenAI 官方 Voice IP JSON、三份自动域名列表。
 - 校验格式、原始规则数量、完整广告拦截和默认直连；只将上游 `Proxy` 改成 `KR`，保留原 `Reject`、`DIRECT`、`[URL Rewrite]` 和 `[MITM]`。
-- 只有内容实际变更才提交生成的 `.conf`、`rules/*.list` 和 `data/sources.json`。
+- 只有内容实际变更才提交生成的 `.conf`、`rules/*.list` 和 `data/sources.json`；**修改 `config/user-settings.json` 也会立即触发同一工作流**，无须等第二天。
 - **任何源下载失败或校验失败则 Actions 失败，不提交半成品，仓库保留上一份可用配置。**
 
 你在小火箭导入本仓库的 **raw 配置 URL** 后，小火箭端还需要按客户端设置刷新订阅（后台更新时机由 iOS 决定），**GitHub 更新≠已安装到手机的配置立即热更新**。
