@@ -270,6 +270,73 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn('ROOT / "rules/openai-manual-fallback.list"', code)
         self.assertIn('ROOT / "config/manual-openai.rules"', code)
 
+    def test_every_original_hy_rule_preserved_as_active_or_archived(self):
+        # Independent original user HY ACL inventory (excluding geosite:openai).
+        # Never drop entries merely because another list overlaps them.
+        expected = {
+            "DOMAIN-SUFFIX,openai.com",
+            "DOMAIN-SUFFIX,oaistatic.com",
+            "DOMAIN-SUFFIX,oaiusercontent.com",
+            "DOMAIN-SUFFIX,oaistatsig.com",
+            "DOMAIN-SUFFIX,sora.com",
+            "DOMAIN-SUFFIX,chat.com",
+            "DOMAIN-SUFFIX,crixet.com",
+            "DOMAIN,openai.com.cdn.cloudflare.net",
+            "DOMAIN,openaiapi-site.azureedge.net",
+            "DOMAIN,openaiassets.blob.core.windows.net",
+            "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+            "DOMAIN,openaicom.imgix.net",
+            "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+            "DOMAIN,production-openaicom-storage.azureedge.net",
+            "DOMAIN-SUFFIX,chatgpt.com",
+            "DOMAIN-SUFFIX,chatgpt.site",
+            "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+            "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+            "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-SUFFIX,turn.livekit.cloud",
+            "DOMAIN,cdn.openaimerge.com",
+            "DOMAIN,cdn.workos.com",
+            "DOMAIN,forwarder.workos.com",
+            "DOMAIN,setup.workos.com",
+            "DOMAIN,images.workoscdn.com",
+            "DOMAIN,workos.imgix.net",
+            "DOMAIN,challenges.cloudflare.com",
+            "DOMAIN,humb.apple.com",
+            "DOMAIN-SUFFIX,intercom.io",
+            "DOMAIN-SUFFIX,intercomcdn.com",
+            "DOMAIN-SUFFIX,ct.sendgrid.net",
+            "DOMAIN,js.stripe.com",
+            "DOMAIN,o207216.ingest.sentry.io",
+            "DOMAIN,o33249.ingest.sentry.io",
+            "DOMAIN,browser-intake-datadoghq.com",
+            "DOMAIN,rum.browser-intake-datadoghq.com",
+            "DOMAIN,openai.qualtrics.com",
+            "AND,((PROTOCOL,UDP),(DST-PORT,3478))",
+            "DOMAIN-SUFFIX,statsig.com",
+            "DOMAIN-SUFFIX,statsigapi.net",
+            "DOMAIN-SUFFIX,featuregates.org",
+            "DOMAIN-SUFFIX,featureassets.org",
+            "DOMAIN-SUFFIX,prodregistryv2.org",
+        }
+        self.assertEqual(len(expected), 43)
+        raw = (build.ROOT / "config/manual-openai.rules").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        active = {line.strip() for line in raw
+                  if line.strip().startswith(("DOMAIN", "AND,"))}
+        archived = {line.strip()[2:] for line in raw
+                    if line.strip().startswith(("# DOMAIN", "# AND,"))}
+        self.assertFalse(expected - active - archived)
+        self.assertIn("DOMAIN-SUFFIX,openai.com", active)
+        self.assertIn("DOMAIN,cdn.workos.com", archived)
+        self.assertIn(
+            "AND,((PROTOCOL,UDP),(DST-PORT,3478))", archived
+        )
+        # HY geosite:openai is represented by maintained public sources.
+        self.assertIn('"v2fly":', (
+            build.ROOT / "scripts/build.py"
+        ).read_text(encoding="utf-8"))
+
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
             "jp_node_name": "日本JP",
