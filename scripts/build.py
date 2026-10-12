@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import sys
 import urllib.request
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
@@ -98,7 +99,9 @@ def render_groups(settings: dict[str, str]) -> str:
 
 
 def render_dns(settings: dict[str, str]) -> str:
-    return DNS.replace("#proxy=JP", f"#proxy={settings['jp_policy_name']}")
+    # Shadowrocket requires URL-encoded policy names in DoH #proxy=.
+    encoded = quote(settings["jp_policy_name"], safe="")
+    return DNS.replace("#proxy=JP", f"#proxy={encoded}")
 
 
 
