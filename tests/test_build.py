@@ -148,6 +148,64 @@ class BuildTest(unittest.TestCase):
             with self.subTest(host=host):
                 self.assertTrue(covers(host), host)
 
+    def test_official_chatgpt_network_allowlist_routes_to_dedicated_node(self):
+        # OpenAI official ChatGPT network guidance, checked 2026-10-12.
+        manual = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        rules = ["DOMAIN-SUFFIX,openai.com", "DOMAIN-SUFFIX,chatgpt.com"] + manual
+        def covers(host):
+            return any(
+                (kind == "DOMAIN" and host == name) or
+                (kind == "DOMAIN-SUFFIX" and (host == name or host.endswith("." + name)))
+                for kind, name in (rule.split(",", 1) for rule in rules)
+                if kind in {"DOMAIN", "DOMAIN-SUFFIX"}
+            )
+        destinations = (
+            "sub.auth.openai.com",
+            "chatgpt.com",
+            "sub.ct.sendgrid.net",
+            "sub.intercom.io",
+            "sub.intercomcdn.com",
+            "sub.oaistatic.com",
+            "sub.oaiusercontent.com",
+            "sub.openai.com",
+            "sub.oaistatsig.com",
+            "android.chat.openai.com",
+            "auth0.openai.com",
+            "cdn.openaimerge.com",
+            "cdn.workos.com",
+            "challenges.cloudflare.com",
+            "chat.openai.com",
+            "desktop.chat.openai.com",
+            "forwarder.workos.com",
+            "frontend-apps-multi-region.workos.com",
+            "humb.apple.com",
+            "images.workoscdn.com",
+            "ios.chat.openai.com",
+            "js.intercomcdn.com",
+            "js.stripe.com",
+            "o207216.ingest.sentry.io",
+            "o33249.ingest.sentry.io",
+            "rum.browser-intake-datadoghq.com",
+            "setup.auth.openai.com",
+            "setup.workos.com",
+            "tcr9i.chat.openai.com",
+            "workos.imgix.net",
+            "ws.chatgpt.com",
+        )
+        for host in destinations:
+            with self.subTest(host=host):
+                self.assertTrue(covers(host), host)
+        for rule in build.OFFICIAL_CHATGPT_SHARED_RULES:
+            with self.subTest(rule=rule):
+                self.assertIn(rule, manual)
+                self.assertFalse(build.is_openai_specific_rule(rule))
+        for unsafe in ("DOMAIN-SUFFIX,workos.com", "DOMAIN-SUFFIX,stripe.com",
+                       "DOMAIN-SUFFIX,cloudflare.com",
+                       "DOMAIN-SUFFIX,arkoselabs.com"):
+            with self.subTest(unsafe=unsafe):
+                self.assertNotIn(unsafe, manual)
+                self.assertNotIn(unsafe, build.OFFICIAL_CHATGPT_SHARED_RULES)
+
     def test_voice(self):
         doc = json.dumps({"prefixes": [
             {"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 6)
@@ -237,10 +295,9 @@ class BuildTest(unittest.TestCase):
         self.assertIn("DOMAIN,cdn.openaimerge.com", active)
         self.assertIn("DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com", active)
         for forbidden in ("DOMAIN-SUFFIX,workos.com",
-                          "DOMAIN-SUFFIX,intercom.io",
+                          "DOMAIN-SUFFIX,stripe.com",
                           "DOMAIN-SUFFIX,statsig.com",
-                          "DOMAIN,cdn.workos.com",
-                          "DOMAIN,challenges.cloudflare.com",
+                          "DOMAIN-SUFFIX,cloudflare.com",
                           "AND,((PROTOCOL,UDP),(DST-PORT,3478))"):
             self.assertNotIn(forbidden, active)
 
@@ -269,8 +326,8 @@ class BuildTest(unittest.TestCase):
             with self.subTest(safe=safe):
                 self.assertTrue(build.is_openai_specific_rule(safe))
 
-        # Shared third-party rules stay commented, and accidentally
-        # enabling a broad/shared line aborts generation safely.
+        # Officially documented shared dependencies are intentionally active.
+        # Unlisted vendor hosts and overly broad suffixes must still fail.
         existing = (build.ROOT / "config/manual-openai.rules").read_text(
             encoding="utf-8"
         )
@@ -278,7 +335,7 @@ class BuildTest(unittest.TestCase):
             path = Path(folder) / "manual.rules"
             for bad in (
                 "DOMAIN-SUFFIX,workos.com",
-                "DOMAIN,cdn.workos.com",
+                "DOMAIN,other.workos.com",
                 "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
             ):
                 path.write_text(existing + "\n" + bad + "\n", encoding="utf-8")
@@ -385,7 +442,7 @@ class BuildTest(unittest.TestCase):
                     if line.strip().startswith(("# DOMAIN", "# AND,"))}
         self.assertFalse(expected - active - archived)
         self.assertIn("DOMAIN-SUFFIX,openai.com", active)
-        self.assertIn("DOMAIN,cdn.workos.com", archived)
+        self.assertIn("DOMAIN,cdn.workos.com", active)
         self.assertIn(
             "AND,((PROTOCOL,UDP),(DST-PORT,3478))", archived
         )

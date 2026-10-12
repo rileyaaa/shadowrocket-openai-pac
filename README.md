@@ -36,11 +36,11 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - `DOMAIN-SUFFIX,chatgpt.com` 已覆盖 `ws.chatgpt.com`，包括 Codex 使用的 ChatGPT WebSocket 目的域名；`chatgpt.site` 为不同域，必须另留。OpenAI 官方确认 ChatGPT Sites 使用 `*.chatgpt.site` 子域。
 - `DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com` 是 ChatGPT 专用 Azure Web PubSub 主机匹配，不是 `*.azure.com` 或通用云域名。
 - `openai-api.arkoselabs.com`、`openai.qualtrics.com`、`cdn.openaimerge.com` 等可明确识别的主机只使用精确 `DOMAIN`。不要无证据扩大为 `DOMAIN-SUFFIX,arkoselabs.com` 等第三方整站。
-- 你 HY 原文里的 WorkOS、Stripe、Intercom、Sentry、Statsig / Feature Gates、Cloudflare 验证、Apple 检测等共享依赖仍保留为注释，不默认走 OpenAI 专用节点。**例外：`host.livekit.cloud`、`turn.livekit.cloud` 根据你对 Voice 连通性的明确优先选择，现已启用**，因此可能把其他使用 LiveKit 的应用也转到 OpenAI 出口。官方“允许访问清单”不等于“OpenAI 独占域名清单”。
+- **OpenAI 覆盖优先**：官方 ChatGPT 网络清单明确列出的 WorkOS、Cloudflare 验证、Intercom、SendGrid、Sentry、Apple 相关检测等共享依赖，现已按完整主机或官方通配子域纳入手工规则；Voice 所需 LiveKit 规则也继续生效。其他使用这些共享主机的应用也可能转到 OpenAI 节点。这是覆盖优先的取舍，不表示它们为 OpenAI 独占域名。
 - `gpt(all, udp/3478)` 会误伤其他应用的 UDP 3478。改为自动更新的官方 Voice 目的 IP，不能把“所有 UDP/3478”直接划为 OpenAI。
 - **截至 2026-10，Sora 产品和 API 已停止服务**；`sora.com` 仍按你要求保留为历史兼容规则，不代表该服务仍在线。
 
-第三方共享主机如果确需强制走 OpenAI 专用节点，先确认**具体 OpenAI 专用主机**，并将其加入 `scripts/build.py` 的 `OPENAI_SPECIFIC_HOSTS` 允许列表和手工源；仅凭 `cdn.workos.com` 之类多人共用的主机名做不到“只分 ChatGPT 的那一次请求”。
+官方 ChatGPT 指南明确列出的共享依赖已经作为白名单例外强制走 OpenAI 专用节点，不再要求其是 OpenAI 独占域名。其他社区新增但未获官方确认的第三方主机仍需人工审核；单靠域名分流无法区分同一共享域名上的 ChatGPT 请求与其他应用请求。
 
 自动源使用安全的专属域名筛选；对于 `IP-ASN,20473` 或其他社区发布的宽泛服务商 IP / ASN 不强制日本，以免截走无关流量。官方 Voice JSON 只包含语音目的 IP，不能当作整个 OpenAI 的全量 IP 库。**因此不能保证“100% 所有 OpenAI 依赖都只走日本，同时所有非 OpenAI 流量绝不改变”**：共享第三方主机无法用纯域名分流同时满足这两个要求。
 
@@ -119,3 +119,15 @@ LiveKit 官方网络说明：`*.host.livekit.cloud` 主要涉及 UDP/3478 TURN�
 
 启用后应在 Shadowrocket 里测试 ChatGPT Voice 和可能使用 LiveKit 的其他实时通话软件。如果其他应用出现通话故障、延迟增大或出口误路由，可撤销这两项例外恢复原策略。
 
+
+## OpenAI 连接覆盖优先：官方网络依赖（2026-10-12）
+
+目标是让 OpenAI 网页、iOS、Codex、语音、登录和文件相关连接尽可能通过 openai_node_name 指定的节点；不因节点延迟或共享第三方域名而排除官方明确要求的访问目标。核对来源：
+
+https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps
+
+已将官方所列的共享第三方目标加入 config/manual-openai.rules，精确主机保持 DOMAIN，官方通配子域（ct.sendgrid.net、intercom.io、intercomcdn.com）使用 DOMAIN-SUFFIX。它们不属于 OpenAI 独占服务，可能连带让其他网站的对应主机流量走 OpenAI 出口。
+
+包含 WorkOS 身份验证组件、Cloudflare 验证、Intercom 支持资源、SendGrid、Stripe 脚本、Sentry 与 Datadog 监控、Apple 检测。自动上游仍只采纳 OpenAI 专属域名，官方共享依赖由独立手工兜底承接；Voice 官方目的 IP、原 Johnshall 规则和两节点变量都未改变。
+
+安全边界：不引入 DOMAIN-SUFFIX,workos.com、DOMAIN-SUFFIX,stripe.com、DOMAIN-SUFFIX,cloudflare.com 等未获官方明确要求的整个供应商域名，也不使用 DOMAIN-KEYWORD,openai。静态域名和官方 Voice 目的 IP 不可能预知所有未来服务或隐藏直连目标，因此无法数学保证 100% 的 OpenAI 流量；新增目标应结合已建立的待审核规则报告及 Shadowrocket 连接日志查证。

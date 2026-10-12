@@ -3,9 +3,10 @@
 # Only remove an active manual rule if another ACTIVE rule INSIDE THIS FILE
 # provably covers all its destinations; never compare against automatic rules.
 # The generator adds the configured OpenAI node name; do NOT put it here.
-# Shared third-party HY entries remain archived below, except the two
-# intentionally enabled LiveKit TURN endpoint suffixes. They are multi-tenant
-# and also redirect unrelated LiveKit applications to the OpenAI node.
+# Coverage-first policy: first-party hosts, LiveKit voice, and officially
+# listed shared ChatGPT dependencies are ACTIVE. These may also route traffic
+# from other apps using those exact/shared vendor hosts to the OpenAI node.
+# Unverified and overbroad third-party patterns remain archived for review.
 # HY's geosite:openai comes from the independently updated automatic source.
 # HY's broad udp/3478 catch-all remains archived, since it catches other apps.
 
@@ -41,28 +42,32 @@ DOMAIN,openai.qualtrics.com
 DOMAIN,chat.openai.com.cdn.cloudflare.net
 DOMAIN,openai-api.arkoselabs.com
 
-# ---- Original HY references: NOT ACTIVE (shared/non-exclusive third-party) ----
-# Enabling any entry below also sends other apps using that domain to the OpenAI node.
-# DOMAIN,cdn.workos.com
-# DOMAIN,forwarder.workos.com
-# DOMAIN,setup.workos.com
-# DOMAIN,images.workoscdn.com
-# DOMAIN,workos.imgix.net
-# DOMAIN,challenges.cloudflare.com
-# DOMAIN,humb.apple.com
-# DOMAIN-SUFFIX,intercom.io
-# DOMAIN-SUFFIX,intercomcdn.com
-# DOMAIN-SUFFIX,ct.sendgrid.net
-# DOMAIN,js.stripe.com
-# DOMAIN,o207216.ingest.sentry.io
-# DOMAIN,o33249.ingest.sentry.io
+# Official ChatGPT web/app network dependencies - coverage-first exceptions
+# https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps
+# Some shared vendor domains will carry unrelated traffic on the OpenAI node.
+DOMAIN-SUFFIX,ct.sendgrid.net
+DOMAIN-SUFFIX,intercom.io
+DOMAIN-SUFFIX,intercomcdn.com
+DOMAIN,cdn.workos.com
+DOMAIN,challenges.cloudflare.com
+DOMAIN,forwarder.workos.com
+DOMAIN,frontend-apps-multi-region.workos.com
+DOMAIN,humb.apple.com
+DOMAIN,images.workoscdn.com
+DOMAIN,js.stripe.com
+DOMAIN,o207216.ingest.sentry.io
+DOMAIN,o33249.ingest.sentry.io
+DOMAIN,rum.browser-intake-datadoghq.com
+DOMAIN,setup.workos.com
+DOMAIN,workos.imgix.net
+
+# ---- Remaining historical HY references: NOT ACTIVE (not officially listed) ----
+# These broader/unconfirmed patterns are not automatically added to routing.
 # DOMAIN,browser-intake-datadoghq.com
-# DOMAIN,rum.browser-intake-datadoghq.com
 # DOMAIN-SUFFIX,statsig.com
 # DOMAIN-SUFFIX,statsigapi.net
 # DOMAIN-SUFFIX,featuregates.org
 # DOMAIN-SUFFIX,featureassets.org
 # DOMAIN-SUFFIX,prodregistryv2.org
-# DOMAIN,frontend-apps-multi-region.workos.com
 # DOMAIN-KEYWORD,openai
 # AND,((PROTOCOL,UDP),(DST-PORT,3478))

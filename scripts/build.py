@@ -60,6 +60,28 @@ OPENAI_SPECIFIC_HOSTS = frozenset({
 OPENAI_SPECIFIC_WILDCARDS = frozenset({
     "chatgpt-async-webps-prod-*.webpubsub.azure.com",
 })
+
+# Shared vendor endpoints that OpenAI explicitly includes in its official
+# ChatGPT web/app network guidance. Opt-in for COVERAGE over traffic isolation.
+# Their use may also route other companies' client requests to the OpenAI node.
+# Keep this exact allowlist separate from automatic OpenAI-only geosite filters.
+OFFICIAL_CHATGPT_SHARED_RULES = frozenset({
+    "DOMAIN-SUFFIX,ct.sendgrid.net",
+    "DOMAIN-SUFFIX,intercom.io",
+    "DOMAIN-SUFFIX,intercomcdn.com",
+    "DOMAIN,cdn.workos.com",
+    "DOMAIN,challenges.cloudflare.com",
+    "DOMAIN,forwarder.workos.com",
+    "DOMAIN,frontend-apps-multi-region.workos.com",
+    "DOMAIN,humb.apple.com",
+    "DOMAIN,images.workoscdn.com",
+    "DOMAIN,js.stripe.com",
+    "DOMAIN,o207216.ingest.sentry.io",
+    "DOMAIN,o33249.ingest.sentry.io",
+    "DOMAIN,rum.browser-intake-datadoghq.com",
+    "DOMAIN,setup.workos.com",
+    "DOMAIN,workos.imgix.net",
+})
 DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
 PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
 CONFIG = ROOT / "Shadowrocket_Johnshall_OpenAI.conf"
@@ -309,11 +331,11 @@ def parse_manual(path: Path) -> list[str]:
         if len(parts) != 2:
             raise ValueError(f"Invalid manual rule {line}")
         normalized = domain_rule(parts[0], parts[1])
-        if not is_openai_specific_rule(normalized):
+        if (not is_openai_specific_rule(normalized)
+                and normalized not in OFFICIAL_CHATGPT_SHARED_RULES):
             raise ValueError(
-                "Manual rule is not in the verified OpenAI-specific list; "
-                "for a newly confirmed dedicated third-party host, add "
-                "its exact hostname to OPENAI_SPECIFIC_HOSTS, not a broad suffix: "
+                "Manual rule is neither verified OpenAI-specific nor an "
+                "explicitly approved official ChatGPT shared dependency: "
                 + normalized
             )
         result.append(normalized)
