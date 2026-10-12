@@ -59,7 +59,7 @@ def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
             raise ValueError(f"{key} must be a nonempty node name")
         if value != value.strip():
             raise ValueError(f"{key} has leading/trailing whitespace")
-        if any(ord(char) < 32 or char in {",", "=", "#", "\\\\"} for char in value):
+        if any(ord(char) < 32 or char in ",=#" or char == chr(92) for char in value):
             raise ValueError(f"{key} contains unsafe Shadowrocket syntax characters")
         if value.upper() in RESERVED_POLICIES:
             raise ValueError(f"{key} cannot be a built-in policy")
