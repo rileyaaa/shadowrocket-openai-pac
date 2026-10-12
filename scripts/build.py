@@ -161,12 +161,20 @@ def is_openai_specific_rule(rule: str) -> bool:
         return False
     if kind == "DOMAIN-WILDCARD":
         return value in OPENAI_SPECIFIC_WILDCARDS
-    if value in OPENAI_SPECIFIC_HOSTS:
-        return True
     if kind == "DOMAIN-SUFFIX":
+        # Suffix policy is reserved for confirmed OpenAI-only namespaces.
+        # E.g. azureedge.net / qualtrics.com / workos.com are shared,
+        # and even an approved exact host must not become a wildcard.
         return value in OPENAI_SPECIFIC_SUFFIXES
-    return any(value == suffix or value.endswith("." + suffix)
-               for suffix in OPENAI_SPECIFIC_SUFFIXES)
+    if kind == "DOMAIN":
+        return (
+            value in OPENAI_SPECIFIC_HOSTS
+            or any(
+                value == suffix or value.endswith("." + suffix)
+                for suffix in OPENAI_SPECIFIC_SUFFIXES
+            )
+        )
+    return False
 
 
 def filter_auto_domains(rules: list[str]) -> list[str]:
@@ -254,13 +262,18 @@ def parse_manual(path: Path) -> list[str]:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        if line == "AND,((PROTOCOL,UDP),(DST-PORT,3478))":
-            result.append(line)
-            continue
         parts = line.split(",", 1)
         if len(parts) != 2:
             raise ValueError(f"Invalid manual rule {line}")
-        result.append(domain_rule(parts[0], parts[1]))
+        normalized = domain_rule(parts[0], parts[1])
+        if not is_openai_specific_rule(normalized):
+            raise ValueError(
+                "Manual rule is not in the verified OpenAI-specific list; "
+                "for a newly confirmed dedicated third-party host, add "
+                "its exact hostname to OPENAI_SPECIFIC_HOSTS, not a broad suffix: "
+                + normalized
+            )
+        result.append(normalized)
     if len(result) < 20 or "DOMAIN-SUFFIX,openai.com" not in result or "DOMAIN-SUFFIX,chatgpt.com" not in result:
         raise ValueError("Manual OpenAI fallback is incomplete")
     return list(dict.fromkeys(result))
