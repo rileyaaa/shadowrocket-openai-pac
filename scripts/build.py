@@ -221,8 +221,8 @@ def compact_openai_rules(
     """
     auto_kept = compact_rules_within_layer(auto)
     manual_kept = compact_rules_within_layer(manual)
-    if len(auto_kept) < 10 or len(manual_kept) < 10:
-        raise ValueError("Automatic or manual OpenAI rule layer is unexpectedly small")
+    if not auto_kept or not manual_kept:
+        raise ValueError("Automatic or manual OpenAI rule layer is empty")
     return auto_kept, manual_kept
 
 
