@@ -427,17 +427,41 @@ def validate_upstream_change(stats: dict[str, int], old_state: dict | None) -> N
         )
 
 
+def excluded_auto_rule_sources(source_lists: dict[str, list[str]],
+                               accepted: list[str]) -> dict[str, list[str]]:
+    """Collect rejected community rules with provenance, never as routing rules."""
+    allowed = set(accepted)
+    excluded: dict[str, set[str]] = {}
+    for source_name, rules in source_lists.items():
+        for rule in rules:
+            if rule not in allowed:
+                excluded.setdefault(rule, set()).add(source_name)
+    return {rule: sorted(names) for rule, names in sorted(excluded.items())}
+
+
 def active_auto_rules(text: str) -> set[str]:
     return {row.strip() for row in text.splitlines()
             if row.strip() and not row.lstrip().startswith("#")}
 
 
 def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
-                     after_auto: str, config_changed: bool) -> dict:
+                     after_auto: str, config_changed: bool,
+                     excluded_sources: dict[str, list[str]] | None = None) -> dict:
     old_state = old_state or {}
     old_sources = old_state.get("sources", {})
     old_stats = old_state.get("statistics", {})
     old_rules, new_rules = active_auto_rules(before_auto), active_auto_rules(after_auto)
+    excluded_now = current.get("review", {}).get("excluded_auto_rules", [])
+    excluded_before = old_state.get("review", {}).get("excluded_auto_rules")
+    if not isinstance(excluded_now, list) or any(
+        not isinstance(rule, str) for rule in excluded_now
+    ):
+        raise ValueError("Invalid excluded-auto-rule review snapshot")
+    has_baseline = isinstance(excluded_before, list)
+    added_rejected = (
+        sorted(set(excluded_now) - set(excluded_before)) if has_baseline else []
+    )
+    origin = excluded_sources or {}
     return {
         "changed_sources": sorted(
             key for key, source in current["sources"].items()
@@ -452,6 +476,12 @@ def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
         },
         "auto_added": sorted(new_rules - old_rules),
         "auto_removed": sorted(old_rules - new_rules),
+        "excluded_review_total": len(excluded_now),
+        "excluded_review_baseline_created": not has_baseline,
+        "new_excluded_candidates": [
+            {"rule": rule, "sources": sorted(origin.get(rule, []))}
+            for rule in added_rejected
+        ],
     }
 
 
@@ -466,14 +496,15 @@ def run():
     original = opt.upstream_file.read_bytes() if opt.upstream_file else fetch(BASE_URL, 1_000_000)
     voice_raw = opt.voice_file.read_bytes() if opt.voice_file else fetch(VOICE_URL)
     source_data = {"johnshall": (BASE_URL, original), "voice": (VOICE_URL, voice_raw)}
-    lists = []
+    source_lists = {}
     for name, (url, fmt) in DOMAIN_SOURCES.items():
         raw = (opt.domain_dir / f"{name}.txt").read_bytes() if opt.domain_dir else fetch(url)
         source_data[name] = (url, raw)
-        lists.append(parse_domain_list(raw.decode("utf-8-sig"), fmt))
+        source_lists[name] = parse_domain_list(raw.decode("utf-8-sig"), fmt)
     ips = parse_voice(voice_raw)
-    all_auto_domains = list(dict.fromkeys(rule for one in lists for rule in one))
+    all_auto_domains = list(dict.fromkeys(rule for one in source_lists.values() for rule in one))
     domains = filter_auto_domains(all_auto_domains)
+    excluded_candidates = excluded_auto_rule_sources(source_lists, domains)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
     emitted_auto, emitted_manual = compact_openai_rules(domains, manual)
     built, stats = generate(
@@ -507,9 +538,14 @@ def run():
         "sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                     for name, (url, data) in source_data.items()},
         "settings": settings, "statistics": stats,
+        # Only a review baseline: never feed these rejected rules into .conf.
+        "review": {"excluded_auto_rules": list(excluded_candidates)},
     }
     changed = not CONFIG.exists() or CONFIG.read_text(encoding="utf-8") != built
-    report = make_sync_report(old_state, source_state, old_auto, automatic_source, changed)
+    report = make_sync_report(
+        old_state, source_state, old_auto, automatic_source, changed,
+        excluded_sources=excluded_candidates,
+    )
     # All validation is complete before touching generated output files.
     write_if_changed(CONFIG, built)
     write_if_changed(auto_path, automatic_source)

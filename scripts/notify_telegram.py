@@ -52,6 +52,21 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
         lines.append("新增：" + "；".join(added[:5]) + ("…" if len(added) > 5 else ""))
     if removed:
         lines.append("删除：" + "；".join(removed[:5]) + ("…" if len(removed) > 5 else ""))
+    # Newly rejected domain/rule candidates are REVIEW ONLY.
+    candidates = report.get("new_excluded_candidates", [])
+    reviewed_total = report.get("excluded_review_total", 0)
+    lines.append("")
+    if report.get("excluded_review_baseline_created", False):
+        lines.append(f"🔎 待审核基线已建立：现有 {reviewed_total} 条旧排除项，不计为新增")
+    elif not candidates:
+        lines.append(f"🔎 上游新增待审核规则：无（当前排除项 {reviewed_total} 条）")
+    else:
+        lines.append(f"🔎 上游新增待审核规则：{len(candidates)} 条（未自动分流）")
+        for item in candidates[:8]:
+            where = ", ".join(NAMES.get(s, s) for s in item["sources"])
+            lines.append(f"· {item['rule']} [{where or '来源待查'}]")
+        if len(candidates) > 8:
+            lines.append(f"其余 {len(candidates)-8} 条请查看本次 Actions 摘要")
     if run_url:
         lines.extend(["", f"Actions：{run_url}"])
     return "\n".join(lines)[:3900]
@@ -94,6 +109,12 @@ def main() -> int:
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as summary:
             summary.write("## Shadowrocket 同步成功摘要\n\n~~~text\n" + message + "\n~~~\n")
+            candidates = report.get("new_excluded_candidates", [])
+            if candidates:
+                summary.write("\n### 完整新增待审核规则清单（未自动分流）\n\n")
+                for item in candidates:
+                    where = ", ".join(NAMES.get(s, s) for s in item["sources"])
+                    summary.write(f"- {item['rule']} — {where or '来源待查'}\n")
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not token or not chat_id:

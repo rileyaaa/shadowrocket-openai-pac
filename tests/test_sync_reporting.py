@@ -70,6 +70,72 @@ class SyncReportTests(unittest.TestCase):
         self.assertIn("检查成功，无变化", text)
         self.assertIn("定时运行", text)
 
+    def test_excluded_rules_are_deduplicated_and_have_provenance(self):
+        sources = {
+            "metacubex": ["DOMAIN-SUFFIX,chatgpt.com", "DOMAIN,brand-new.vendor.example"],
+            "v2fly": ["DOMAIN,brand-new.vendor.example", "DOMAIN-SUFFIX,stripe.com"],
+            "acl4ssr": ["DOMAIN-SUFFIX,stripe.com"],
+        }
+        excluded = build.excluded_auto_rule_sources(
+            sources, ["DOMAIN-SUFFIX,chatgpt.com"]
+        )
+        self.assertEqual(excluded, {
+            "DOMAIN,brand-new.vendor.example": ["metacubex", "v2fly"],
+            "DOMAIN-SUFFIX,stripe.com": ["acl4ssr", "v2fly"],
+        })
+        self.assertNotIn("DOMAIN-SUFFIX,chatgpt.com", excluded)
+
+    def test_initial_review_baseline_never_realerts_all_old_rules(self):
+        before = {"statistics": self.stats, "sources": {}, "settings": {}}
+        after = {**before, "review": {"excluded_auto_rules": [
+            "DOMAIN-SUFFIX,stripe.com", "DOMAIN,old-service.example"
+        ]}}
+        report = build.make_sync_report(before, after, "", "", False)
+        self.assertTrue(report["excluded_review_baseline_created"])
+        self.assertEqual(report["excluded_review_total"], 2)
+        self.assertEqual(report["new_excluded_candidates"], [])
+        message = notify_telegram.format_report(
+            report, "push", "", "", when="2026-10-12 14:00"
+        )
+        self.assertIn("基线已建立", message)
+        self.assertIn("不计为新增", message)
+
+    def test_future_new_rejected_candidate_is_reported_with_sources(self):
+        before = {"statistics": self.stats, "sources": {}, "settings": {},
+                  "review": {"excluded_auto_rules": [
+                      "DOMAIN-SUFFIX,stripe.com", "DOMAIN,old-service.example"
+                  ]}}
+        after = {**before, "review": {"excluded_auto_rules": [
+            "DOMAIN-SUFFIX,stripe.com", "DOMAIN,new-service.example"
+        ]}}
+        report = build.make_sync_report(
+            before, after, "", "", False,
+            excluded_sources={"DOMAIN,new-service.example": ["metacubex", "v2fly"]},
+        )
+        self.assertFalse(report["excluded_review_baseline_created"])
+        self.assertEqual(report["new_excluded_candidates"], [
+            {"rule": "DOMAIN,new-service.example", "sources": ["metacubex", "v2fly"]}
+        ])
+        message = notify_telegram.format_report(
+            report, "schedule", "", "", when="2026-10-13 11:30"
+        )
+        self.assertIn("DOMAIN,new-service.example", message)
+        self.assertIn("MetaCubeX", message)
+        self.assertIn("v2fly", message)
+        self.assertIn("未自动分流", message)
+        self.assertNotIn("old-service.example", message)
+
+    def test_review_existing_exclusions_does_not_spam(self):
+        state = {"statistics": self.stats, "sources": {}, "settings": {},
+                 "review": {"excluded_auto_rules": ["DOMAIN-SUFFIX,stripe.com"]}}
+        report = build.make_sync_report(state, state, "", "", False)
+        self.assertFalse(report["excluded_review_baseline_created"])
+        self.assertFalse(report["new_excluded_candidates"])
+        message = notify_telegram.format_report(
+            report, "schedule", "", "", when="2026-10-13 11:30"
+        )
+        self.assertIn("上游新增待审核规则：无", message)
+
     def test_upstream_download_one_retry_then_success(self):
         class GoodResponse:
             status = 200
