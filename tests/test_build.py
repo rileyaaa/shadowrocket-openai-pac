@@ -59,6 +59,28 @@ class BuildTest(unittest.TestCase):
             with self.subTest(shared=shared):
                 self.assertNotIn(shared, result)
 
+    def test_verified_openai_showcase_domains_are_precise(self):
+        manual = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        for rule in (
+            "DOMAIN-SUFFIX,openai.fm",
+            "DOMAIN,chatkit.world",
+            "DOMAIN,openai-photobooth-demo.vercel.app",
+            "DOMAIN,openai-realtime-solar-system-demo.vercel.app",
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, manual)
+                self.assertTrue(build.is_openai_specific_rule(rule))
+        self.assertTrue(build.domain_rule_covers(
+            "DOMAIN-SUFFIX,openai.fm", "DOMAIN,www.openai.fm"
+        ))
+        for unrelated in (
+            "DOMAIN-SUFFIX,vercel.app",
+            "DOMAIN,unrelated-project.vercel.app",
+            "DOMAIN-SUFFIX,chatkit.world",
+        ):
+            with self.subTest(unrelated=unrelated):
+                self.assertFalse(build.is_openai_specific_rule(unrelated))
+
     def test_current_official_openai_first_party_hosts(self):
         # First-party / dedicated hostnames from OpenAI's network guidance
         # and Codex cloud agent documentation as checked 2026-10-12.

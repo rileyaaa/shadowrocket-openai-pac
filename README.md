@@ -71,7 +71,9 @@ python scripts/build.py
 
 报告记录：触发来源、变化的上游、规则数量与变化量、新增和删除的自动规则示例及 Actions 运行链接。相同摘要也写入 Actions Summary。
 
-在私有仓库 Settings → Secrets and variables → Actions → New repository secret 创建名为 TELEGRAM_BOT_TOKEN 的 Secret，存放从 BotFather 获得的 Bot Token。目标 Chat ID 已在工作流环境变量 TELEGRAM_CHAT_ID 中设置。先向自己的机器人发送 /start，确保它可以发消息。即使是私有仓库也**不要直接将 Bot Token 提交到任何项目文件或 Git 历史**。若旧 Token 曾在聊天中暴露，建议撤销旧 Token 并换新后再放入 Secret。
+在仓库 Settings → Secrets and variables → Actions → New repository secret 创建两条密钥：`TELEGRAM_BOT_TOKEN`（BotFather Token）以及 `TELEGRAM_CHAT_ID`（个人 Telegram Chat ID）。两者均由 GitHub Secrets 注入，不再在当前工作流里写明文 Chat ID。先向自己的机器人发送 /start，确保它可以发消息。即使是私有仓库也不要直接把 Token 或 Chat ID 写入源码。若旧 Token 曾在聊天中暴露，建议撤销旧 Token 并更换为新 Token。
+
+**准备公开仓库时特别注意：旧提交的 Git 历史中已经出现过 Chat ID。改成 Secret 仅保护之后的提交，并不能删除历史记录。若要求 Chat ID 连历史也不可见，应使用经过清理的新公开仓库，保留现有仓库私有；不要误以为改变 Secret 就能抹除旧历史。**
 
 未设置 Secret 时，Actions 同步正常，摘要照样生成，但 Telegram 步骤会提示未配置并跳过发送。Telegram 发送暂时失败最多重试 3 次；发送异常不影响已经成功发布的配置。
 
@@ -80,3 +82,20 @@ python scripts/build.py
 每次与已发布的 data/sources.json 数量对比：Voice IP 下降超过 30% 或增长超过 100%，自动 OpenAI 域名下降超过 25% 或增长超过 100%，Johnshall 规则行数、原 Proxy 映射、广告拦截数量下降超过 15% 或增长超过 50% 时，拒绝本次发布；这些比例是审查阈值，不代表真实上游永远不会出现合理的大变更。
 
 触发保护时构建失败，旧的完整 .conf 保留不变，不会发送“成功”消息。核实合法变更后再调整阈值。原有双层 OpenAI 规则结构和 Johnshall 分流架构不变。
+
+## OpenAI 官方演示域名的补充（2026-10-12）
+
+以下已核对 OpenAI 官方 Developer Showcase，加入独立手工规则层，并保持自动规则层不变：
+
+- `DOMAIN-SUFFIX,openai.fm`：OpenAI 官方语音合成体验站，包含实际跳转的 `www.openai.fm`。
+- `DOMAIN,chatkit.world`：官方 ChatKit 演示站，只允许完整主机。
+- `DOMAIN,openai-photobooth-demo.vercel.app`：官方图像 Photobooth 演示站。
+- `DOMAIN,openai-realtime-solar-system-demo.vercel.app`：官方 Realtime Solar System 演示站。
+
+官方来源：https://developers.openai.com/showcase/openai-fm 、https://developers.openai.com/showcase/chatkit-world 、https://developers.openai.com/showcase/openai-imagegen-demo 、https://developers.openai.com/showcase/solar-system-demo 。
+
+未引入 `DOMAIN-SUFFIX,vercel.app` 等共享平台规则。新域名只加入维护中的独立手工兜底，自动规则仍严格来自官方 Voice 目的 IP 与原四份社区规则；两层规则不会互相去重。
+
+## 上游下载失败重试
+
+全部六个上游下载现在采用最多两次请求（初次失败后延迟 2 秒重试 1 次），包括 HTTP/网络错误与响应截断；两次都失败则停止构建并保留上一次成功发布的 `.conf`。域名解析与规则格式校验仍会失败关闭，不会用损坏数据代替完整配置。

@@ -9,6 +9,11 @@
 # HY's broad udp/3478 catch-all remains archived, since it catches other apps.
 
 # OpenAI first-party and dedicated infrastructure
+# Verified OpenAI-operated showcase sites (do not include generic vercel.app)
+DOMAIN-SUFFIX,openai.fm
+DOMAIN,chatkit.world
+DOMAIN,openai-photobooth-demo.vercel.app
+DOMAIN,openai-realtime-solar-system-demo.vercel.app
 DOMAIN-SUFFIX,openai.com
 DOMAIN-SUFFIX,oaistatic.com
 DOMAIN-SUFFIX,oaiusercontent.com

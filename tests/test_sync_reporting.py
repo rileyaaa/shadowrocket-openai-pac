@@ -70,6 +70,50 @@ class SyncReportTests(unittest.TestCase):
         self.assertIn("检查成功，无变化", text)
         self.assertIn("定时运行", text)
 
+    def test_upstream_download_one_retry_then_success(self):
+        class GoodResponse:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, size):
+                return b"valid source content"
+        import urllib.error
+        with patch(
+            "build.urllib.request.urlopen",
+            side_effect=[urllib.error.URLError("temporary outage"), GoodResponse()],
+        ) as urlopen, patch("build.time.sleep") as sleep:
+            self.assertEqual(build.fetch("https://upstream.example/source", minimum=5), b"valid source content")
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_upstream_download_second_failure_is_fatal(self):
+        import urllib.error
+        with patch(
+            "build.urllib.request.urlopen",
+            side_effect=urllib.error.URLError("unavailable"),
+        ) as urlopen, patch("build.time.sleep") as sleep:
+            with self.assertRaises(urllib.error.URLError):
+                build.fetch("https://upstream.example/source", minimum=5)
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+    def test_upstream_truncated_response_also_retries_once(self):
+        class TooShort:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, size):
+                return b"x"
+        with patch("build.urllib.request.urlopen", return_value=TooShort()) as urlopen, patch("build.time.sleep") as sleep:
+            with self.assertRaisesRegex(ValueError, "Truncated or oversized"):
+                build.fetch("https://upstream.example/source", minimum=5)
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(2)
+
     def test_telegram_is_post_payload_with_chat_id(self):
         class Fake:
             def __enter__(self):

@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import ipaddress
 import json
 from pathlib import Path
 import re
 import sys
+import time
 import urllib.request
 from urllib.parse import quote
 
@@ -35,6 +37,7 @@ OPENAI_SPECIFIC_SUFFIXES = frozenset({
     "oaistatic.com", "oaistatsig.com", "oaiusercontent.com",
     "sora.com", "crixet.com", "chatgpt.livekit.cloud",
     "openai.com.cdn.cloudflare.net",
+    "openai.fm",  # Official OpenAI speech demo; includes www.openai.fm
 })
 OPENAI_SPECIFIC_HOSTS = frozenset({
     "openaiapi-site.azureedge.net",
@@ -47,6 +50,9 @@ OPENAI_SPECIFIC_HOSTS = frozenset({
     "openai-api.arkoselabs.com",
     "openai.qualtrics.com",
     "chat.openai.com.cdn.cloudflare.net",
+    "chatkit.world",  # Official ChatKit showcase
+    "openai-photobooth-demo.vercel.app",  # Exact OpenAI showcase host
+    "openai-realtime-solar-system-demo.vercel.app",  # Exact OpenAI showcase host
 })
 OPENAI_SPECIFIC_WILDCARDS = frozenset({
     "chatgpt-async-webps-prod-*.webpubsub.azure.com",
@@ -107,14 +113,31 @@ def render_dns(settings: dict[str, str]) -> str:
 
 
 def fetch(url: str, minimum: int = 50) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "shadowrocket-openai-pac/1.0", "Accept": "*/*"})
-    with urllib.request.urlopen(request, timeout=75) as response:
-        content = response.read(13_000_000)
-        if not 200 <= response.status < 300:
-            raise ValueError(f"Unexpected HTTP status for {url}: {response.status}")
-        if not minimum <= len(content) < 13_000_000:
-            raise ValueError(f"Truncated or oversized data from {url}: {len(content)}")
-        return content
+    """Download an upstream; one retry for network, HTTP or truncated responses.
+
+    Both failed attempts abort publication. Never fall back to incomplete data.
+    """
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "shadowrocket-openai-pac/1.0", "Accept": "*/*"}
+    )
+    for attempt in range(2):  # initial request + exactly one retry
+        try:
+            with urllib.request.urlopen(request, timeout=75) as response:
+                content = response.read(13_000_000)
+                if not 200 <= response.status < 300:
+                    raise ValueError(f"Unexpected HTTP status for {url}: {response.status}")
+                if not minimum <= len(content) < 13_000_000:
+                    raise ValueError(f"Truncated or oversized data from {url}: {len(content)}")
+                return content
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            if attempt:
+                raise
+            print(
+                f"Upstream fetch failed ({type(exc).__name__}); retrying once: {url}",
+                file=sys.stderr,
+            )
+            time.sleep(2)
+    raise AssertionError("Unreachable upstream retry state")
 
 
 def domain_rule(kind: str, value: str) -> str:

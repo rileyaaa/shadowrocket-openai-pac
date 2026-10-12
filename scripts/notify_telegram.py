@@ -95,11 +95,12 @@ def main() -> int:
         with open(summary_path, "a", encoding="utf-8") as summary:
             summary.write("## Shadowrocket 同步成功摘要\n\n~~~text\n" + message + "\n~~~\n")
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-    if not token:
-        print("::warning::TELEGRAM_BOT_TOKEN Actions Secret is missing; report not sent.")
-        return 0
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat_id:
+        print("::warning::Missing Telegram Actions Secret(s): TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID; report not sent.")
+        return 1
     try:
-        send(token, os.environ.get("TELEGRAM_CHAT_ID", ""), message)
+        send(token, chat_id, message)
     except (RuntimeError, ValueError):
         print("::warning::Telegram message not sent; check Secret, chat ID, and /start.")
         return 1
