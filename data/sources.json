@@ -26,16 +26,16 @@
     }
   },
   "statistics": {
-    "auto_input_rules": 22,
+    "auto_input_rules": 20,
     "automatic_openai_domains": 19,
-    "cross_layer_duplicate_rules_retained": 16,
-    "excluded_shared_auto_domains": 22,
+    "cross_layer_duplicate_rules_retained": 18,
+    "excluded_shared_auto_domains": 24,
     "johnshall_lines": 87212,
     "manual_backup_rules": 22,
     "manual_openai_rules": 22,
     "mapped_proxy_to_kr": 30239,
     "retained_ad_rules": 56886,
-    "suppressed_redundant_auto_rules": 3,
+    "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "voice_prefixes": 23
   }
