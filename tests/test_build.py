@@ -86,8 +86,8 @@ class BuildTest(unittest.TestCase):
             "DOMAIN-SUFFIX,livekit.cloud",
             "DOMAIN-SUFFIX,production.livekit.cloud",
             "DOMAIN-SUFFIX,rtc.livekit.cloud",
-            "DOMAIN,cdn.workos.com",
-            "DOMAIN,challenges.cloudflare.com",
+            "DOMAIN-SUFFIX,workos.com",
+            "DOMAIN-SUFFIX,cloudflare.com",
         ):
             with self.subTest(too_broad=too_broad):
                 self.assertFalse(build.is_openai_specific_rule(too_broad))
