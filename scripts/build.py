@@ -40,13 +40,9 @@ dns-direct-fallback-proxy = false
 hijack-dns = 8.8.8.8:53,8.8.4.4:53,1.1.1.1:53,1.0.0.1:53,223.5.5.5:53,223.6.6.6:53
 """
 DNS_KEYS = {line.partition("=")[0].strip() for line in DNS.splitlines() if "=" in line and not line.startswith("#")}
-# Used only when the corresponding exact node name has not been configured.
-DEFAULT_NODE_FILTERS = {
-    "jp": "(?i)(日本|东京|東京|大阪|Japan|Tokyo|Osaka|JP)",
-    "kr": "(?i)(韩国|韓國|首尔|首爾|Korea|Seoul|KR)",
-}
+# Two exact Shadowrocket node names, no proxy groups or automatic node selection.
 SETTINGS_PATH = ROOT / "config/user-settings.json"
-SETTING_KEYS = {"jp_node_name", "kr_node_name", "jp_policy_name", "kr_policy_name"}
+SETTING_KEYS = {"jp_node_name", "kr_node_name"}
 RESERVED_POLICIES = {
     "DIRECT", "PROXY", "REJECT", "REJECT-DROP", "REJECT-NO-DROP",
     "FINAL", "PASS", "GLOBAL", "SYSTEM", "NONE",
@@ -54,55 +50,28 @@ RESERVED_POLICIES = {
 
 
 def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
-    """Read node names from versioned user config, not from generated output."""
+    """Fail safely when the two exact node names are absent or ambiguous."""
     data = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict) or set(data) != SETTING_KEYS:
         raise ValueError(f"Expected exactly these settings: {sorted(SETTING_KEYS)}")
     for key, value in data.items():
-        if not isinstance(value, str):
-            raise ValueError(f"{key} must be a string")
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{key} must be a nonempty node name")
         if value != value.strip():
             raise ValueError(f"{key} has leading/trailing whitespace")
-        if any(ord(c) < 32 or c in {",", "=", "#", "\\"} for c in value):
+        if any(ord(char) < 32 or char in {",", "=", "#", "\\\\"} for char in value):
             raise ValueError(f"{key} contains unsafe Shadowrocket syntax characters")
-        if key.endswith("_policy_name") and not value:
-            raise ValueError(f"{key} cannot be empty")
-    jp, kr = data["jp_policy_name"], data["kr_policy_name"]
-    if jp.casefold() == kr.casefold():
-        raise ValueError("JP and KR policy names cannot be identical")
-    if jp.upper() in RESERVED_POLICIES or kr.upper() in RESERVED_POLICIES:
-        raise ValueError("Policy names cannot override Shadowrocket built-in actions")
-    if any(node and node.casefold() in {jp.casefold(), kr.casefold()}
-           for node in (data["jp_node_name"], data["kr_node_name"])):
-        raise ValueError("Node names must not collide with JP/KR policy names")
-    if data["jp_node_name"] and data["jp_node_name"] == data["kr_node_name"]:
+        if value.upper() in RESERVED_POLICIES:
+            raise ValueError(f"{key} cannot be a built-in policy")
+    if data["jp_node_name"].casefold() == data["kr_node_name"].casefold():
         raise ValueError("JP and KR must not point to the same exact node")
     return data
 
 
-def render_groups(settings: dict[str, str]) -> str:
-    lines = [
-        "[Proxy Group]",
-        "# Auto-generated from config/user-settings.json.",
-        "# Exact node name (when set) takes precedence over the country regex.",
-        "# No KR/DIRECT option is added to the OpenAI policy.",
-    ]
-    for prefix in ("jp", "kr"):
-        group = settings[f"{prefix}_policy_name"]
-        node = settings[f"{prefix}_node_name"]
-        if node:
-            # One explicitly named node, preselected by Shadowrocket.
-            lines.append(f"{group} = select,{node},policy-select-name={node}")
-        else:
-            lines.append(f"{group} = select,policy-regex-filter={DEFAULT_NODE_FILTERS[prefix]}")
-    return "\n".join(lines) + "\n"
-
-
 def render_dns(settings: dict[str, str]) -> str:
-    # Shadowrocket requires URL-encoded policy names in DoH #proxy=.
-    encoded = quote(settings["jp_policy_name"], safe="")
+    # DoH #proxy= points directly at the actual Japan node name.
+    encoded = quote(settings["jp_node_name"], safe="")
     return DNS.replace("#proxy=JP", f"#proxy={encoded}")
-
 
 
 def fetch(url: str, minimum: int = 50) -> bytes:
@@ -202,8 +171,8 @@ def split_base(source: str):
 
 def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None):
     settings = settings if settings is not None else load_settings()
-    jp_policy = settings["jp_policy_name"]
-    kr_policy = settings["kr_policy_name"]
+    jp_node = settings["jp_node_name"]
+    kr_node = settings["kr_node_name"]
     if len(base.encode()) < 1_000_000 or len(base.splitlines()) < 50_000:
         raise ValueError("Johnshall config is unexpectedly small")
     banner, general, original_rules, tail = split_base(base)
@@ -216,7 +185,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         if not line.lstrip().startswith("#") and line.strip():
             if re.search(r",reject(?:,|$)", line, re.I):
                 before_ads += 1
-            line, count = PROXY_POLICY.subn(lambda _: f",{kr_policy}", line)
+            line, count = PROXY_POLICY.subn(lambda _: f",{kr_node}", line)
             converted += count
         changed.append(line)
     if converted < 10000 or before_ads < 20000:
@@ -226,21 +195,20 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
     if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
         raise ValueError("Unconverted original Proxy rule found")
     # IP rule priority first. This only covers official voice IPs, NOT all of OpenAI.
-    jp_ip_rules = [f"{rule},{jp_policy},no-resolve" for rule in ips]
-    jp_auto_domains = [f"{rule},{jp_policy}" for rule in domains]
-    jp_manual = [f"{rule},{jp_policy}" for rule in manual]
+    jp_ip_rules = [f"{rule},{jp_node},no-resolve" for rule in ips]
+    jp_auto_domains = [f"{rule},{jp_node}" for rule in domains]
+    jp_manual = [f"{rule},{jp_node}" for rule in manual]
     result = (
         banner + "# Automatically generated from Johnshall; do not edit output directly.\n"
         + "# Source: rileyaaa/shadowrocket-openai-pac, daily checked by GitHub Actions.\n"
-        + f"# {jp_policy} = OpenAI, {kr_policy} = other original Proxy, original REJECT/DIRECT kept.\n\n"
+        + f"# {jp_node} = OpenAI, {kr_node} = original Proxy, original REJECT/DIRECT kept.\n\n"
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
-        + render_groups(settings) + "\n"
         + "[Rule]\n"
         + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
         + "# [2] OpenAI automatically maintained domain rules\n" + "\n".join(jp_auto_domains) + "\n\n"
         + "# [3] Complete custom HY ACL fallback, including broad UDP/3478\n"
         + "\n".join(jp_manual) + "\n\n"
-        + "# [4] Johnshall complete original rules, Proxy policies mapped to configured KR policy\n"
+        + "# [4] Johnshall complete original rules, Proxy policies mapped to exact KR node\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
     )
     assert result.count("[Rule]") == 1
