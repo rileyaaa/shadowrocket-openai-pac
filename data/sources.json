@@ -1,4 +1,10 @@
 {
+  "settings": {
+    "jp_node_name": "",
+    "jp_policy_name": "JP",
+    "kr_node_name": "",
+    "kr_policy_name": "KR"
+  },
   "sources": {
     "acl4ssr": {
       "sha256": "c4f839e4dda6cb96e4373349c72b4e5f848b8ae03564c0d0eae0873955310129",
