@@ -16,7 +16,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 
 | 优先顺序 | 目标 | 动作 |
 |---|---|---|
-| 1 | OpenAI 官方 `chatgpt-voice.json` IP，**仅 UDP/3478** | `JP` |
+| 1 | OpenAI 官方 `chatgpt-voice.json` IP，IP-only 连接优先匹配（不限定协议） | `JP` |
 | 2 | 自动维护 OpenAI 域名：MetaCubeX GeoSite、ACL4SSR、blackmatrix7 的域名条目 | `JP` |
 | 3 | `config/manual-openai.rules`：原 HY ACL **完整手工兜底**，含 ChatGPT、OpenAI API、Sora、Codex、WorkOS、LiveKit 等 | `JP` |
 | 4 | 原版 Johnshall 87k 左右规则中的 `Proxy/PROXY` | `KR` |
@@ -25,7 +25,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 
 > 注意：第 4～6 项保持上游规则的**原始相对顺序**，并非所有 `REJECT` 规则都排在 `KR` 规则之前。若同一目标同时匹配多个规则，依照小火箭的实际规则优先级生效。若是新出现且所有 JP 规则都不认识的 OpenAI 域名，仍有漏匹配可能；没有人可以保证掌握尚未公布的全部域名。
 
-**IP 解释：** OpenAI 公开的 `chatgpt-voice.json` 只覆盖 ChatGPT 语音连接服务器，不是所有 OpenAI 产品的全量目标 IP。不会把 Cloudflare、Azure 或其他 AI 公司整段 ASN 误当成 OpenAI。手工保留 `AND,((PROTOCOL,UDP),(DST-PORT,3478)),JP` 的宽松兜底，其他应用的 UDP 3478 也可能被导入 JP（偏向宁可多走 JP）。
+**IP 解释：** OpenAI 公开的 `chatgpt-voice.json` 只覆盖 ChatGPT 语音连接服务器，不是所有 OpenAI 产品的全量目标 IP。不会把 Cloudflare、Azure 或其他 AI 公司整段 ASN 误当成 OpenAI。官方 Voice IP 条目使用 `no-resolve`，只有目的地址为该 IP 的连接才匹配，不会为了套用 IP 表而先解析全部域名。手工保留 `AND,((PROTOCOL,UDP),(DST-PORT,3478)),JP` 的宽松兜底，其他应用的 UDP 3478 也可能被导入 JP（偏向宁可多走 JP）。
 
 ## DNS（加密、防污染）
 
