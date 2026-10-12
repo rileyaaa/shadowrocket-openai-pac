@@ -3,8 +3,9 @@
 # Only remove an active manual rule if another ACTIVE rule INSIDE THIS FILE
 # provably covers all its destinations; never compare against automatic rules.
 # The generator adds the configured OpenAI node name; do NOT put it here.
-# Shared third-party HY entries stay archived below as comments, not deleted:
-# using a shared host cannot identify whether ChatGPT or another site called it.
+# Shared third-party HY entries remain archived below, except the two
+# intentionally enabled LiveKit TURN endpoint suffixes. They are multi-tenant
+# and also redirect unrelated LiveKit applications to the OpenAI node.
 # HY's geosite:openai comes from the independently updated automatic source.
 # HY's broad udp/3478 catch-all remains archived, since it catches other apps.
 
@@ -32,6 +33,9 @@ DOMAIN-SUFFIX,chatgpt.com
 DOMAIN-SUFFIX,chatgpt.site
 DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com
 DOMAIN-SUFFIX,chatgpt.livekit.cloud
+# LiveKit TURN/UDP and TURN/TLS - intentionally shared, user-approved exception
+DOMAIN-SUFFIX,host.livekit.cloud
+DOMAIN-SUFFIX,turn.livekit.cloud
 DOMAIN,cdn.openaimerge.com
 DOMAIN,openai.qualtrics.com
 DOMAIN,chat.openai.com.cdn.cloudflare.net
@@ -39,8 +43,6 @@ DOMAIN,openai-api.arkoselabs.com
 
 # ---- Original HY references: NOT ACTIVE (shared/non-exclusive third-party) ----
 # Enabling any entry below also sends other apps using that domain to the OpenAI node.
-# DOMAIN-SUFFIX,host.livekit.cloud
-# DOMAIN-SUFFIX,turn.livekit.cloud
 # DOMAIN,cdn.workos.com
 # DOMAIN,forwarder.workos.com
 # DOMAIN,setup.workos.com

@@ -36,6 +36,9 @@ OPENAI_SPECIFIC_SUFFIXES = frozenset({
     "openai.com", "chatgpt.com", "chatgpt.site", "chat.com",
     "oaistatic.com", "oaistatsig.com", "oaiusercontent.com",
     "sora.com", "crixet.com", "chatgpt.livekit.cloud",
+    # Explicitly requested shared LiveKit TURN endpoint exceptions.
+    # These may also route OTHER LiveKit customer traffic via OpenAI node.
+    "host.livekit.cloud", "turn.livekit.cloud",
     "openai.com.cdn.cloudflare.net",
     "openai.fm",  # Official OpenAI speech demo; includes www.openai.fm
 })

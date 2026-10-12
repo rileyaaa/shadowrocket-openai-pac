@@ -42,6 +42,7 @@ class BuildTest(unittest.TestCase):
             "DOMAIN-SUFFIX,sentry.io",
             "DOMAIN-SUFFIX,statsig.com",
             "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-SUFFIX,turn.livekit.cloud",
             "DOMAIN-KEYWORD,openai",
             "DOMAIN,static.cloudflareinsights.com",
             "DOMAIN-SUFFIX,algolia.net",
@@ -49,15 +50,49 @@ class BuildTest(unittest.TestCase):
         result = build.filter_auto_domains(raw)
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com", result)
         self.assertIn("DOMAIN,openaiassets.blob.core.windows.net", result)
+        self.assertIn("DOMAIN-SUFFIX,host.livekit.cloud", result)
+        self.assertIn("DOMAIN-SUFFIX,turn.livekit.cloud", result)
         for shared in (
             "DOMAIN-SUFFIX,auth0.com", "DOMAIN-SUFFIX,stripe.com",
             "DOMAIN-SUFFIX,intercom.io", "DOMAIN-SUFFIX,sentry.io",
-            "DOMAIN-SUFFIX,statsig.com", "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-SUFFIX,statsig.com",
             "DOMAIN-KEYWORD,openai", "DOMAIN,static.cloudflareinsights.com",
             "DOMAIN-SUFFIX,algolia.net",
         ):
             with self.subTest(shared=shared):
                 self.assertNotIn(shared, result)
+
+    def test_shared_livekit_turn_is_narrow_explicit_exception(self):
+        # The two vendor TURN subdomains were deliberately opted in; never
+        # broaden to *.livekit.cloud or all UDP/3478 for unrelated apps.
+        approved = (
+            "DOMAIN-SUFFIX,host.livekit.cloud",
+            "DOMAIN-SUFFIX,turn.livekit.cloud",
+        )
+        active = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        for rule in approved:
+            with self.subTest(rule=rule):
+                self.assertTrue(build.is_openai_specific_rule(rule))
+                self.assertIn(rule, active)
+                self.assertIn(rule, build.filter_auto_domains(
+                    ["DOMAIN-SUFFIX,openai.com", "DOMAIN-SUFFIX,chatgpt.com",
+                     "DOMAIN-SUFFIX,oaistatic.com", "DOMAIN-SUFFIX,oaiusercontent.com",
+                     "DOMAIN-SUFFIX,oaistatsig.com", "DOMAIN-SUFFIX,sora.com",
+                     "DOMAIN-SUFFIX,chat.com", "DOMAIN-SUFFIX,crixet.com",
+                     "DOMAIN-SUFFIX,chatgpt.site", "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+                     rule]
+                ))
+        for too_broad in (
+            "DOMAIN-SUFFIX,livekit.cloud",
+            "DOMAIN-SUFFIX,production.livekit.cloud",
+            "DOMAIN-SUFFIX,rtc.livekit.cloud",
+            "DOMAIN,cdn.workos.com",
+            "DOMAIN,challenges.cloudflare.com",
+        ):
+            with self.subTest(too_broad=too_broad):
+                self.assertFalse(build.is_openai_specific_rule(too_broad))
+                self.assertNotIn(too_broad, active)
+        self.assertNotIn("AND,((PROTOCOL,UDP),(DST-PORT,3478))", active)
 
     def test_verified_openai_showcase_domains_are_precise(self):
         manual = build.parse_manual(build.ROOT / "config/manual-openai.rules")

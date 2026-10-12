@@ -36,7 +36,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - `DOMAIN-SUFFIX,chatgpt.com` 已覆盖 `ws.chatgpt.com`，包括 Codex 使用的 ChatGPT WebSocket 目的域名；`chatgpt.site` 为不同域，必须另留。OpenAI 官方确认 ChatGPT Sites 使用 `*.chatgpt.site` 子域。
 - `DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com` 是 ChatGPT 专用 Azure Web PubSub 主机匹配，不是 `*.azure.com` 或通用云域名。
 - `openai-api.arkoselabs.com`、`openai.qualtrics.com`、`cdn.openaimerge.com` 等可明确识别的主机只使用精确 `DOMAIN`。不要无证据扩大为 `DOMAIN-SUFFIX,arkoselabs.com` 等第三方整站。
-- 你 HY 原文里的 WorkOS、Stripe、Intercom、Sentry、LiveKit 通用域名、Statsig / Feature Gates、Cloudflare 验证、Apple 检测等**仍完整保存在手工源文件的注释区**，未丢失；但它们是共享服务，不能仅凭域名断定某次连接属于 OpenAI，因此**不默认强制日本**。官方“允许访问清单”不等于“OpenAI 独占域名清单”。
+- 你 HY 原文里的 WorkOS、Stripe、Intercom、Sentry、Statsig / Feature Gates、Cloudflare 验证、Apple 检测等共享依赖仍保留为注释，不默认走 OpenAI 专用节点。**例外：`host.livekit.cloud`、`turn.livekit.cloud` 根据你对 Voice 连通性的明确优先选择，现已启用**，因此可能把其他使用 LiveKit 的应用也转到 OpenAI 出口。官方“允许访问清单”不等于“OpenAI 独占域名清单”。
 - `gpt(all, udp/3478)` 会误伤其他应用的 UDP 3478。改为自动更新的官方 Voice 目的 IP，不能把“所有 UDP/3478”直接划为 OpenAI。
 - **截至 2026-10，Sora 产品和 API 已停止服务**；`sora.com` 仍按你要求保留为历史兼容规则，不代表该服务仍在线。
 
@@ -110,3 +110,12 @@ python scripts/build.py
 - 这些规则只用于人工审核，从未自动加入 .conf、自动列表或手工兜底。共享第三方域名不会因为出现在上游就被直接导向 OpenAI 节点。
 
 没有新增定时任务，继续随每天 11:30、手动和配置修改触发的 GitHub Actions 成功运行后推送。
+
+## LiveKit TURN 路由的明确例外（2026-10-12）
+
+经过使用者明确选择，为尽量覆盖 ChatGPT Voice 相关的 TURN 连接，将 `DOMAIN-SUFFIX,host.livekit.cloud` 与 `DOMAIN-SUFFIX,turn.livekit.cloud` 同时添加到自动允许列表及独立手工兜底。它们是 LiveKit **共享云服务**，并非 OpenAI 独占；其他应用经这些子域进行的 WebRTC/TURN 流量也可能改走 OpenAI 专用节点，可能影响其他应用的延迟、出口地区或 UDP 连接质量。
+
+LiveKit 官方网络说明：`*.host.livekit.cloud` 主要涉及 UDP/3478 TURN，`*.turn.livekit.cloud` 主要涉及 TCP/443 TURN/TLS（https://docs.livekit.io/deploy/admin/firewall/）。本项目没有新增 `DOMAIN-SUFFIX,livekit.cloud`、通用 UDP/3478 或 IP/ASN 一刀切规则。原官方 ChatGPT Voice 目标 IP、其他 OpenAI 分流与 Johnshall 剩余规则不变。
+
+启用后应在 Shadowrocket 里测试 ChatGPT Voice 和可能使用 LiveKit 的其他实时通话软件。如果其他应用出现通话故障、延迟增大或出口误路由，可撤销这两项例外恢复原策略。
+
