@@ -121,6 +121,52 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("DOMAIN-SUFFIX,statsig.com", rules)
         self.assertNotIn("AND,((PROTOCOL,UDP),(DST-PORT,3478))", rules)
 
+    def test_parent_suffix_redundancy_and_fallback_recovery(self):
+        auto = [
+            "DOMAIN-SUFFIX,openai.com",
+            "DOMAIN,api.openai.com",
+            "DOMAIN,openaiapi-site.azureedge.net",
+            "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
+            "DOMAIN-SUFFIX,chatgpt.com",
+            "DOMAIN,ws.chatgpt.com",
+            "DOMAIN-SUFFIX,oaistatic.com",
+            "DOMAIN-SUFFIX,oaiusercontent.com",
+            "DOMAIN-SUFFIX,oaistatsig.com",
+            "DOMAIN-SUFFIX,sora.com",
+            "DOMAIN-SUFFIX,chat.com",
+            "DOMAIN-SUFFIX,crixet.com",
+            "DOMAIN-SUFFIX,chatgpt.site",
+        ]
+        manual = [
+            "DOMAIN-SUFFIX,openai.com",
+            "DOMAIN,login.openai.com",
+            "DOMAIN,openaiapi-site.azureedge.net",
+            "DOMAIN,cdn.openaimerge.com",
+            "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+        ]
+        compact_auto, compact_manual = build.compact_openai_rules(auto, manual)
+        self.assertIn("DOMAIN-SUFFIX,openai.com", compact_auto)
+        self.assertIn("DOMAIN-SUFFIX,openaiapi-site.azureedge.net", compact_auto)
+        self.assertNotIn("DOMAIN,api.openai.com", compact_auto)
+        self.assertNotIn("DOMAIN,login.openai.com", compact_manual)
+        self.assertNotIn("DOMAIN,openaiapi-site.azureedge.net", compact_auto)
+        self.assertNotIn("DOMAIN,openaiapi-site.azureedge.net", compact_manual)
+        self.assertEqual(compact_manual, [
+            "DOMAIN,cdn.openaimerge.com",
+            "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+        ])
+        # When upstream removes a suffix, the manual fallback returns.
+        fewer = [r for r in auto if r != "DOMAIN-SUFFIX,openai.com"]
+        out_auto, out_manual = build.compact_openai_rules(fewer, manual)
+        self.assertIn("DOMAIN-SUFFIX,openai.com", out_manual)
+        self.assertNotIn("DOMAIN,login.openai.com", out_manual)
+        self.assertFalse(build.domain_rule_covers(
+            "DOMAIN,openai.com", "DOMAIN,login.openai.com"
+        ))
+        self.assertFalse(build.domain_rule_covers(
+            "DOMAIN-SUFFIX,openai.com", "DOMAIN,notopenai.com"
+        ))
+
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
             "jp_node_name": "日本JP",
