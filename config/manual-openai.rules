@@ -1,4 +1,10 @@
-# Converted from original HY gpt(...) ACL. The builder appends ,JP to each rule.
+# Only OpenAI-specific destinations override Johnshall and use the Japan node.
+# The build script adds the Japan node name automatically.
+# Your complete original HY rule references are preserved at the bottom,
+# but shared third-party destinations are COMMENTED OUT to keep original routing.
+# OpenAI Voice IP addresses are still updated from OpenAI's official JSON.
+
+# OpenAI first-party and dedicated infrastructure
 DOMAIN-SUFFIX,openai.com
 DOMAIN-SUFFIX,oaistatic.com
 DOMAIN-SUFFIX,oaiusercontent.com
@@ -17,33 +23,35 @@ DOMAIN-SUFFIX,chatgpt.com
 DOMAIN-SUFFIX,chatgpt.site
 DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com
 DOMAIN-SUFFIX,chatgpt.livekit.cloud
-DOMAIN-SUFFIX,host.livekit.cloud
-DOMAIN-SUFFIX,turn.livekit.cloud
 DOMAIN,cdn.openaimerge.com
-DOMAIN,cdn.workos.com
-DOMAIN,forwarder.workos.com
-DOMAIN,setup.workos.com
-DOMAIN,images.workoscdn.com
-DOMAIN,workos.imgix.net
-DOMAIN,challenges.cloudflare.com
-DOMAIN,humb.apple.com
-DOMAIN-SUFFIX,intercom.io
-DOMAIN-SUFFIX,intercomcdn.com
-DOMAIN-SUFFIX,ct.sendgrid.net
-DOMAIN,js.stripe.com
-DOMAIN,o207216.ingest.sentry.io
-DOMAIN,o33249.ingest.sentry.io
-DOMAIN,browser-intake-datadoghq.com
-DOMAIN,rum.browser-intake-datadoghq.com
 DOMAIN,openai.qualtrics.com
-DOMAIN-SUFFIX,statsig.com
-DOMAIN-SUFFIX,statsigapi.net
-DOMAIN-SUFFIX,featuregates.org
-DOMAIN-SUFFIX,featureassets.org
-DOMAIN-SUFFIX,prodregistryv2.org
-DOMAIN,frontend-apps-multi-region.workos.com
 DOMAIN,chat.openai.com.cdn.cloudflare.net
 DOMAIN,openai-api.arkoselabs.com
-DOMAIN-KEYWORD,openai
-# Intentional broad HY ACL fallback: all UDP/3478 -> JP, including non-OpenAI flows
-AND,((PROTOCOL,UDP),(DST-PORT,3478))
+
+# ---- Original HY references: NOT ACTIVE (shared/non-exclusive third-party) ----
+# Enabling any entry below sends other applications on that same domain to JP.
+# DOMAIN-SUFFIX,host.livekit.cloud
+# DOMAIN-SUFFIX,turn.livekit.cloud
+# DOMAIN,cdn.workos.com
+# DOMAIN,forwarder.workos.com
+# DOMAIN,setup.workos.com
+# DOMAIN,images.workoscdn.com
+# DOMAIN,workos.imgix.net
+# DOMAIN,challenges.cloudflare.com
+# DOMAIN,humb.apple.com
+# DOMAIN-SUFFIX,intercom.io
+# DOMAIN-SUFFIX,intercomcdn.com
+# DOMAIN-SUFFIX,ct.sendgrid.net
+# DOMAIN,js.stripe.com
+# DOMAIN,o207216.ingest.sentry.io
+# DOMAIN,o33249.ingest.sentry.io
+# DOMAIN,browser-intake-datadoghq.com
+# DOMAIN,rum.browser-intake-datadoghq.com
+# DOMAIN-SUFFIX,statsig.com
+# DOMAIN-SUFFIX,statsigapi.net
+# DOMAIN-SUFFIX,featuregates.org
+# DOMAIN-SUFFIX,featureassets.org
+# DOMAIN-SUFFIX,prodregistryv2.org
+# DOMAIN,frontend-apps-multi-region.workos.com
+# DOMAIN-KEYWORD,openai
+# AND,((PROTOCOL,UDP),(DST-PORT,3478))
