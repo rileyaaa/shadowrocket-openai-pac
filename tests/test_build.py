@@ -121,7 +121,7 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("DOMAIN-SUFFIX,statsig.com", rules)
         self.assertNotIn("AND,((PROTOCOL,UDP),(DST-PORT,3478))", rules)
 
-    def test_parent_suffix_redundancy_and_fallback_recovery(self):
+    def test_independent_layers_with_internal_dedup_only(self):
         auto = [
             "DOMAIN-SUFFIX,openai.com",
             "DOMAIN,api.openai.com",
@@ -139,33 +139,53 @@ class BuildTest(unittest.TestCase):
         ]
         manual = [
             "DOMAIN-SUFFIX,openai.com",
-            "DOMAIN,login.openai.com",
+            "DOMAIN,login.openai.com",  # covered within manual by the parent
             "DOMAIN,openaiapi-site.azureedge.net",
             "DOMAIN,cdn.openaimerge.com",
             "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
         ]
         compact_auto, compact_manual = build.compact_openai_rules(auto, manual)
         self.assertIn("DOMAIN-SUFFIX,openai.com", compact_auto)
+        self.assertIn("DOMAIN-SUFFIX,openai.com", compact_manual)
         self.assertIn("DOMAIN-SUFFIX,openaiapi-site.azureedge.net", compact_auto)
+        self.assertIn("DOMAIN,openaiapi-site.azureedge.net", compact_manual)
         self.assertNotIn("DOMAIN,api.openai.com", compact_auto)
         self.assertNotIn("DOMAIN,login.openai.com", compact_manual)
         self.assertNotIn("DOMAIN,openaiapi-site.azureedge.net", compact_auto)
-        self.assertNotIn("DOMAIN,openaiapi-site.azureedge.net", compact_manual)
         self.assertEqual(compact_manual, [
+            "DOMAIN-SUFFIX,openai.com",
+            "DOMAIN,openaiapi-site.azureedge.net",
             "DOMAIN,cdn.openaimerge.com",
             "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
         ])
-        # When upstream removes a suffix, the manual fallback returns.
-        fewer = [r for r in auto if r != "DOMAIN-SUFFIX,openai.com"]
-        out_auto, out_manual = build.compact_openai_rules(fewer, manual)
-        self.assertIn("DOMAIN-SUFFIX,openai.com", out_manual)
-        self.assertNotIn("DOMAIN,login.openai.com", out_manual)
+        # The manual layer is independent of upstream's additions/deletions.
+        upstream_without_openai = [r for r in auto
+                                   if r != "DOMAIN-SUFFIX,openai.com"]
+        _, manual_after_change = build.compact_openai_rules(
+            upstream_without_openai, manual
+        )
+        self.assertEqual(manual_after_change, compact_manual)
+        # Boundary-safe suffix semantics: a.com never matches nota.com.
         self.assertFalse(build.domain_rule_covers(
             "DOMAIN,openai.com", "DOMAIN,login.openai.com"
         ))
         self.assertFalse(build.domain_rule_covers(
             "DOMAIN-SUFFIX,openai.com", "DOMAIN,notopenai.com"
         ))
+
+    def test_manual_exact_third_party_hosts_no_generic_suffix(self):
+        active = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        self.assertIn("DOMAIN,openai.qualtrics.com", active)
+        self.assertIn("DOMAIN,openai-api.arkoselabs.com", active)
+        self.assertIn("DOMAIN,cdn.openaimerge.com", active)
+        self.assertIn("DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com", active)
+        for forbidden in ("DOMAIN-SUFFIX,workos.com",
+                          "DOMAIN-SUFFIX,intercom.io",
+                          "DOMAIN-SUFFIX,statsig.com",
+                          "DOMAIN,cdn.workos.com",
+                          "DOMAIN,challenges.cloudflare.com",
+                          "AND,((PROTOCOL,UDP),(DST-PORT,3478))"):
+            self.assertNotIn(forbidden, active)
 
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
