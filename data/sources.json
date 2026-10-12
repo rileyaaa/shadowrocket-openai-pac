@@ -13,7 +13,6 @@
       "DOMAIN-SUFFIX,client-api.arkoselabs.com",
       "DOMAIN-SUFFIX,events.statsigapi.net",
       "DOMAIN-SUFFIX,featuregates.org",
-      "DOMAIN-SUFFIX,host.livekit.cloud",
       "DOMAIN-SUFFIX,identrust.com",
       "DOMAIN-SUFFIX,intercom.io",
       "DOMAIN-SUFFIX,intercomcdn.com",
@@ -23,8 +22,7 @@
       "DOMAIN-SUFFIX,openaicom.imgix.net",
       "DOMAIN-SUFFIX,segment.io",
       "DOMAIN-SUFFIX,sentry.io",
-      "DOMAIN-SUFFIX,stripe.com",
-      "DOMAIN-SUFFIX,turn.livekit.cloud"
+      "DOMAIN-SUFFIX,stripe.com"
     ]
   },
   "settings": {
@@ -58,14 +56,14 @@
     }
   },
   "statistics": {
-    "auto_input_rules": 21,
-    "auto_total_ip_and_domain_rules": 43,
-    "automatic_openai_domains": 20,
-    "cross_layer_duplicate_rules_retained": 19,
-    "excluded_shared_auto_domains": 24,
+    "auto_input_rules": 23,
+    "auto_total_ip_and_domain_rules": 45,
+    "automatic_openai_domains": 22,
+    "cross_layer_duplicate_rules_retained": 21,
+    "excluded_shared_auto_domains": 22,
     "johnshall_lines": 87212,
-    "manual_backup_rules": 26,
-    "manual_openai_rules": 26,
+    "manual_backup_rules": 28,
+    "manual_openai_rules": 28,
     "mapped_proxy_to_johnshall_node": 30239,
     "retained_ad_rules": 56886,
     "suppressed_redundant_auto_rules": 1,
