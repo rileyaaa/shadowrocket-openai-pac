@@ -46,6 +46,11 @@ class BuildTest(unittest.TestCase):
             self.assertIn("#proxy=GPT-JP", build.render_dns(loaded))
             self.assertNotIn("#proxy=JP", build.render_dns(loaded))
 
+    def test_custom_chinese_policy_url_encoding(self):
+        settings = dict(build.load_settings(), jp_policy_name="日本 专线")
+        dns = build.render_dns(settings)
+        self.assertIn("#proxy=%E6%97%A5%E6%9C%AC%20%E4%B8%93%E7%BA%BF", dns)
+
     def test_user_settings_regex_fallback(self):
         settings = build.load_settings()
         groups = build.render_groups(settings)
