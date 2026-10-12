@@ -338,12 +338,28 @@ class BuildTest(unittest.TestCase):
         ).read_text(encoding="utf-8"))
 
     def test_only_two_user_variables(self):
-        self.assertEqual(build.load_settings(), {
-            "openai_node_name": "日本JP",
-            "johnshall_proxy_node_name": "韩国KR",
-        })
+        settings = build.load_settings()
+        self.assertEqual(set(settings), build.SETTING_KEYS)
         self.assertEqual(build.SETTING_KEYS, {"openai_node_name", "johnshall_proxy_node_name"})
+        for name in settings.values():
+            self.assertIsInstance(name, str)
+            self.assertTrue(name.strip())
+        self.assertNotEqual(
+            settings["openai_node_name"].casefold(),
+            settings["johnshall_proxy_node_name"].casefold(),
+        )
         self.assertEqual(build.CONFIG.name, "Shadowrocket_Johnshall_OpenAI.conf")
+
+    def test_node_names_can_change_without_changing_tests(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "user-settings.json"
+            for names in (
+                {"openai_node_name": "日本JP-1", "johnshall_proxy_node_name": "韩国KR-1"},
+                {"openai_node_name": "美国US", "johnshall_proxy_node_name": "新加坡SG"},
+            ):
+                path.write_text(json.dumps(names, ensure_ascii=False), encoding="utf-8")
+                with self.subTest(names=names):
+                    self.assertEqual(build.load_settings(path), names)
 
     def test_exact_node_name_and_dns_escaping(self):
         settings = {"openai_node_name": "🛰️ OpenAI 出口", "johnshall_proxy_node_name": "🌐 常规代理出口"}
