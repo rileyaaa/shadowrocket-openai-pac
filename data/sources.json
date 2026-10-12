@@ -1,0 +1,32 @@
+{
+  "sources": {
+    "acl4ssr": {
+      "sha256": "c4f839e4dda6cb96e4373349c72b4e5f848b8ae03564c0d0eae0873955310129",
+      "url": "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list"
+    },
+    "blackmatrix7": {
+      "sha256": "6f4047cdbf6953cf5d9b38c4ccd6da7bc6f1acb91b7a87134f25d5b8f5d2408b",
+      "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
+    },
+    "johnshall": {
+      "sha256": "cf07fa386639bca6d272e5d34cf301e994ecef74a4b0ac47850bc1d953e3f2c9",
+      "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
+    },
+    "metacubex": {
+      "sha256": "9c3c755ad42fa75196e5d37705d0d5bfff5f60bc0d9a1f017272e70eafde7645",
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
+    },
+    "voice": {
+      "sha256": "8f03f3c594165eeff009915c7e2beb4bdfb9d429fb1955c205e3b33ec781899a",
+      "url": "https://openai.com/chatgpt-voice.json"
+    }
+  },
+  "statistics": {
+    "automatic_openai_domains": 44,
+    "johnshall_lines": 87212,
+    "manual_openai_rules": 47,
+    "mapped_proxy_to_kr": 30239,
+    "retained_ad_rules": 56886,
+    "voice_prefixes": 23
+  }
+}
