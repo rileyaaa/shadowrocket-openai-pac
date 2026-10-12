@@ -176,6 +176,48 @@ def filter_auto_domains(rules: list[str]) -> list[str]:
     return kept
 
 
+def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
+    """Whether a same-policy rule makes the narrow domain rule redundant.
+
+    DOMAIN-SUFFIX,example.com covers example.com and sub.example.com;
+    DOMAIN,example.com does NOT cover sub.example.com.
+    Wildcards are only deduplicated when the rule is exactly identical.
+    """
+    if broad_rule == narrow_rule:
+        return True
+    broad_type, broad_host = broad_rule.split(",", 1)
+    narrow_type, narrow_host = narrow_rule.split(",", 1)
+    return (
+        broad_type == "DOMAIN-SUFFIX"
+        and narrow_type in {"DOMAIN", "DOMAIN-SUFFIX"}
+        and (narrow_host == broad_host or narrow_host.endswith("." + broad_host))
+    )
+
+
+def compact_openai_rules(
+    auto: list[str], manual: list[str]
+) -> tuple[list[str], list[str]]:
+    """Do not emit already-covered JP rules, but keep the original manual file.
+
+    Every build recomputes coverage. When an upstream rule disappears, a
+    manually maintained fallback is automatically emitted again.
+    """
+    candidates = list(dict.fromkeys([*auto, *manual]))
+    final = [
+        rule for rule in candidates
+        if not any(
+            other != rule and domain_rule_covers(other, rule)
+            for other in candidates
+        )
+    ]
+    final_set = set(final)
+    auto_kept = [r for r in auto if r in final_set]
+    manual_kept = [r for r in manual if r in final_set and r not in auto]
+    if len(auto_kept) + len(manual_kept) < 10:
+        raise ValueError("Too few retained OpenAI domain rules after compacting")
+    return auto_kept, manual_kept
+
+
 def parse_voice(raw: bytes) -> list[str]:
     doc = json.loads(raw.decode("utf-8-sig"))
     if not isinstance(doc, dict) or not isinstance(doc.get("prefixes"), list):
@@ -311,11 +353,19 @@ def run():
     all_auto_domains = list(dict.fromkeys(rule for one in lists for rule in one))
     domains = filter_auto_domains(all_auto_domains)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
-    built, stats = generate(original.decode("utf-8-sig"), ips, domains, manual, settings=settings)
+    emitted_auto, emitted_manual = compact_openai_rules(domains, manual)
+    built, stats = generate(
+        original.decode("utf-8-sig"), ips, emitted_auto, emitted_manual, settings=settings
+    )
     stats["excluded_shared_auto_domains"] = len(all_auto_domains) - len(domains)
+    stats["auto_input_rules"] = len(domains)
+    stats["manual_backup_rules"] = len(manual)
+    stats["suppressed_redundant_openai_rules"] = (
+        len(domains) + len(manual) - len(emitted_auto) - len(emitted_manual)
+    )
     # Validation has now succeeded, so publish all outputs.
     write_if_changed(CONFIG, built)
-    write_if_changed(ROOT / "rules/openai-auto-domains.list", "# Automatically synced from three domain sources\n" + "\n".join(domains) + "\n")
+    write_if_changed(ROOT / "rules/openai-auto-domains.list", "# Automatically synced from three domain sources\n" + "\n".join(emitted_auto) + "\n")
     write_if_changed(ROOT / "rules/openai-voice-ips.list", "# Official ChatGPT Voice IP ranges only\n" + "\n".join(ips) + "\n")
     state = {"sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                          for name, (url, data) in source_data.items()},
