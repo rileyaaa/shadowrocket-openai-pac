@@ -36,7 +36,7 @@ jobs:
         run: python scripts/build.py
       - name: Commit only when upstream changes
         run: |
-          git add -- Shadowrocket_Johnshall_JP_KR.conf rules/openai-auto-domains.list rules/openai-manual-fallback.list rules/openai-voice-ips.list data/sources.json
+          git add -A -- Shadowrocket_Johnshall_JP_KR.conf rules data/sources.json
           if git diff --cached --quiet; then
             echo "No changes; already in sync."
             exit 0

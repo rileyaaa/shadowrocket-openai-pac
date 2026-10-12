@@ -23,6 +23,7 @@ DOMAIN_SOURCES = {
     "metacubex": ("https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list", "meta"),
     "acl4ssr": ("https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list", "typed"),
     "blackmatrix7": ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list", "typed"),
+    "v2fly": ("https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai", "v2fly"),
 }
 RULE_TYPES = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
 
@@ -142,6 +143,22 @@ def parse_domain_list(source: str, fmt: str) -> list[str]:
             if len(parts) >= 2 and parts[0].strip().upper() in RULE_TYPES:
                 rules.append(domain_rule(parts[0], parts[1]))
             # Deliberately exclude over-broad IP-ASN and third-party IP ranges.
+        elif fmt == "v2fly":
+            # geosite syntax: bare domain=domain plus subdomains, full:=one
+            # exact hostname, regexp:=regex. Never treat metadata as a host.
+            entry = line.split(" @", 1)[0].strip()
+            if entry.startswith("full:"):
+                rules.append(domain_rule("DOMAIN", entry[5:]))
+            elif entry == r"regexp:^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$":
+                # A known ChatGPT-specific pattern; Shadowrocket supports
+                # DOMAIN-WILDCARD but not arbitrary geosite regex syntax.
+                rules.append(domain_rule(
+                    "DOMAIN-WILDCARD",
+                    "chatgpt-async-webps-prod-*.webpubsub.azure.com",
+                ))
+            elif not entry.startswith("regexp:") and ":" not in entry:
+                rules.append(domain_rule("DOMAIN-SUFFIX", entry))
+            # Unknown regex expressions are intentionally NOT broadened.
         else:
             raise ValueError(f"Unexpected source format: {fmt}")
     if not 10 <= len(rules) <= 2000:
@@ -334,11 +351,11 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         + f"# {jp_node} = OpenAI, {kr_node} = original Proxy, original REJECT/DIRECT kept.\n\n"
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
-        + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
-        + "# [2] Independent OpenAI auto layer; JP remote DNS\n" + "\n".join(jp_auto_domains) + "\n\n"
-        + "# [3] Independent manual OpenAI fallback layer; NOT deduplicated against auto\n"
+        + "# [1a] OpenAI automatic rules - official Voice destination IPs\n" + "\n".join(jp_ip_rules) + "\n\n"
+        + "# [1b] OpenAI automatic rules - public domain rules\n" + "\n".join(jp_auto_domains) + "\n\n"
+        + "# [2] Independent manual OpenAI fallback (no cross-layer dedup)\n"
         + "\n".join(jp_manual) + "\n\n"
-        + "# [4] Johnshall complete original rules, Proxy policies mapped to exact KR node\n"
+        + "# [3] Johnshall full original rules, Proxy mapped to exact KR node\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
     )
     assert result.count("[Rule]") == 1
@@ -386,20 +403,21 @@ def run():
     stats["cross_layer_duplicate_rules_retained"] = len(
         set(emitted_auto) & set(emitted_manual)
     )
+    stats["auto_total_ip_and_domain_rules"] = len(ips) + len(emitted_auto)
     # Validation has now succeeded, so publish all outputs.
     write_if_changed(CONFIG, built)
-    write_if_changed(
-        ROOT / "rules/openai-auto-domains.list",
-        "# Independent OpenAI automatic domain layer; upstream managed\n"
-        + "\n".join(emitted_auto) + "\n",
+    # Exactly ONE generated public/OpenAI automatic rule source:
+    # official destination Voice IPs plus maintained public geosite/domain lists.
+    # This list is policy-free: the standalone .conf binds both layers to JP.
+    automatic_source = (
+        "# OpenAI automatic rules: official Voice destination IPs + public domains\n"
+        "# No node name here: route is supplied while merging into .conf\n"
+        "# Voice IPs (destination-only); never use OpenAI egress source ranges\n"
+        + "\n".join(f"{rule},no-resolve" for rule in ips) + "\n"
+        + "# Dedicated first-party and explicitly verified hosted domains\n"
+        + "\n".join(emitted_auto) + "\n"
     )
-    write_if_changed(
-        ROOT / "rules/openai-manual-fallback.list",
-        "# Independent OpenAI manual fallback; optimized against itself ONLY\n"
-        + "# Source: config/manual-openai.rules (shared third-party hosts stay commented)\n"
-        + "\n".join(emitted_manual) + "\n",
-    )
-    write_if_changed(ROOT / "rules/openai-voice-ips.list", "# Official ChatGPT Voice IP ranges only\n" + "\n".join(ips) + "\n")
+    write_if_changed(ROOT / "rules/openai-auto.list", automatic_source)
     state = {"sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                          for name, (url, data) in source_data.items()},
              "settings": settings, "statistics": stats}

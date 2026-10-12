@@ -228,6 +228,48 @@ class BuildTest(unittest.TestCase):
                 with self.subTest(bad=bad), self.assertRaises(ValueError):
                     build.parse_manual(path)
 
+    def test_v2fly_geosite_parser(self):
+        source = "\n".join((
+            "chat.com", "chatgpt.com", "chatgpt.site", "crixet.com",
+            "oaistatic.com", "oaistatsig.com", "oaiusercontent.com",
+            "openai.com", "sora.com",
+            "full:openaiassets.blob.core.windows.net",
+            r"regexp:^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$",
+            "full:openai.qualtrics.com @ads",
+            "full:browser-intake-datadoghq.com @ads",
+        ))
+        parsed = build.parse_domain_list(source, "v2fly")
+        self.assertIn("DOMAIN-SUFFIX,chatgpt.com", parsed)
+        self.assertIn("DOMAIN,openaiassets.blob.core.windows.net", parsed)
+        self.assertIn("DOMAIN,openai.qualtrics.com", parsed)
+        self.assertIn(
+            "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+            parsed,
+        )
+        self.assertNotIn("DOMAIN,openaiassets.blob.core.windows.net @ads", parsed)
+        filtered = build.filter_auto_domains(parsed)
+        self.assertNotIn("DOMAIN,browser-intake-datadoghq.com", filtered)
+        self.assertIn("DOMAIN,openai.qualtrics.com", filtered)
+
+    def test_manual_coverage_invariant_and_two_sources(self):
+        original = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        compacted = build.compact_rules_within_layer(original)
+        # A manual-only rule may disappear ONLY when an emitted manual rule
+        # provably covers exactly the same or more hostnames.
+        for rule in original:
+            with self.subTest(rule=rule):
+                self.assertTrue(any(
+                    build.domain_rule_covers(kept, rule) for kept in compacted
+                ))
+        # The two routing inputs are a generated automatic source and
+        # the editable manual original; no third list is required.
+        code = (build.ROOT / "scripts/build.py").read_text(encoding="utf-8")
+        self.assertIn('ROOT / "rules/openai-auto.list"', code)
+        self.assertNotIn('ROOT / "rules/openai-auto-domains.list"', code)
+        self.assertNotIn('ROOT / "rules/openai-voice-ips.list"', code)
+        self.assertNotIn('ROOT / "rules/openai-manual-fallback.list"', code)
+        self.assertIn('ROOT / "config/manual-openai.rules"', code)
+
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
             "jp_node_name": "日本JP",
@@ -288,8 +330,8 @@ class BuildTest(unittest.TestCase):
         same_rule = "DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns"
         self.assertEqual(output.count(same_rule), 2)
         self.assertLess(
-            output.index("# [2] Independent OpenAI auto layer"),
-            output.index("# [3] Independent manual OpenAI fallback layer"),
+            output.index("# [1b] OpenAI automatic rules - public domain rules"),
+            output.index("# [2] Independent manual OpenAI fallback"),
         )
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns", output)
         self.assertIn("IP-CIDR,8.8.4.0/24,东京日本-1,no-resolve", output)

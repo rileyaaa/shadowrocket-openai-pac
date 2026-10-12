@@ -1,8 +1,12 @@
-# Only OpenAI-specific destinations override Johnshall and use the Japan node.
-# The build script adds the Japan node name automatically.
-# Your complete original HY rule references are preserved at the bottom,
-# but shared third-party destinations are COMMENTED OUT to keep original routing.
-# OpenAI Voice IP addresses are still updated from OpenAI's official JSON.
+# SOURCE 2/2: independent OpenAI manual fallback. Edit this file only.
+# SOURCE 1/2 (automatic): rules/openai-auto.list (Voice IP + public geosite).
+# Only remove an active manual rule if another ACTIVE rule INSIDE THIS FILE
+# provably covers all its destinations; never compare against automatic rules.
+# The generator adds the Japan node name; do NOT put it here.
+# Shared third-party HY entries stay archived below as comments, not deleted:
+# using a shared host cannot identify whether ChatGPT or another site called it.
+# HY's geosite:openai comes from the independently updated automatic source.
+# HY's broad udp/3478 catch-all remains archived, since it catches other apps.
 
 # OpenAI first-party and dedicated infrastructure
 DOMAIN-SUFFIX,openai.com
