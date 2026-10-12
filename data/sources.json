@@ -26,12 +26,15 @@
     }
   },
   "statistics": {
-    "automatic_openai_domains": 22,
+    "auto_input_rules": 22,
+    "automatic_openai_domains": 19,
     "excluded_shared_auto_domains": 22,
     "johnshall_lines": 87212,
-    "manual_openai_rules": 22,
+    "manual_backup_rules": 22,
+    "manual_openai_rules": 2,
     "mapped_proxy_to_kr": 30239,
     "retained_ad_rules": 56886,
+    "suppressed_redundant_openai_rules": 23,
     "voice_prefixes": 23
   }
 }
