@@ -20,15 +20,20 @@
       "sha256": "9c3c755ad42fa75196e5d37705d0d5bfff5f60bc0d9a1f017272e70eafde7645",
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
     },
+    "v2fly": {
+      "sha256": "19a100966b3c5b0dff2e7038ba66366ef10d6384781b3eda6de4d1e79712dcc6",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai"
+    },
     "voice": {
       "sha256": "8f03f3c594165eeff009915c7e2beb4bdfb9d429fb1955c205e3b33ec781899a",
       "url": "https://openai.com/chatgpt-voice.json"
     }
   },
   "statistics": {
-    "auto_input_rules": 20,
-    "automatic_openai_domains": 19,
-    "cross_layer_duplicate_rules_retained": 18,
+    "auto_input_rules": 21,
+    "auto_total_ip_and_domain_rules": 43,
+    "automatic_openai_domains": 20,
+    "cross_layer_duplicate_rules_retained": 19,
     "excluded_shared_auto_domains": 24,
     "johnshall_lines": 87212,
     "manual_backup_rules": 22,
