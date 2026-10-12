@@ -1,4 +1,32 @@
 {
+  "review": {
+    "excluded_auto_rules": [
+      "DOMAIN,browser-intake-datadoghq.com",
+      "DOMAIN,o33249.ingest.sentry.io",
+      "DOMAIN,static.cloudflareinsights.com",
+      "DOMAIN-KEYWORD,openai",
+      "DOMAIN-SUFFIX,ai.com",
+      "DOMAIN-SUFFIX,algolia.net",
+      "DOMAIN-SUFFIX,api.statsig.com",
+      "DOMAIN-SUFFIX,auth0.com",
+      "DOMAIN-SUFFIX,challenges.cloudflare.com",
+      "DOMAIN-SUFFIX,client-api.arkoselabs.com",
+      "DOMAIN-SUFFIX,events.statsigapi.net",
+      "DOMAIN-SUFFIX,featuregates.org",
+      "DOMAIN-SUFFIX,host.livekit.cloud",
+      "DOMAIN-SUFFIX,identrust.com",
+      "DOMAIN-SUFFIX,intercom.io",
+      "DOMAIN-SUFFIX,intercomcdn.com",
+      "DOMAIN-SUFFIX,launchdarkly.com",
+      "DOMAIN-SUFFIX,observeit.net",
+      "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
+      "DOMAIN-SUFFIX,openaicom.imgix.net",
+      "DOMAIN-SUFFIX,segment.io",
+      "DOMAIN-SUFFIX,sentry.io",
+      "DOMAIN-SUFFIX,stripe.com",
+      "DOMAIN-SUFFIX,turn.livekit.cloud"
+    ]
+  },
   "settings": {
     "johnshall_proxy_node_name": "韩国KR",
     "openai_node_name": "日本JP"
