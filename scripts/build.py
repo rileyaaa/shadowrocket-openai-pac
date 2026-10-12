@@ -25,11 +25,36 @@ DOMAIN_SOURCES = {
     "blackmatrix7": ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list", "typed"),
 }
 RULE_TYPES = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
+
+# Only domains dedicated to OpenAI may override the original Johnshall route.
+# OpenAI rule-set providers also include unrelated shared services such as
+# stripe.com, auth0.com, sentry.io and launchdarkly.com: NEVER import those.
+OPENAI_SPECIFIC_SUFFIXES = frozenset({
+    "openai.com", "chatgpt.com", "chatgpt.site", "chat.com",
+    "oaistatic.com", "oaistatsig.com", "oaiusercontent.com",
+    "sora.com", "crixet.com", "chatgpt.livekit.cloud",
+    "openai.com.cdn.cloudflare.net",
+})
+OPENAI_SPECIFIC_HOSTS = frozenset({
+    "openaiapi-site.azureedge.net",
+    "openaiassets.blob.core.windows.net",
+    "openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+    "openaicom.imgix.net",
+    "openaicomproductionae4b.blob.core.windows.net",
+    "production-openaicom-storage.azureedge.net",
+    "cdn.openaimerge.com",
+    "openai-api.arkoselabs.com",
+    "openai.qualtrics.com",
+    "chat.openai.com.cdn.cloudflare.net",
+})
+OPENAI_SPECIFIC_WILDCARDS = frozenset({
+    "chatgpt-async-webps-prod-*.webpubsub.azure.com",
+})
 DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
 PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
 CONFIG = ROOT / "Shadowrocket_Johnshall_JP_KR.conf"
 
-DNS = """# Encrypted AliDNS first; Google DNS over JP as fallback
+DNS = """# Encrypted AliDNS first; Google DNS over KR as fallback
 dns-server = https://dns.alidns.com/dns-query#no-h3
 direct-dns-server = https://dns.alidns.com/dns-query#no-h3
 fallback-dns-server = https://dns.google/dns-query#proxy=JP
@@ -69,8 +94,8 @@ def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
 
 
 def render_dns(settings: dict[str, str]) -> str:
-    # DoH #proxy= points directly at the actual Japan node name.
-    encoded = quote(settings["jp_node_name"], safe="")
+    # Google DNS is not an OpenAI service: route it through the daily KR node.
+    encoded = quote(settings["kr_node_name"], safe="")
     return DNS.replace("#proxy=JP", f"#proxy={encoded}")
 
 
@@ -118,6 +143,33 @@ def parse_domain_list(source: str, fmt: str) -> list[str]:
     return list(dict.fromkeys(rules))
 
 
+def is_openai_specific_rule(rule: str) -> bool:
+    """Reject shared third-party services in auto lists to preserve original routing.
+
+    Even when published under 'OpenAI' elsewhere, generic Stripe, Auth0,
+    Cloudflare challenges, Statsig and Intercom traffic are NOT all OpenAI.
+    Exact third-party hosts may be opted into the manual list intentionally.
+    """
+    kind, value = rule.split(",", 1)
+    if kind == "DOMAIN-KEYWORD":
+        return False
+    if kind == "DOMAIN-WILDCARD":
+        return value in OPENAI_SPECIFIC_WILDCARDS
+    if value in OPENAI_SPECIFIC_HOSTS:
+        return True
+    if kind == "DOMAIN-SUFFIX":
+        return value in OPENAI_SPECIFIC_SUFFIXES
+    return any(value == suffix or value.endswith("." + suffix)
+               for suffix in OPENAI_SPECIFIC_SUFFIXES)
+
+
+def filter_auto_domains(rules: list[str]) -> list[str]:
+    kept = list(dict.fromkeys(rule for rule in rules if is_openai_specific_rule(rule)))
+    if len(kept) < 10:
+        raise ValueError(f"Too few OpenAI-only automatic domains: {len(kept)}")
+    return kept
+
+
 def parse_voice(raw: bytes) -> list[str]:
     doc = json.loads(raw.decode("utf-8-sig"))
     if not isinstance(doc, dict) or not isinstance(doc.get("prefixes"), list):
@@ -152,7 +204,7 @@ def parse_manual(path: Path) -> list[str]:
         if len(parts) != 2:
             raise ValueError(f"Invalid manual rule {line}")
         result.append(domain_rule(parts[0], parts[1]))
-    if len(result) < 40 or "DOMAIN-SUFFIX,openai.com" not in result or "DOMAIN-SUFFIX,chatgpt.com" not in result:
+    if len(result) < 20 or "DOMAIN-SUFFIX,openai.com" not in result or "DOMAIN-SUFFIX,chatgpt.com" not in result:
         raise ValueError("Manual OpenAI fallback is incomplete")
     return list(dict.fromkeys(result))
 
@@ -205,13 +257,15 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
         + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
-        + "# [2] OpenAI automatically maintained domain rules\n" + "\n".join(jp_auto_domains) + "\n\n"
-        + "# [3] Complete custom HY ACL fallback, including broad UDP/3478\n"
+        + "# [2] Automatically maintained OpenAI-specific domains ONLY\n" + "\n".join(jp_auto_domains) + "\n\n"
+        + "# [3] Manually verified OpenAI-specific fallback (shared domains omitted)\n"
         + "\n".join(jp_manual) + "\n\n"
         + "# [4] Johnshall complete original rules, Proxy policies mapped to exact KR node\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
     )
     assert result.count("[Rule]") == 1
+    if "[Proxy Group]" in result:
+        raise ValueError("Unexpected proxy group in standalone config")
     return result, {"johnshall_lines": len(original_rules.splitlines()), "mapped_proxy_to_kr": converted,
                     "retained_ad_rules": before_ads, "voice_prefixes": len(ips),
                     "automatic_openai_domains": len(domains), "manual_openai_rules": len(manual)}
@@ -239,9 +293,11 @@ def run():
         source_data[name] = (url, raw)
         lists.append(parse_domain_list(raw.decode("utf-8-sig"), fmt))
     ips = parse_voice(voice_raw)
-    domains = list(dict.fromkeys(rule for one in lists for rule in one))
+    all_auto_domains = list(dict.fromkeys(rule for one in lists for rule in one))
+    domains = filter_auto_domains(all_auto_domains)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
     built, stats = generate(original.decode("utf-8-sig"), ips, domains, manual, settings=settings)
+    stats["excluded_shared_auto_domains"] = len(all_auto_domains) - len(domains)
     # Validation has now succeeded, so publish all outputs.
     write_if_changed(CONFIG, built)
     write_if_changed(ROOT / "rules/openai-auto-domains.list", "# Automatically synced from three domain sources\n" + "\n".join(domains) + "\n")
