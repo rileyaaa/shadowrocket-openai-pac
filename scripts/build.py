@@ -54,10 +54,15 @@ DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
 PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
 CONFIG = ROOT / "Shadowrocket_Johnshall_JP_KR.conf"
 
-DNS = """# Encrypted AliDNS first; Google DNS over KR as fallback
-dns-server = https://dns.alidns.com/dns-query#no-h3
+DNS = """# Route-aware DNS:
+# Proxy domain names are resolved remotely by their chosen JP or KR node.
+# If Shadowrocket must resolve locally for proxy routing, use Google DoH over KR.
+# DIRECT traffic and proxy-server hostname bootstrap use AliDNS encrypted DoH.
+# A global fallback cannot vary by rule: use AliDNS rather than silently
+# sending DIRECT-domain DNS queries through the Korean proxy.
+dns-server = https://dns.google/dns-query#proxy=KR
 direct-dns-server = https://dns.alidns.com/dns-query#no-h3
-fallback-dns-server = https://dns.google/dns-query#proxy=JP
+fallback-dns-server = https://dns.alidns.com/dns-query#no-h3
 proxy-dns-server = https://dns.alidns.com/dns-query#no-h3
 dns-direct-system = false
 dns-fallback-system = false
@@ -94,9 +99,10 @@ def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
 
 
 def render_dns(settings: dict[str, str]) -> str:
-    # Google DNS is not an OpenAI service: route it through the daily KR node.
+    # Local DNS for proxy-classified lookups uses the Korean node.
+    # Explicit OpenAI rules below force remote resolution by the Japan node.
     encoded = quote(settings["kr_node_name"], safe="")
-    return DNS.replace("#proxy=JP", f"#proxy={encoded}")
+    return DNS.replace("#proxy=KR", f"#proxy={encoded}")
 
 
 def fetch(url: str, minimum: int = 50) -> bytes:
@@ -178,13 +184,14 @@ def parse_voice(raw: bytes) -> list[str]:
     for item in doc["prefixes"]:
         if not isinstance(item, dict):
             raise ValueError("Unexpected voice IP entry")
-        value = item.get("ipv4Prefix") or item.get("ipv6Prefix")
-        if not value:
+        values = [item[key] for key in ("ipv4Prefix", "ipv6Prefix") if item.get(key)]
+        if not values:
             raise ValueError(f"Missing voice prefix in {item}")
-        network = ipaddress.ip_network(value, strict=False)
-        if not network.is_global or network.prefixlen == 0:
-            raise ValueError(f"Unsafe voice network: {network}")
-        results.add(network)
+        for value in values:
+            network = ipaddress.ip_network(value, strict=False)
+            if not network.is_global or network.prefixlen == 0:
+                raise ValueError(f"Unsafe voice network: {network}")
+            results.add(network)
     if not 5 <= len(results) <= 3000:
         raise ValueError(f"Unexpected voice prefix count: {len(results)}")
     networks = sorted(results, key=lambda ip: (ip.version, int(ip.network_address), ip.prefixlen))
@@ -246,10 +253,18 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         raise ValueError("Missing/duplicate Johnshall final DIRECT")
     if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
         raise ValueError("Unconverted original Proxy rule found")
-    # IP rule priority first. This only covers official voice IPs, NOT all of OpenAI.
+    # IP rule priority first. This only covers official Voice IPs, NOT all OpenAI.
     jp_ip_rules = [f"{rule},{jp_node},no-resolve" for rule in ips]
-    jp_auto_domains = [f"{rule},{jp_node}" for rule in domains]
-    jp_manual = [f"{rule},{jp_node}" for rule in manual]
+    # Prevent client-side resolution for OpenAI domains: the JP proxy sees
+    # and resolves the original hostname. DOMAIN-WILDCARD remains unchanged
+    # because support for this modifier varies with Shadowrocket versions.
+    def jp_domain(rule: str) -> str:
+        kind = rule.split(",", 1)[0]
+        option = ",force-remote-dns" if kind in {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD"} else ""
+        return f"{rule},{jp_node}{option}"
+
+    jp_auto_domains = [jp_domain(rule) for rule in domains]
+    jp_manual = [jp_domain(rule) for rule in manual]
     result = (
         banner + "# Automatically generated from Johnshall; do not edit output directly.\n"
         + "# Source: rileyaaa/shadowrocket-openai-pac, daily checked by GitHub Actions.\n"
@@ -257,7 +272,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
         + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
-        + "# [2] Automatically maintained OpenAI-specific domains ONLY\n" + "\n".join(jp_auto_domains) + "\n\n"
+        + "# [2] OpenAI-specific auto domains, resolved remotely by JP\n" + "\n".join(jp_auto_domains) + "\n\n"
         + "# [3] Manually verified OpenAI-specific fallback (shared domains omitted)\n"
         + "\n".join(jp_manual) + "\n\n"
         + "# [4] Johnshall complete original rules, Proxy policies mapped to exact KR node\n"
