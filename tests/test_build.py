@@ -59,6 +59,38 @@ class BuildTest(unittest.TestCase):
             with self.subTest(shared=shared):
                 self.assertNotIn(shared, result)
 
+    def test_current_official_openai_first_party_hosts(self):
+        # First-party / dedicated hostnames from OpenAI's network guidance
+        # and Codex cloud agent documentation as checked 2026-10-12.
+        auto = build.filter_auto_domains([
+            f"DOMAIN-SUFFIX,{root}" for root in
+            ("openai.com", "chatgpt.com", "chatgpt.site", "oaistatic.com",
+             "oaiusercontent.com", "oaistatsig.com", "sora.com", "chat.com",
+             "crixet.com", "chatgpt.livekit.cloud")
+        ] + ["DOMAIN,openaiassets.blob.core.windows.net",
+             "DOMAIN,openaiapi-site.azureedge.net"])
+        rules = auto + build.parse_manual(build.ROOT / "config/manual-openai.rules")
+
+        def covers(host):
+            return any(
+                (kind == "DOMAIN" and host == suffix) or
+                (kind == "DOMAIN-SUFFIX" and
+                 (host == suffix or host.endswith("." + suffix)))
+                for kind, suffix in (item.split(",", 1) for item in rules)
+                if kind in {"DOMAIN", "DOMAIN-SUFFIX"}
+            )
+
+        for host in (
+            "api.openai.com", "auth.openai.com", "platform.openai.com",
+            "setup.auth.openai.com", "ios.chat.openai.com",
+            "ws.chatgpt.com", "codex-cloud-environments.chatgpt.com",
+            "files.oaiusercontent.com", "cdn.oaistatic.com",
+            "events.oaistatsig.com", "cdn.openaimerge.com",
+            "openaiassets.blob.core.windows.net",
+        ):
+            with self.subTest(host=host):
+                self.assertTrue(covers(host), host)
+
     def test_voice(self):
         doc = json.dumps({"prefixes": [
             {"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 6)
@@ -66,6 +98,18 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(len(build.parse_voice(doc.encode())), 5)
         with self.assertRaises(ValueError):
             build.parse_voice(b'{"prefixes":[{"ipv4Prefix":"0.0.0.0/0"}]}')
+
+    def test_voice_dual_ipv4_and_ipv6(self):
+        items = [{"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 5)]
+        items.append({
+            "ipv4Prefix": "8.8.8.8/32",
+            "ipv6Prefix": "2001:4860:4860::8888/128",
+        })
+        data = json.dumps({"prefixes": items}).encode()
+        result = build.parse_voice(data)
+        self.assertIn("IP-CIDR,8.8.8.8/32", result)
+        self.assertIn("IP-CIDR6,2001:4860:4860::8888/128", result)
+        self.assertEqual(len(result), 6)
 
     def test_manual_full(self):
         rules = build.parse_manual(build.ROOT / "config/manual-openai.rules")
@@ -89,6 +133,10 @@ class BuildTest(unittest.TestCase):
         dns = build.render_dns(settings)
         self.assertIn("#proxy=" + quote(settings["kr_node_name"], safe=""), dns)
         self.assertNotIn("#proxy=" + quote(settings["jp_node_name"], safe=""), dns)
+        self.assertIn("dns-server = https://dns.google/dns-query#proxy=" + quote(settings["kr_node_name"], safe=""), dns)
+        self.assertIn("direct-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
+        self.assertIn("fallback-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
+        self.assertIn("proxy-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
 
     def test_settings_fail_closed(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -129,10 +177,11 @@ class BuildTest(unittest.TestCase):
             settings=settings,
         )
         self.assertNotIn("[Proxy Group]", output)
-        self.assertIn("DOMAIN-SUFFIX,chatgpt.com,东京日本-1", output)
+        self.assertIn("DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns", output)
         self.assertIn("IP-CIDR,8.8.4.0/24,东京日本-1,no-resolve", output)
-        self.assertIn("DOMAIN-SUFFIX,openai.com,东京日本-1", output)
+        self.assertIn("DOMAIN-SUFFIX,openai.com,东京日本-1,force-remote-dns", output)
         self.assertIn("DOMAIN-SUFFIX,proxy42.example,首尔韩国-2", output)
+        self.assertNotIn("DOMAIN-SUFFIX,proxy42.example,首尔韩国-2,force-remote-dns", output)
         self.assertIn("#proxy=" + quote("首尔韩国-2", safe=""), output)
         self.assertNotIn(",Proxy\n", output)
         self.assertEqual(counts["mapped_proxy_to_kr"], 10001)
