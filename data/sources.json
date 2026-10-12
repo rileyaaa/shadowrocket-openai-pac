@@ -26,9 +26,10 @@
     }
   },
   "statistics": {
-    "automatic_openai_domains": 44,
+    "automatic_openai_domains": 22,
+    "excluded_shared_auto_domains": 22,
     "johnshall_lines": 87212,
-    "manual_openai_rules": 47,
+    "manual_openai_rules": 22,
     "mapped_proxy_to_kr": 30239,
     "retained_ad_rules": 56886,
     "voice_prefixes": 23
