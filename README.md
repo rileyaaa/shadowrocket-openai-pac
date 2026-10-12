@@ -1,6 +1,6 @@
 # Shadowrocket OpenAI JP / KR · Johnshall 每日同步
 
-基于 [Johnshall 原始 Shadowrocket 配置](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever) 自动生成**完整且可订阅的** `.conf` 文件，保留原项目广告拦截、直连和 URL Rewrite/MITM 规则，同时加入 OpenAI 专用日本线路。不是 HY 服务端 ACL，也不需要任何 Shadowrocket 策略组。
+基于 [Johnshall 原始 Shadowrocket 配置](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever) 自动生成**完整且可订阅的** `.conf` 文件。**唯一的路由改变是 OpenAI 专属流量优先走日本节点：原版需要代理的其他网站仍走韩国，原版直连/广告拦截规则原样保留。** 没有额外策略组，也不是 HY 服务端 ACL。
 
 ## 订阅地址
 
@@ -37,15 +37,19 @@ Google DoH 备用代理也会自动改成 URL 编码后的日本节点名称。
 
 ## 分流与加密 DNS
 
+**逻辑等价于先选择韩国节点运行原 Johnshall 规则，再为 OpenAI 插入日本优先例外：**
+
 1. 官方 [ChatGPT Voice IP](https://openai.com/chatgpt-voice.json) 自动列表 → `jp_node_name`。
-2. MetaCubeX、ACL4SSR、blackmatrix7 的 OpenAI 自动域名 → `jp_node_name`。
-3. [完整原 HY 手工兜底](config/manual-openai.rules)（含 Codex、WorkOS、Voice、UDP/3478）→ `jp_node_name`。
-4. Johnshall 原本 `Proxy/PROXY` 规则 → `kr_node_name`。
-5. Johnshall 原本广告 `REJECT`、直连 `DIRECT`、`FINAL,direct` 原样保留。
+2. MetaCubeX、ACL4SSR、blackmatrix7 自动域名源中，**经过 OpenAI 专属域名白名单筛选**的条目 → `jp_node_name`。
+3. [OpenAI 手工兜底](config/manual-openai.rules) 中启用的专属域名 → `jp_node_name`。
+4. Johnshall 原本 `Proxy/PROXY` 的所有规则 → `kr_node_name`，完全保留规则相对顺序。
+5. Johnshall 原本广告 `Reject`、直连 `direct`、`FINAL,direct` 原样保留。
 
-原配置约 8 万多行，构建器只替换原 `Proxy` 出站目标，不删除原广告名单。IP 表只覆盖公开的 ChatGPT Voice IP，不能当作 OpenAI 全业务 IP 清单。宽松的 UDP/3478 兜底可能让非 OpenAI 业务走日本节点。未知新 OpenAI 域名仍有漏判风险。
+**为什么过滤自动规则？** 部分所谓 OpenAI 规则源包含 `stripe.com`、`auth0.com`、`intercom.io`、`sentry.io` 等全站共享服务。强制把这些服务全部送日本会改变其他网站的原有出站行为，因此生成器会主动排除它们。你原来 HY 的 25 条共享服务或过宽匹配保留为手工文件中的**注释**，不会生效。包括全局 UDP/3478 也不会强制走日本。
 
-DNS：直连用阿里加密 DoH `https://dns.alidns.com/dns-query`；Google 加密 DoH `https://dns.google/dns-query` 通过日本节点作为备用。禁用自动退回系统 DNS；这不能控制代理服务端自己的 DNS，也不能拦截每个 App 自带的 DoH。
+**限制：** 共享第三方主机可能被 OpenAI 和别的网站同时使用，纯域名/IP 分流无法精确识别它究竟服务哪一个应用。为了优先保持 Johnshall 原始行为，本项目不劫持这些共享域名；部分 OpenAI 登录、语音或其他第三方依赖可能因此仍按照原规则走 KR/DIRECT。官方 Voice IP 清单不是 OpenAI 全业务 IP 清单，未来未知新域名也可能漏判。
+
+DNS：直连用阿里加密 DoH `https://dns.alidns.com/dns-query`；Google 加密 DoH `https://dns.google/dns-query` 经**韩国日常节点**作为备用，不让普通 DNS 查询成为 JP 例外。禁用自动退回系统 DNS；这不能控制代理服务器自己的 DNS，也无法强制拦截全部 App 自带的 DoH。
 
 ## 每日更新与失败保护
 
