@@ -1,0 +1,46 @@
+name: Sync Johnshall and OpenAI rules
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 10:30 Asia/Taipei every day (UTC 02:30)
+    - cron: '30 2 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'config/**'
+      - 'tests/**'
+      - '.github/workflows/sync-upstream.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: johnshall-openai-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Generate verified Shadowrocket config
+        run: python scripts/build.py
+      - name: Commit only when upstream changes
+        run: |
+          git add -- Shadowrocket_Johnshall_JP_KR.conf rules/openai-auto-domains.list rules/openai-voice-ips.list data/sources.json
+          if git diff --cached --quiet; then
+            echo "No changes; already in sync."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync Johnshall and OpenAI rules"
+          git push origin HEAD:main
