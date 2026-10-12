@@ -3,9 +3,11 @@ name: Sync Johnshall and OpenAI rules
 on:
   workflow_dispatch:
   schedule:
-    # Johnshall upstream: daily 23:00 UTC (07:00 Asia/Taipei).
-    # Run one hour later: 00:00 UTC (08:00 Asia/Taipei).
-    - cron: '0 0 * * *'
+    # Johnshall publishes around 07:04 Asia/Taipei daily.
+    # MetaCubeX is the latest daily source: recent releases 09:09-10:26.
+    # Leave at least an hour after the observed latest upstream completion.
+    # Scheduled at 11:30 Asia/Taipei = 03:30 UTC (not event-driven).
+    - cron: '30 3 * * *'
   push:
     branches: [main]
     paths:
@@ -36,7 +38,7 @@ jobs:
         run: python scripts/build.py
       - name: Commit only when upstream changes
         run: |
-          git add -A -- Shadowrocket_Johnshall_JP_KR.conf rules data/sources.json
+          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json
           if git diff --cached --quiet; then
             echo "No changes; already in sync."
             exit 0

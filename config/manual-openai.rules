@@ -2,7 +2,7 @@
 # SOURCE 1/2 (automatic): rules/openai-auto.list (Voice IP + public geosite).
 # Only remove an active manual rule if another ACTIVE rule INSIDE THIS FILE
 # provably covers all its destinations; never compare against automatic rules.
-# The generator adds the Japan node name; do NOT put it here.
+# The generator adds the configured OpenAI node name; do NOT put it here.
 # Shared third-party HY entries stay archived below as comments, not deleted:
 # using a shared host cannot identify whether ChatGPT or another site called it.
 # HY's geosite:openai comes from the independently updated automatic source.
@@ -33,7 +33,7 @@ DOMAIN,chat.openai.com.cdn.cloudflare.net
 DOMAIN,openai-api.arkoselabs.com
 
 # ---- Original HY references: NOT ACTIVE (shared/non-exclusive third-party) ----
-# Enabling any entry below sends other applications on that same domain to JP.
+# Enabling any entry below also sends other apps using that domain to the OpenAI node.
 # DOMAIN-SUFFIX,host.livekit.cloud
 # DOMAIN-SUFFIX,turn.livekit.cloud
 # DOMAIN,cdn.workos.com

@@ -53,15 +53,15 @@ OPENAI_SPECIFIC_WILDCARDS = frozenset({
 })
 DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
 PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
-CONFIG = ROOT / "Shadowrocket_Johnshall_JP_KR.conf"
+CONFIG = ROOT / "Shadowrocket_Johnshall_OpenAI.conf"
 
 DNS = """# Route-aware DNS:
-# Proxy domain names are resolved remotely by their chosen JP or KR node.
-# If Shadowrocket must resolve locally for proxy routing, use Google DoH over KR.
+# Proxy domain names are resolved remotely by their selected role-based node.
+# If Shadowrocket must resolve locally, use Google DoH via Johnshall Proxy.
 # DIRECT traffic and proxy-server hostname bootstrap use AliDNS encrypted DoH.
 # A global fallback cannot vary by rule: use AliDNS rather than silently
-# sending DIRECT-domain DNS queries through the Korean proxy.
-dns-server = https://dns.google/dns-query#proxy=KR
+# sending DIRECT-domain DNS queries through the Johnshall Proxy node.
+dns-server = https://dns.google/dns-query#proxy=JOHNSHALL_PROXY_NODE
 direct-dns-server = https://dns.alidns.com/dns-query#no-h3
 fallback-dns-server = https://dns.alidns.com/dns-query#no-h3
 proxy-dns-server = https://dns.alidns.com/dns-query#no-h3
@@ -73,7 +73,7 @@ hijack-dns = 8.8.8.8:53,8.8.4.4:53,1.1.1.1:53,1.0.0.1:53,223.5.5.5:53,223.6.6.6:
 DNS_KEYS = {line.partition("=")[0].strip() for line in DNS.splitlines() if "=" in line and not line.startswith("#")}
 # Two exact Shadowrocket node names, no proxy groups or automatic node selection.
 SETTINGS_PATH = ROOT / "config/user-settings.json"
-SETTING_KEYS = {"jp_node_name", "kr_node_name"}
+SETTING_KEYS = {"openai_node_name", "johnshall_proxy_node_name"}
 RESERVED_POLICIES = {
     "DIRECT", "PROXY", "REJECT", "REJECT-DROP", "REJECT-NO-DROP",
     "FINAL", "PASS", "GLOBAL", "SYSTEM", "NONE",
@@ -94,16 +94,16 @@ def load_settings(path: Path = SETTINGS_PATH) -> dict[str, str]:
             raise ValueError(f"{key} contains unsafe Shadowrocket syntax characters")
         if value.upper() in RESERVED_POLICIES:
             raise ValueError(f"{key} cannot be a built-in policy")
-    if data["jp_node_name"].casefold() == data["kr_node_name"].casefold():
-        raise ValueError("JP and KR must not point to the same exact node")
+    if data["openai_node_name"].casefold() == data["johnshall_proxy_node_name"].casefold():
+        raise ValueError("OpenAI and Johnshall Proxy must not point to the same exact node")
     return data
 
 
 def render_dns(settings: dict[str, str]) -> str:
-    # Local DNS for proxy-classified lookups uses the Korean node.
-    # Explicit OpenAI rules below force remote resolution by the Japan node.
-    encoded = quote(settings["kr_node_name"], safe="")
-    return DNS.replace("#proxy=KR", f"#proxy={encoded}")
+    # Local DNS for proxy-classified lookups uses the Johnshall Proxy node.
+    # Explicit OpenAI rules below force remote resolution by the OpenAI node.
+    encoded = quote(settings["johnshall_proxy_node_name"], safe="")
+    return DNS.replace("#proxy=JOHNSHALL_PROXY_NODE", f"#proxy={encoded}")
 
 
 def fetch(url: str, minimum: int = 50) -> bytes:
@@ -310,8 +310,8 @@ def split_base(source: str):
 
 def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None):
     settings = settings if settings is not None else load_settings()
-    jp_node = settings["jp_node_name"]
-    kr_node = settings["kr_node_name"]
+    openai_node = settings["openai_node_name"]
+    johnshall_proxy_node = settings["johnshall_proxy_node_name"]
     if len(base.encode()) < 1_000_000 or len(base.splitlines()) < 50_000:
         raise ValueError("Johnshall config is unexpectedly small")
     banner, general, original_rules, tail = split_base(base)
@@ -324,7 +324,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         if not line.lstrip().startswith("#") and line.strip():
             if re.search(r",reject(?:,|$)", line, re.I):
                 before_ads += 1
-            line, count = PROXY_POLICY.subn(lambda _: f",{kr_node}", line)
+            line, count = PROXY_POLICY.subn(lambda _: f",{johnshall_proxy_node}", line)
             converted += count
         changed.append(line)
     if converted < 10000 or before_ads < 20000:
@@ -334,34 +334,34 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
     if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
         raise ValueError("Unconverted original Proxy rule found")
     # IP rule priority first. This only covers official Voice IPs, NOT all OpenAI.
-    jp_ip_rules = [f"{rule},{jp_node},no-resolve" for rule in ips]
-    # Prevent client-side resolution for OpenAI domains: the JP proxy sees
+    openai_ip_rules = [f"{rule},{openai_node},no-resolve" for rule in ips]
+    # Prevent client-side resolution for OpenAI domains: the OpenAI proxy sees
     # and resolves the original hostname. DOMAIN-WILDCARD remains unchanged
     # because support for this modifier varies with Shadowrocket versions.
-    def jp_domain(rule: str) -> str:
+    def openai_domain(rule: str) -> str:
         kind = rule.split(",", 1)[0]
         option = ",force-remote-dns" if kind in {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD"} else ""
-        return f"{rule},{jp_node}{option}"
+        return f"{rule},{openai_node}{option}"
 
-    jp_auto_domains = [jp_domain(rule) for rule in domains]
-    jp_manual = [jp_domain(rule) for rule in manual]
+    openai_auto_domains = [openai_domain(rule) for rule in domains]
+    openai_manual = [openai_domain(rule) for rule in manual]
     result = (
         banner + "# Automatically generated from Johnshall; do not edit output directly.\n"
         + "# Source: rileyaaa/shadowrocket-openai-pac, daily checked by GitHub Actions.\n"
-        + f"# {jp_node} = OpenAI, {kr_node} = original Proxy, original REJECT/DIRECT kept.\n\n"
+        + f"# {openai_node} = OpenAI, {johnshall_proxy_node} = original Proxy, original REJECT/DIRECT kept.\n\n"
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
-        + "# [1a] OpenAI automatic rules - official Voice destination IPs\n" + "\n".join(jp_ip_rules) + "\n\n"
-        + "# [1b] OpenAI automatic rules - public domain rules\n" + "\n".join(jp_auto_domains) + "\n\n"
+        + "# [1a] OpenAI automatic rules - official Voice destination IPs\n" + "\n".join(openai_ip_rules) + "\n\n"
+        + "# [1b] OpenAI automatic rules - public domain rules\n" + "\n".join(openai_auto_domains) + "\n\n"
         + "# [2] Independent manual OpenAI fallback (no cross-layer dedup)\n"
-        + "\n".join(jp_manual) + "\n\n"
-        + "# [3] Johnshall full original rules, Proxy mapped to exact KR node\n"
+        + "\n".join(openai_manual) + "\n\n"
+        + "# [3] Johnshall full original rules, Proxy mapped to exact configured node\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
     )
     assert result.count("[Rule]") == 1
     if "[Proxy Group]" in result:
         raise ValueError("Unexpected proxy group in standalone config")
-    return result, {"johnshall_lines": len(original_rules.splitlines()), "mapped_proxy_to_kr": converted,
+    return result, {"johnshall_lines": len(original_rules.splitlines()), "mapped_proxy_to_johnshall_node": converted,
                     "retained_ad_rules": before_ads, "voice_prefixes": len(ips),
                     "automatic_openai_domains": len(domains), "manual_openai_rules": len(manual)}
 
@@ -408,7 +408,7 @@ def run():
     write_if_changed(CONFIG, built)
     # Exactly ONE generated public/OpenAI automatic rule source:
     # official destination Voice IPs plus maintained public geosite/domain lists.
-    # This list is policy-free: the standalone .conf binds both layers to JP.
+    # This list is policy-free: the standalone .conf binds both layers to the OpenAI node.
     automatic_source = (
         "# OpenAI automatic rules: official Voice destination IPs + public domains\n"
         "# No node name here: route is supplied while merging into .conf\n"

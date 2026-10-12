@@ -1,4 +1,4 @@
 {
-  "jp_node_name": "日本JP",
-  "kr_node_name": "韩国KR"
+  "openai_node_name": "日本JP",
+  "johnshall_proxy_node_name": "韩国KR"
 }

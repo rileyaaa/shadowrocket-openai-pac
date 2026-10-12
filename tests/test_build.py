@@ -339,17 +339,18 @@ class BuildTest(unittest.TestCase):
 
     def test_only_two_user_variables(self):
         self.assertEqual(build.load_settings(), {
-            "jp_node_name": "日本JP",
-            "kr_node_name": "韩国KR",
+            "openai_node_name": "日本JP",
+            "johnshall_proxy_node_name": "韩国KR",
         })
-        self.assertEqual(build.SETTING_KEYS, {"jp_node_name", "kr_node_name"})
+        self.assertEqual(build.SETTING_KEYS, {"openai_node_name", "johnshall_proxy_node_name"})
+        self.assertEqual(build.CONFIG.name, "Shadowrocket_Johnshall_OpenAI.conf")
 
     def test_exact_node_name_and_dns_escaping(self):
-        settings = {"jp_node_name": "🇯🇵 东京 JP 01", "kr_node_name": "🇰🇷 首尔 KR 02"}
+        settings = {"openai_node_name": "🛰️ OpenAI 出口", "johnshall_proxy_node_name": "🌐 常规代理出口"}
         dns = build.render_dns(settings)
-        self.assertIn("#proxy=" + quote(settings["kr_node_name"], safe=""), dns)
-        self.assertNotIn("#proxy=" + quote(settings["jp_node_name"], safe=""), dns)
-        self.assertIn("dns-server = https://dns.google/dns-query#proxy=" + quote(settings["kr_node_name"], safe=""), dns)
+        self.assertIn("#proxy=" + quote(settings["johnshall_proxy_node_name"], safe=""), dns)
+        self.assertNotIn("#proxy=" + quote(settings["openai_node_name"], safe=""), dns)
+        self.assertIn("dns-server = https://dns.google/dns-query#proxy=" + quote(settings["johnshall_proxy_node_name"], safe=""), dns)
         self.assertIn("direct-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
         self.assertIn("fallback-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
         self.assertIn("proxy-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
@@ -358,13 +359,13 @@ class BuildTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "user-settings.json"
             for invalid in [
-                {"jp_node_name": ""},
-                {"jp_node_name": "PROXY"},
-                {"jp_node_name": "日本JP", "kr_node_name": "日本JP"},
-                {"jp_node_name": "bad,syntax"},
-                {"jp_node_name": "bad\\name"},
-                {"jp_node_name": "bad\n[Rule]"},
-                {"jp_node_name": "JP", "kr_node_name": "KR", "jp_policy_name": "JP"},
+                {"openai_node_name": ""},
+                {"openai_node_name": "PROXY"},
+                {"openai_node_name": "日本JP", "johnshall_proxy_node_name": "日本JP"},
+                {"openai_node_name": "bad,syntax"},
+                {"openai_node_name": "bad\\name"},
+                {"openai_node_name": "bad\n[Rule]"},
+                {"openai_node_name": "JP", "johnshall_proxy_node_name": "KR", "extra_policy_name": "JP"},
             ]:
                 data = dict(build.load_settings())
                 data.update(invalid)
@@ -384,7 +385,7 @@ class BuildTest(unittest.TestCase):
             "[URL Rewrite]\nrewrite\n"
             "[MITM]\nhostname=example\n"
         )
-        settings = {"jp_node_name": "东京日本-1", "kr_node_name": "首尔韩国-2"}
+        settings = {"openai_node_name": "美国US-1", "johnshall_proxy_node_name": "新加坡SG-2"}
         output, counts = build.generate(
             upstream,
             ["IP-CIDR,8.8.4.0/24"],
@@ -394,20 +395,20 @@ class BuildTest(unittest.TestCase):
         )
         self.assertNotIn("[Proxy Group]", output)
         # Manual/automatic duplicate is intentional: independent layers.
-        same_rule = "DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns"
+        same_rule = "DOMAIN-SUFFIX,chatgpt.com,美国US-1,force-remote-dns"
         self.assertEqual(output.count(same_rule), 2)
         self.assertLess(
             output.index("# [1b] OpenAI automatic rules - public domain rules"),
             output.index("# [2] Independent manual OpenAI fallback"),
         )
-        self.assertIn("DOMAIN-SUFFIX,chatgpt.com,东京日本-1,force-remote-dns", output)
-        self.assertIn("IP-CIDR,8.8.4.0/24,东京日本-1,no-resolve", output)
-        self.assertIn("DOMAIN-SUFFIX,openai.com,东京日本-1,force-remote-dns", output)
-        self.assertIn("DOMAIN-SUFFIX,proxy42.example,首尔韩国-2", output)
-        self.assertNotIn("DOMAIN-SUFFIX,proxy42.example,首尔韩国-2,force-remote-dns", output)
-        self.assertIn("#proxy=" + quote("首尔韩国-2", safe=""), output)
+        self.assertIn("DOMAIN-SUFFIX,chatgpt.com,美国US-1,force-remote-dns", output)
+        self.assertIn("IP-CIDR,8.8.4.0/24,美国US-1,no-resolve", output)
+        self.assertIn("DOMAIN-SUFFIX,openai.com,美国US-1,force-remote-dns", output)
+        self.assertIn("DOMAIN-SUFFIX,proxy42.example,新加坡SG-2", output)
+        self.assertNotIn("DOMAIN-SUFFIX,proxy42.example,新加坡SG-2,force-remote-dns", output)
+        self.assertIn("#proxy=" + quote("新加坡SG-2", safe=""), output)
         self.assertNotIn(",Proxy\n", output)
-        self.assertEqual(counts["mapped_proxy_to_kr"], 10001)
+        self.assertEqual(counts["mapped_proxy_to_johnshall_node"], 10001)
         self.assertEqual(counts["retained_ad_rules"], 20001)
         self.assertTrue(output.rstrip().endswith("hostname=example"))
 

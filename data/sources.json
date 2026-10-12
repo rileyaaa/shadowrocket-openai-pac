@@ -1,7 +1,7 @@
 {
   "settings": {
-    "jp_node_name": "日本JP",
-    "kr_node_name": "韩国KR"
+    "johnshall_proxy_node_name": "韩国KR",
+    "openai_node_name": "日本JP"
   },
   "sources": {
     "acl4ssr": {
@@ -38,7 +38,7 @@
     "johnshall_lines": 87212,
     "manual_backup_rules": 22,
     "manual_openai_rules": 22,
-    "mapped_proxy_to_kr": 30239,
+    "mapped_proxy_to_johnshall_node": 30239,
     "retained_ad_rules": 56886,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
