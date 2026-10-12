@@ -482,8 +482,13 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn("#proxy=" + quote(settings["openai_node_name"], safe=""), dns)
         self.assertIn("dns-server = https://dns.google/dns-query#proxy=" + quote(settings["johnshall_proxy_node_name"], safe=""), dns)
         self.assertIn("direct-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
-        self.assertIn("fallback-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
+        self.assertEqual(
+            [line for line in dns.splitlines() if line.startswith("fallback-dns-server =")],
+            ["fallback-dns-server = https://dns.alidns.com/dns-query#no-h3,https://doh.pub/dns-query#no-h3"],
+        )
         self.assertIn("proxy-dns-server = https://dns.alidns.com/dns-query#no-h3", dns)
+        self.assertIn("dns-fallback-system = false", dns)
+        self.assertNotIn("fallback-dns-server = system", dns)
 
     def test_settings_fail_closed(self):
         with tempfile.TemporaryDirectory() as folder:

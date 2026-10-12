@@ -63,6 +63,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - 专属 OpenAI 域名优先远端解析：OpenAI 专用节点；
 - Johnshall 原 Proxy 网站由配置中的常规代理节点访问，通常由该节点远端解析；
 - DIRECT 使用 `https://dns.alidns.com/dns-query#no-h3` 本地加密解析；
+- `fallback-dns-server` 使用阿里 AliDNS 与腾讯 DNSPod 两个加密 DoH 地址，按 Shadowrocket 支持的逗号分隔语法提供备用解析；两者均附加 `#no-h3`，并保持 `dns-fallback-system = false`，不回退系统 DNS；
 - 小火箭本地需要解析代理类域名时，`dns-server` 使用 Google DoH，经 Johnshall 常规代理节点；
 - `proxy-dns-server`（节点服务器域名启动解析）使用阿里 DoH，避免代理依赖循环。
 

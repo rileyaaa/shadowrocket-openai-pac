@@ -90,11 +90,11 @@ DNS = """# Route-aware DNS:
 # Proxy domain names are resolved remotely by their selected role-based node.
 # If Shadowrocket must resolve locally, use Google DoH via Johnshall Proxy.
 # DIRECT traffic and proxy-server hostname bootstrap use AliDNS encrypted DoH.
-# A global fallback cannot vary by rule: use AliDNS rather than silently
-# sending DIRECT-domain DNS queries through the Johnshall Proxy node.
+# A global fallback cannot vary by rule: use direct, encrypted AliDNS +
+# DNSPod DoH, never the Johnshall Proxy node for DIRECT fallback queries.
 dns-server = https://dns.google/dns-query#proxy=JOHNSHALL_PROXY_NODE
 direct-dns-server = https://dns.alidns.com/dns-query#no-h3
-fallback-dns-server = https://dns.alidns.com/dns-query#no-h3
+fallback-dns-server = https://dns.alidns.com/dns-query#no-h3,https://doh.pub/dns-query#no-h3
 proxy-dns-server = https://dns.alidns.com/dns-query#no-h3
 dns-direct-system = false
 dns-fallback-system = false
