@@ -4,10 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     # Johnshall publishes around 07:04 Asia/Taipei daily.
-    # MetaCubeX is the latest daily source: recent releases 09:09-10:26.
-    # Leave at least an hour after the observed latest upstream completion.
-    # Scheduled at 11:30 Asia/Taipei = 03:30 UTC (not event-driven).
-    - cron: '30 3 * * *'
+    # MetaCubeX is the latest regular daily source; recent builds completed around 09:09-10:27.
+    # Latest observed finish by 2026-10-12: 10:26:49 Asia/Taipei on 2026-10-06.
+    # Schedule roughly 30 minutes later; this is fixed cron, not event-driven.
+    # Scheduled at 11:00 Asia/Taipei = 03:00 UTC.
+    - cron: '0 3 * * *'
   push:
     branches: [main]
     paths:

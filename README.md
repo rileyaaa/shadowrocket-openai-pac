@@ -71,7 +71,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 
 ## 每日同步与测试
 
-Johnshall 上游约在每天 **07:04 台北时间**发布；目前每日自动上游中较晚完成的是 MetaCubeX，近几次约在 **09:09～10:26** 完成。因此本仓库 [GitHub Actions](.github/workflows/sync-upstream.yml) 设为每天 **11:30 台北时间（03:30 UTC）** 合并，预留约一小时以上缓冲。该时间为固定计划，并非根据上游完成事件动态触发；若上游或 GitHub Actions 延迟更久，本仓库下一次运行仍会重试获取。修改节点备注、手工规则或生成脚本也会触发构建；手机端需刷新配置订阅。
+Johnshall 上游约在每天 **07:04 台北时间**发布；截至 2026-10-12 核查，规律性自动来源中较晚完成的是 MetaCubeX，近几次约在 **09:09～10:27** 完成，最近观察到的最晚一次为 **2026-10-06 10:26:49（台北时间）**。因此本仓库 [GitHub Actions](.github/workflows/sync-upstream.yml) 改为每天 **11:00 台北时间（03:00 UTC）** 合并，比该次最晚完成时间晚约 **33 分钟**。该时间为固定计划，并非根据上游完成事件动态触发；若上游或 GitHub Actions 延迟更久，可能无法在当天获取最新版本，但下一次运行仍会重新获取。修改节点备注、手工规则或生成脚本也会触发构建；手机端需刷新配置订阅。
 
 ```bash
 python -m unittest discover -s tests -v
@@ -82,7 +82,7 @@ python scripts/build.py
 
 ## GitHub Actions 成功后 Telegram 推送
 
-**Telegram 没有单独的每日定时任务**：原 Actions 每天 11:30 检查上游，但只在某次 Actions 的测试、生成和提交步骤成功后立即发一次报告。此行为适用于定时、手动、修改配置触发的 Actions。**没有上游变化也会发送检查成功、无变化。** 构建失败不会发送误导性的成功通知。
+**Telegram 没有单独的每日定时任务**：原 Actions 每天 11:00 检查上游，但只在某次 Actions 的测试、生成和提交步骤成功后立即发一次报告。此行为适用于定时、手动、修改配置触发的 Actions。**没有上游变化也会发送检查成功、无变化。** 构建失败不会发送误导性的成功通知。
 
 报告记录：触发来源、变化的上游、规则数量与变化量、新增和删除的自动规则示例及 Actions 运行链接。相同摘要也写入 Actions Summary。
 
@@ -124,7 +124,7 @@ python scripts/build.py
 - 本次没有新的排除项，就报告无新增，不反复提醒旧候选。
 - 这些规则只用于人工审核，从未自动加入 .conf、自动列表或手工兜底。共享第三方域名不会因为出现在上游就被直接导向 OpenAI 节点。
 
-没有新增定时任务，继续随每天 11:30、手动和配置修改触发的 GitHub Actions 成功运行后推送。
+没有新增定时任务，继续随每天 11:00、手动和配置修改触发的 GitHub Actions 成功运行后推送。
 
 ## LiveKit TURN 路由的明确例外（2026-10-12）
 
