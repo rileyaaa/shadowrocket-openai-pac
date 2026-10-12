@@ -194,27 +194,35 @@ def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
     )
 
 
-def compact_openai_rules(
-    auto: list[str], manual: list[str]
-) -> tuple[list[str], list[str]]:
-    """Do not emit already-covered JP rules, but keep the original manual file.
+def compact_rules_within_layer(rules: list[str]) -> list[str]:
+    """Remove only redundant rules within one self-contained rule layer.
 
-    Every build recomputes coverage. When an upstream rule disappears, a
-    manually maintained fallback is automatically emitted again.
+    A DOMAIN-SUFFIX parent supersedes its DOMAIN or DOMAIN-SUFFIX children.
+    Do not compare rules across upstream and manual sources: the manual list
+    is an independent, always-emitted safety net for future upstream changes.
     """
-    candidates = list(dict.fromkeys([*auto, *manual]))
-    final = [
+    candidates = list(dict.fromkeys(rules))
+    return [
         rule for rule in candidates
         if not any(
             other != rule and domain_rule_covers(other, rule)
             for other in candidates
         )
     ]
-    final_set = set(final)
-    auto_kept = [r for r in auto if r in final_set]
-    manual_kept = [r for r in manual if r in final_set and r not in auto]
-    if len(auto_kept) + len(manual_kept) < 10:
-        raise ValueError("Too few retained OpenAI domain rules after compacting")
+
+
+def compact_openai_rules(
+    auto: list[str], manual: list[str]
+) -> tuple[list[str], list[str]]:
+    """Optimize each OpenAI layer independently; never cross-deduplicate.
+
+    The final standalone .conf always contains two separate sections, even
+    when the same exact domain occurs in both auto and manual layers.
+    """
+    auto_kept = compact_rules_within_layer(auto)
+    manual_kept = compact_rules_within_layer(manual)
+    if len(auto_kept) < 10 or len(manual_kept) < 10:
+        raise ValueError("Automatic or manual OpenAI rule layer is unexpectedly small")
     return auto_kept, manual_kept
 
 
@@ -314,8 +322,8 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
         + "# [1] Official ChatGPT Voice IP prefixes, automatic\n" + "\n".join(jp_ip_rules) + "\n\n"
-        + "# [2] OpenAI-specific auto domains, resolved remotely by JP\n" + "\n".join(jp_auto_domains) + "\n\n"
-        + "# [3] Manually verified OpenAI-specific fallback (shared domains omitted)\n"
+        + "# [2] Independent OpenAI auto layer; JP remote DNS\n" + "\n".join(jp_auto_domains) + "\n\n"
+        + "# [3] Independent manual OpenAI fallback layer; NOT deduplicated against auto\n"
         + "\n".join(jp_manual) + "\n\n"
         + "# [4] Johnshall complete original rules, Proxy policies mapped to exact KR node\n"
         + "\n".join(changed) + "\n\n" + tail + "\n"
@@ -360,12 +368,24 @@ def run():
     stats["excluded_shared_auto_domains"] = len(all_auto_domains) - len(domains)
     stats["auto_input_rules"] = len(domains)
     stats["manual_backup_rules"] = len(manual)
-    stats["suppressed_redundant_openai_rules"] = (
-        len(domains) + len(manual) - len(emitted_auto) - len(emitted_manual)
+    stats["suppressed_redundant_auto_rules"] = len(domains) - len(emitted_auto)
+    stats["suppressed_redundant_manual_rules"] = len(manual) - len(emitted_manual)
+    stats["cross_layer_duplicate_rules_retained"] = len(
+        set(emitted_auto) & set(emitted_manual)
     )
     # Validation has now succeeded, so publish all outputs.
     write_if_changed(CONFIG, built)
-    write_if_changed(ROOT / "rules/openai-auto-domains.list", "# Automatically synced from three domain sources\n" + "\n".join(emitted_auto) + "\n")
+    write_if_changed(
+        ROOT / "rules/openai-auto-domains.list",
+        "# Independent OpenAI automatic domain layer; upstream managed\n"
+        + "\n".join(emitted_auto) + "\n",
+    )
+    write_if_changed(
+        ROOT / "rules/openai-manual-fallback.list",
+        "# Independent OpenAI manual fallback; optimized against itself ONLY\n"
+        + "# Source: config/manual-openai.rules (shared third-party hosts stay commented)\n"
+        + "\n".join(emitted_manual) + "\n",
+    )
     write_if_changed(ROOT / "rules/openai-voice-ips.list", "# Official ChatGPT Voice IP ranges only\n" + "\n".join(ips) + "\n")
     state = {"sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                          for name, (url, data) in source_data.items()},
