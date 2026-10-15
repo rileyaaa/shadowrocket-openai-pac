@@ -139,6 +139,7 @@ class SyncReportTests(unittest.TestCase):
     def test_upstream_download_one_retry_then_success(self):
         class GoodResponse:
             status = 200
+            headers = {}
             def __enter__(self):
                 return self
             def __exit__(self, *args):
@@ -168,6 +169,7 @@ class SyncReportTests(unittest.TestCase):
     def test_upstream_truncated_response_also_retries_once(self):
         class TooShort:
             status = 200
+            headers = {}
             def __enter__(self):
                 return self
             def __exit__(self, *args):

@@ -519,6 +519,7 @@ class BuildTest(unittest.TestCase):
             + "FINAL,direct\n"
             "[URL Rewrite]\nrewrite\n"
             "[MITM]\nhostname=example\n"
+            + build.JOHNSHALL_FOOTER + "\n"
         )
         settings = {"openai_node_name": "美国US-1", "johnshall_proxy_node_name": "新加坡SG-2"}
         output, counts = build.generate(
@@ -545,7 +546,8 @@ class BuildTest(unittest.TestCase):
         self.assertNotIn(",Proxy\n", output)
         self.assertEqual(counts["mapped_proxy_to_johnshall_node"], 10001)
         self.assertEqual(counts["retained_ad_rules"], 20001)
-        self.assertTrue(output.rstrip().endswith("hostname=example"))
+        self.assertIn("hostname=example", output)
+        self.assertTrue(output.rstrip().endswith(build.JOHNSHALL_FOOTER))
 
     def test_upstream_sections(self):
         banner, general, rules, tail = build.split_base(

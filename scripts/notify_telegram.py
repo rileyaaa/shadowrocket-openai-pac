@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 NAMES = {
     "johnshall": "Johnshall", "voice": "OpenAI Voice", "metacubex": "MetaCubeX",
     "v2fly": "v2fly", "acl4ssr": "ACL4SSR", "blackmatrix7": "blackmatrix7",
+    "apple_news": "Apple News 内嵌规则",
 }
 EVENTS = {"push": "代码提交", "schedule": "定时运行", "workflow_dispatch": "手动执行"}
 COUNT_FIELDS = (
@@ -44,6 +45,10 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
         count = report["statistics"][key]
         diff = report.get("stat_deltas", {}).get(key)
         lines.append(f"{label}：{count:,}" + (f" ({diff:+d})" if type(diff) is int else ""))
+    if "embedded_ruleset_rules" in report["statistics"]:
+        lines.append(f"已校验内嵌规则：{report['statistics']['embedded_ruleset_rules']:,}")
+    if "unparsed_upstream_rules" in report["statistics"]:
+        lines.append(f"未支持格式待审核：{report['statistics']['unparsed_upstream_rules']:,}")
     if report.get("settings_changed"):
         lines.append("节点名称：已更新")
     added, removed = report["auto_added"], report["auto_removed"]

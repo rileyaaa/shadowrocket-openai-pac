@@ -27,6 +27,18 @@ DOMAIN_SOURCES = {
     "blackmatrix7": ("https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list", "typed"),
     "v2fly": ("https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai", "v2fly"),
 }
+# Only reviewed external dependencies may be embedded in the standalone file.
+# Unknown/nested remote lists stop publication instead of bypassing validation.
+RULESET_SOURCES = {
+    "apple_news": (
+        "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AppleNews/AppleNews.list",
+        "rules/johnshall-apple-news.list",
+    ),
+}
+JOHNSHALL_FOOTER = "# Made with Love from https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever"
+MAX_DOWNLOAD_BYTES = 13_000_000
+# Review gates, not a claim that official ranges can never legitimately grow.
+VOICE_MIN_PREFIX = {4: 24, 6: 48}
 RULE_TYPES = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
 
 # Only domains dedicated to OpenAI may override the original Johnshall route.
@@ -143,15 +155,27 @@ def fetch(url: str, minimum: int = 50) -> bytes:
     Both failed attempts abort publication. Never fall back to incomplete data.
     """
     request = urllib.request.Request(
-        url, headers={"User-Agent": "shadowrocket-openai-pac/1.0", "Accept": "*/*"}
+        url, headers={"User-Agent": "shadowrocket-openai-pac/1.0", "Accept": "*/*",
+                      "Accept-Encoding": "identity"}
     )
     for attempt in range(2):  # initial request + exactly one retry
         try:
             with urllib.request.urlopen(request, timeout=75) as response:
-                content = response.read(13_000_000)
                 if not 200 <= response.status < 300:
                     raise ValueError(f"Unexpected HTTP status for {url}: {response.status}")
-                if not minimum <= len(content) < 13_000_000:
+                declared = response.headers.get("Content-Length")
+                if declared is not None:
+                    if not re.fullmatch(r"[0-9]+", declared.strip()):
+                        raise ValueError(f"Invalid Content-Length from {url}")
+                    declared = int(declared)
+                    if not minimum <= declared < MAX_DOWNLOAD_BYTES:
+                        raise ValueError(f"Unexpected Content-Length from {url}: {declared}")
+                content = response.read(MAX_DOWNLOAD_BYTES)
+                # HTTPResponse.read(amt) may return a short body without raising
+                # IncompleteRead. Check the advertised length explicitly.
+                if declared is not None and len(content) != declared:
+                    raise ValueError(f"Truncated response from {url}: {len(content)}/{declared}")
+                if not minimum <= len(content) < MAX_DOWNLOAD_BYTES:
                     raise ValueError(f"Truncated or oversized data from {url}: {len(content)}")
                 return content
         except (OSError, ValueError, http.client.HTTPException) as exc:
@@ -175,7 +199,7 @@ def domain_rule(kind: str, value: str) -> str:
     return f"{kind},{value}"
 
 
-def parse_domain_list(source: str, fmt: str) -> list[str]:
+def parse_domain_list(source: str, fmt: str, *, unparsed: list[str] | None = None) -> list[str]:
     rules = []
     for raw in source.splitlines():
         line = raw.strip()
@@ -190,13 +214,17 @@ def parse_domain_list(source: str, fmt: str) -> list[str]:
             parts = line.split(",")
             if len(parts) >= 2 and parts[0].strip().upper() in RULE_TYPES:
                 rules.append(domain_rule(parts[0], parts[1]))
-            # Deliberately exclude over-broad IP-ASN and third-party IP ranges.
+            elif unparsed is not None:
+                # Broad IP/ASN entries and new syntax are review-only.
+                unparsed.append(line)
         elif fmt == "v2fly":
             # geosite syntax: bare domain=domain plus subdomains, full:=one
             # exact hostname, regexp:=regex. Never treat metadata as a host.
             entry = line.split(" @", 1)[0].strip()
             if entry.startswith("full:"):
                 rules.append(domain_rule("DOMAIN", entry[5:]))
+            elif entry.startswith("domain:"):
+                rules.append(domain_rule("DOMAIN-SUFFIX", entry[7:]))
             elif entry == r"regexp:^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$":
                 # A known ChatGPT-specific pattern; Shadowrocket supports
                 # DOMAIN-WILDCARD but not arbitrary geosite regex syntax.
@@ -206,7 +234,10 @@ def parse_domain_list(source: str, fmt: str) -> list[str]:
                 ))
             elif not entry.startswith("regexp:") and ":" not in entry:
                 rules.append(domain_rule("DOMAIN-SUFFIX", entry))
-            # Unknown regex expressions are intentionally NOT broadened.
+            elif unparsed is not None:
+                # Preserve the raw rule and its source for review; never expand
+                # unknown regex/include/keyword syntax into routing rules.
+                unparsed.append(line)
         else:
             raise ValueError(f"Unexpected source format: {fmt}")
     if not 10 <= len(rules) <= 2000:
@@ -307,18 +338,90 @@ def parse_voice(raw: bytes) -> list[str]:
     for item in doc["prefixes"]:
         if not isinstance(item, dict):
             raise ValueError("Unexpected voice IP entry")
-        values = [item[key] for key in ("ipv4Prefix", "ipv6Prefix") if item.get(key)]
+        values = [(version, item[key]) for version, key in ((4, "ipv4Prefix"), (6, "ipv6Prefix")) if item.get(key)]
         if not values:
             raise ValueError(f"Missing voice prefix in {item}")
-        for value in values:
-            network = ipaddress.ip_network(value, strict=False)
-            if not network.is_global or network.prefixlen == 0:
+        for version, value in values:
+            if not isinstance(value, str):
+                raise ValueError("Voice prefix must be a CIDR string")
+            # Never silently widen a host address with an erroneous subnet mask.
+            network = ipaddress.ip_network(value, strict=True)
+            if (network.version != version or not network.is_global
+                    or network.prefixlen < VOICE_MIN_PREFIX[version]):
                 raise ValueError(f"Unsafe voice network: {network}")
             results.add(network)
     if not 5 <= len(results) <= 3000:
         raise ValueError(f"Unexpected voice prefix count: {len(results)}")
     networks = sorted(results, key=lambda ip: (ip.version, int(ip.network_address), ip.prefixlen))
     return [f"{'IP-CIDR6' if n.version == 6 else 'IP-CIDR'},{n}" for n in networks]
+
+
+def voice_address_counts(rules: list[str]) -> dict[str, int]:
+    """Count the union of Voice destinations, independently for IPv4 and IPv6."""
+    networks = {4: [], 6: []}
+    for rule in rules:
+        parts = rule.split(",")
+        if parts[0] not in {"IP-CIDR", "IP-CIDR6"}:
+            continue
+        network = ipaddress.ip_network(parts[1], strict=True)
+        if (parts[0] == "IP-CIDR6") != (network.version == 6):
+            raise ValueError("Voice baseline has an inconsistent address family")
+        networks[network.version].append(network)
+    return {
+        f"voice_ipv{version}_addresses": sum(n.num_addresses for n in ipaddress.collapse_addresses(items))
+        for version, items in networks.items()
+    }
+
+
+def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool) -> dict[str, int]:
+    current = voice_address_counts(ips)
+    if not has_baseline:
+        return current
+    before = voice_address_counts(sorted(active_auto_rules(old_auto)))
+    if not any(before.values()):
+        raise ValueError("Published Voice baseline is missing; refusing to reset coverage protection")
+    for key, after in current.items():
+        previous = before[key]
+        if ((previous == 0 and after > 0)
+                or (previous > 0 and (after * 10 < previous * 7 or after > previous * 2))):
+            raise ValueError(
+                f"VOICE COVERAGE ANOMALY: {key}: {previous} -> {after}; "
+                "review official ranges before changing the published baseline"
+            )
+    return current
+
+
+def parse_embedded_ruleset(source: str) -> list[str]:
+    """The reviewed Apple News list contains policy-free domain rules only."""
+    rules = []
+    for raw in source.lstrip("\ufeff").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(",")
+        if len(parts) != 2 or parts[0] not in RULE_TYPES:
+            raise ValueError(f"Unsupported embedded rule (policy/nested lists not allowed): {line}")
+        rules.append(domain_rule(*parts))
+    declared = re.findall(r"(?m)^#\s*TOTAL:\s*(\d+)\s*$", source)
+    if (not 1 <= len(rules) <= 2000 or len(declared) != 1
+            or int(declared[0]) != len(rules) or len(set(rules)) != len(rules)):
+        raise ValueError("Embedded ruleset count/header is missing, truncated or inconsistent")
+    return rules
+
+
+def inline_ruleset(line: str, rulesets: dict[str, list[str]]) -> list[str]:
+    parts = [part.strip() for part in line.split(",")]
+    if parts[0].upper() not in {"RULE-SET", "DOMAIN-SET"}:
+        return [line]
+    known_urls = {url for url, _ in RULESET_SOURCES.values()}
+    if (parts[0] != "RULE-SET" or len(parts) != 3
+            or parts[1] not in known_urls or parts[1] not in rulesets
+            or not rulesets[parts[1]]):
+        raise ValueError(f"Unreviewed or unavailable external ruleset: {line}")
+    url, policy = parts[1:]
+    return ([f"# Embedded verified RULE-SET: {url}"]
+            + [f"{rule},{policy}" for rule in rulesets[url]]
+            + ["# End embedded RULE-SET"])
 
 
 def parse_manual(path: Path) -> list[str]:
@@ -356,13 +459,21 @@ def split_base(source: str):
             source[matches[2].start():].strip("\n"))
 
 
-def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None):
+def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None,
+             rulesets: dict[str, list[str]] | None = None):
     settings = settings if settings is not None else load_settings()
     openai_node = settings["openai_node_name"]
     johnshall_proxy_node = settings["johnshall_proxy_node_name"]
     if len(base.encode()) < 1_000_000 or len(base.splitlines()) < 50_000:
         raise ValueError("Johnshall config is unexpectedly small")
     banner, general, original_rules, tail = split_base(base)
+    if not base.rstrip().endswith(JOHNSHALL_FOOTER):
+        raise ValueError("Johnshall end marker missing; config may be truncated")
+    rewrite, mitm = tail.split("[MITM]", 1)
+    if not any(row.strip() and not row.lstrip().startswith(("#", "[")) for row in rewrite.splitlines()):
+        raise ValueError("Johnshall URL Rewrite section is empty")
+    if not re.search(r"(?m)^hostname\s*=\s*\S[^\r\n]*$", mitm):
+        raise ValueError("Johnshall MITM hostname setting is missing")
     general_lines = [line for line in general.splitlines()
                      if not ("=" in line and line.partition("=")[0].strip() in DNS_KEYS)]
     changed = []
@@ -374,7 +485,9 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
                 before_ads += 1
             line, count = PROXY_POLICY.subn(lambda _: f",{johnshall_proxy_node}", line)
             converted += count
-        changed.append(line)
+            changed.extend(inline_ruleset(line, rulesets or {}))
+        else:
+            changed.append(line)
     if converted < 10000 or before_ads < 20000:
         raise ValueError(f"Original rules unexpectedly changed: proxy={converted}, reject={before_ads}")
     if sum(line.strip().lower() == "final,direct" for line in changed) != 1:
@@ -453,7 +566,8 @@ def validate_upstream_change(stats: dict[str, int], old_state: dict | None) -> N
 
 
 def excluded_auto_rule_sources(source_lists: dict[str, list[str]],
-                               accepted: list[str]) -> dict[str, list[str]]:
+                               accepted: list[str],
+                               unparsed_sources: dict[str, list[str]] | None = None) -> dict[str, list[str]]:
     """Collect rejected community rules with provenance, never as routing rules."""
     allowed = set(accepted)
     excluded: dict[str, set[str]] = {}
@@ -461,6 +575,9 @@ def excluded_auto_rule_sources(source_lists: dict[str, list[str]],
         for rule in rules:
             if rule not in allowed:
                 excluded.setdefault(rule, set()).add(source_name)
+    for source_name, rules in (unparsed_sources or {}).items():
+        for rule in rules:
+            excluded.setdefault(rule, set()).add(source_name)
     return {rule: sorted(names) for rule, names in sorted(excluded.items())}
 
 
@@ -515,6 +632,7 @@ def run():
     args.add_argument("--upstream-file", type=Path)
     args.add_argument("--voice-file", type=Path)
     args.add_argument("--domain-dir", type=Path)
+    args.add_argument("--ruleset-dir", type=Path, help="Offline snapshots named apple_news.txt, etc.")
     args.add_argument("--report-file", type=Path)
     opt = args.parse_args()
     settings = load_settings()
@@ -522,18 +640,25 @@ def run():
     voice_raw = opt.voice_file.read_bytes() if opt.voice_file else fetch(VOICE_URL)
     source_data = {"johnshall": (BASE_URL, original), "voice": (VOICE_URL, voice_raw)}
     source_lists = {}
+    unparsed_sources = {}
     for name, (url, fmt) in DOMAIN_SOURCES.items():
         raw = (opt.domain_dir / f"{name}.txt").read_bytes() if opt.domain_dir else fetch(url)
         source_data[name] = (url, raw)
-        source_lists[name] = parse_domain_list(raw.decode("utf-8-sig"), fmt)
+        unparsed_sources[name] = []
+        source_lists[name] = parse_domain_list(raw.decode("utf-8-sig"), fmt, unparsed=unparsed_sources[name])
+    rulesets = {}
+    for name, (url, _) in RULESET_SOURCES.items():
+        raw = (opt.ruleset_dir / f"{name}.txt").read_bytes() if opt.ruleset_dir else fetch(url)
+        source_data[name] = (url, raw)
+        rulesets[url] = parse_embedded_ruleset(raw.decode("utf-8-sig"))
     ips = parse_voice(voice_raw)
     all_auto_domains = list(dict.fromkeys(rule for one in source_lists.values() for rule in one))
     domains = filter_auto_domains(all_auto_domains)
-    excluded_candidates = excluded_auto_rule_sources(source_lists, domains)
+    excluded_candidates = excluded_auto_rule_sources(source_lists, domains, unparsed_sources)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
     emitted_auto, emitted_manual = compact_openai_rules(domains, manual)
     built, stats = generate(
-        original.decode("utf-8-sig"), ips, emitted_auto, emitted_manual, settings=settings
+        original.decode("utf-8-sig"), ips, emitted_auto, emitted_manual, settings=settings, rulesets=rulesets
     )
     stats["excluded_shared_auto_domains"] = len(all_auto_domains) - len(domains)
     stats["auto_input_rules"] = len(domains)
@@ -546,6 +671,18 @@ def run():
     stats["auto_total_ip_and_domain_rules"] = len(ips) + len(emitted_auto)
     state_path = ROOT / "data/sources.json"
     old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
+    auto_path = ROOT / "rules/openai-auto.list"
+    old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
+    stats.update(validate_voice_coverage(ips, old_auto, has_baseline=old_state is not None))
+    stats["unparsed_upstream_rules"] = len({rule for rules in unparsed_sources.values() for rule in rules})
+    stats["embedded_ruleset_rules"] = sum(len(rules) for rules in rulesets.values())
+    for name, (url, _) in RULESET_SOURCES.items():
+        prior = (old_state or {}).get("sources", {}).get(name)
+        if prior is not None:
+            previous = prior.get("rule_count")
+            if (type(previous) is not int or previous <= 0
+                    or not previous * 0.85 <= len(rulesets[url]) <= previous * 1.50):
+                raise ValueError(f"Embedded ruleset count changed unexpectedly: {name}")
     validate_upstream_change(stats, old_state)
 
     # Both OpenAI sources remain independent; do not change routing semantics.
@@ -557,8 +694,6 @@ def run():
         + "# Dedicated first-party and explicitly verified hosted domains\n"
         + "\n".join(emitted_auto) + "\n"
     )
-    auto_path = ROOT / "rules/openai-auto.list"
-    old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
     source_state = {
         "sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                     for name, (url, data) in source_data.items()},
@@ -566,6 +701,8 @@ def run():
         # Only a review baseline: never feed these rejected rules into .conf.
         "review": {"excluded_auto_rules": list(excluded_candidates)},
     }
+    for name, (url, _) in RULESET_SOURCES.items():
+        source_state["sources"][name]["rule_count"] = len(rulesets[url])
     changed = not CONFIG.exists() or CONFIG.read_text(encoding="utf-8") != built
     report = make_sync_report(
         old_state, source_state, old_auto, automatic_source, changed,
@@ -574,6 +711,8 @@ def run():
     # All validation is complete before touching generated output files.
     write_if_changed(CONFIG, built)
     write_if_changed(auto_path, automatic_source)
+    for name, (_, snapshot_path) in RULESET_SOURCES.items():
+        write_if_changed(ROOT / snapshot_path, source_data[name][1].decode("utf-8"))
     write_if_changed(state_path, json.dumps(source_state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     if opt.report_file:
         write_if_changed(opt.report_file, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
