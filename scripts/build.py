@@ -679,8 +679,12 @@ def run():
     args.add_argument("--domain-dir", type=Path)
     args.add_argument("--ruleset-dir", type=Path, help="Offline snapshots named apple_news.txt, etc.")
     args.add_argument("--official-network-file", type=Path, help="Offline snapshot of the pinned official allowlist article")
+    args.add_argument("--require-fresh-network", action="store_true",
+                      help="Recovery acceptance: require a live official article; do not hold old domains")
     args.add_argument("--report-file", type=Path)
     opt = args.parse_args()
+    if opt.require_fresh_network and opt.official_network_file:
+        args.error("--require-fresh-network cannot use --official-network-file")
     settings = load_settings()
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     state_path = ROOT / "data/sources.json"
@@ -702,6 +706,13 @@ def run():
         if opt.official_network_file:
             raise  # Explicit offline input errors are never silently ignored.
         network_error = f"HTTP {exc.code}" if isinstance(exc, urllib.error.HTTPError) else type(exc).__name__
+        # Report only a known, non-sensitive response signal. Do not log the
+        # challenge body, cookies, arbitrary headers or exception URLs.
+        if (isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
+                and exc.headers.get("cf-mitigated", "").lower() == "challenge"):
+            network_error += " (Cloudflare challenge)"
+        if opt.require_fresh_network:
+            raise RuntimeError(f"Live official network evidence required: {network_error}") from exc
         held_domains = frozen_published_domains(
             old_auto, CONFIG.read_text(encoding="utf-8") if CONFIG.exists() else "", old_state)
         official = []  # NEVER turn stale evidence into new authority.
