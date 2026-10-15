@@ -1,0 +1,1607 @@
+{
+  "candidates": [
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN,browser-intake-datadoghq.com",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,chat.openai.com.cdn.cloudflare.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,chat.openai.com.cdn.cloudflare.net",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,o33249.ingest.sentry.io"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": false,
+      "reason": "existing_route_coverage",
+      "rule": "DOMAIN,o33249.ingest.sentry.io",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openai-api.arkoselabs.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openai-api.arkoselabs.com",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openai.qualtrics.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openai.qualtrics.com",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaiapi-site.azureedge.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openaiapi-site.azureedge.net",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaiassets.blob.core.windows.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openaiassets.blob.core.windows.net",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaicom.imgix.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openaicom.imgix.net",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaicomproductionae4b.blob.core.windows.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,production-openaicom-storage.azureedge.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN,production-openaicom-storage.azureedge.net",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN,static.cloudflareinsights.com",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "broad_match_forbidden",
+      "rule": "DOMAIN-KEYWORD,openai",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,ai.com",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,algolia.net",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,api.statsig.com",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "shared_platform_scope_forbidden",
+      "rule": "DOMAIN-SUFFIX,auth0.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "acl4ssr"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,challenges.cloudflare.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "candidate_exceeds_evidence_scope",
+      "rule": "DOMAIN-SUFFIX,challenges.cloudflare.com",
+      "sources": [
+        "acl4ssr"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,chat.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,chat.com",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,chatgpt.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,chatgpt.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,chatgpt.livekit.cloud"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,chatgpt.site"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,chatgpt.site",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,client-api.arkoselabs.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,crixet.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,crixet.com",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,events.statsigapi.net",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,featuregates.org",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,host.livekit.cloud"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,host.livekit.cloud",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,identrust.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,intercom.io"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": false,
+      "reason": "existing_route_coverage",
+      "rule": "DOMAIN-SUFFIX,intercom.io",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,intercomcdn.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": false,
+      "reason": "existing_route_coverage",
+      "rule": "DOMAIN-SUFFIX,intercomcdn.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,launchdarkly.com",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,oaistatic.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,oaistatic.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,oaistatsig.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,oaistatsig.com",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,oaiusercontent.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,oaiusercontent.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,observeit.net",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,openai.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,openai.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net",
+      "sources": [
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaiapi-site.azureedge.net",
+        "DOMAIN,openaiapi-site.azureedge.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "candidate_exceeds_evidence_scope",
+      "rule": "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN,openaicom.imgix.net",
+        "DOMAIN,openaicom.imgix.net"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "candidate_exceeds_evidence_scope",
+      "rule": "DOMAIN-SUFFIX,openaicom.imgix.net",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "official_evidence_unavailable",
+      "rule": "DOMAIN-SUFFIX,segment.io",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "shared_platform_scope_forbidden",
+      "rule": "DOMAIN-SUFFIX,sentry.io",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,sora.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,sora.com",
+      "sources": [
+        "acl4ssr",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "shared_platform_scope_forbidden",
+      "rule": "DOMAIN-SUFFIX,stripe.com",
+      "sources": [
+        "acl4ssr",
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-SUFFIX,turn.livekit.cloud"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-SUFFIX,turn.livekit.cloud",
+      "sources": [
+        "blackmatrix7",
+        "metacubex",
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "v2fly"
+      ],
+      "automatic_coverage": true,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [
+        "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com"
+      ],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": true,
+      "permit_auto": true,
+      "reason": "reviewed_policy",
+      "rule": "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+      "sources": [
+        "v2fly"
+      ],
+      "status": "covered"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "broad_match_forbidden",
+      "rule": "IP-ASN,20473,no-resolve",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "rejected"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "no_official_destination_ip_evidence",
+      "rule": "IP-CIDR,24.199.123.28/32,no-resolve",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    },
+    {
+      "active_sources": [
+        "blackmatrix7"
+      ],
+      "automatic_coverage": false,
+      "decision_changed_at": "2026-10-15T07:25:03+00:00",
+      "evidence_rules": [],
+      "first_seen": "2026-10-15T07:25:03+00:00",
+      "manual_coverage": false,
+      "permit_auto": false,
+      "reason": "no_official_destination_ip_evidence",
+      "rule": "IP-CIDR,64.23.132.171/32,no-resolve",
+      "sources": [
+        "blackmatrix7"
+      ],
+      "status": "pending"
+    }
+  ],
+  "counts": {
+    "approved": 0,
+    "covered": 26,
+    "pending": 14,
+    "rejected": 8,
+    "withdrawn": 0
+  },
+  "evidence": {
+    "official_network": {
+      "available": false,
+      "error": "HTTP 403",
+      "url": "https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps"
+    },
+    "voice": {
+      "rules": [
+        "IP-CIDR,4.151.200.38/32",
+        "IP-CIDR,4.155.146.196/32",
+        "IP-CIDR,4.197.172.116/32",
+        "IP-CIDR,4.217.235.100/32",
+        "IP-CIDR,4.245.198.13/32",
+        "IP-CIDR,13.71.25.29/32",
+        "IP-CIDR,20.74.221.21/32",
+        "IP-CIDR,20.162.96.163/32",
+        "IP-CIDR,20.168.48.117/32",
+        "IP-CIDR,20.184.36.134/32",
+        "IP-CIDR,20.203.144.245/32",
+        "IP-CIDR,40.118.236.137/32",
+        "IP-CIDR,51.4.112.173/32",
+        "IP-CIDR,52.143.181.161/32",
+        "IP-CIDR,68.155.152.41/32",
+        "IP-CIDR,72.146.20.246/32",
+        "IP-CIDR,74.248.148.7/32",
+        "IP-CIDR,102.37.57.54/32",
+        "IP-CIDR,135.220.40.201/32",
+        "IP-CIDR,172.203.39.49/32",
+        "IP-CIDR,172.207.173.200/32",
+        "IP-CIDR,172.214.226.198/32",
+        "IP-CIDR,191.233.251.27/32"
+      ],
+      "sha256": "8f03f3c594165eeff009915c7e2beb4bdfb9d429fb1955c205e3b33ec781899a",
+      "url": "https://openai.com/chatgpt-voice.json"
+    }
+  },
+  "inventory": [
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,4.151.200.38/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,4.151.200.38/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,4.155.146.196/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,4.155.146.196/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,4.197.172.116/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,4.197.172.116/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,4.217.235.100/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,4.217.235.100/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,4.245.198.13/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,4.245.198.13/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,13.71.25.29/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,13.71.25.29/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,20.74.221.21/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,20.74.221.21/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,20.162.96.163/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,20.162.96.163/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,20.168.48.117/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,20.168.48.117/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,20.184.36.134/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,20.184.36.134/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,20.203.144.245/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,20.203.144.245/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,40.118.236.137/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,40.118.236.137/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,51.4.112.173/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,51.4.112.173/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,52.143.181.161/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,52.143.181.161/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,68.155.152.41/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,68.155.152.41/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,72.146.20.246/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,72.146.20.246/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,74.248.148.7/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,74.248.148.7/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,102.37.57.54/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,102.37.57.54/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,135.220.40.201/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,135.220.40.201/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,172.203.39.49/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,172.203.39.49/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,172.207.173.200/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,172.207.173.200/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,172.214.226.198/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,172.214.226.198/32"
+    },
+    {
+      "basis": "official_voice_destination",
+      "evidence_rules": [
+        "IP-CIDR,191.233.251.27/32"
+      ],
+      "layer": "official_voice",
+      "rule": "IP-CIDR,191.233.251.27/32"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openaiapi-site.azureedge.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openaiassets.blob.core.windows.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openaicom.imgix.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openaicomproductionae4b.blob.core.windows.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,production-openaicom-storage.azureedge.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,oaiusercontent.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,chatgpt.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,chatgpt.site"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,crixet.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,oaistatic.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,oaistatsig.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,chat.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,openai.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,sora.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,chatgpt.livekit.cloud"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,host.livekit.cloud"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,turn.livekit.cloud"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openai.qualtrics.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN,openai-api.arkoselabs.com"
+    },
+    {
+      "basis": "published_domain_layer_held_evidence_unavailable",
+      "evidence_rules": [],
+      "layer": "automatic_domains",
+      "rule": "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,openai.fm"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,chatkit.world"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openai-photobooth-demo.vercel.app"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openai-realtime-solar-system-demo.vercel.app"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,openai.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,oaistatic.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,oaiusercontent.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,oaistatsig.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,sora.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,chat.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,crixet.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openai.com.cdn.cloudflare.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openaiapi-site.azureedge.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openaiassets.blob.core.windows.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openaicom.imgix.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openaicomproductionae4b.blob.core.windows.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,production-openaicom-storage.azureedge.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,chatgpt.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,chatgpt.site"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,chatgpt.livekit.cloud"
+    },
+    {
+      "basis": "user_approved_shared_exception",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,host.livekit.cloud"
+    },
+    {
+      "basis": "user_approved_shared_exception",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,turn.livekit.cloud"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,cdn.openaimerge.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openai.qualtrics.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,chat.openai.com.cdn.cloudflare.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,openai-api.arkoselabs.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,ct.sendgrid.net"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,intercom.io"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN-SUFFIX,intercomcdn.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,cdn.workos.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,challenges.cloudflare.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,forwarder.workos.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,frontend-apps-multi-region.workos.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,humb.apple.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,images.workoscdn.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,js.stripe.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,o207216.ingest.sentry.io"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,o33249.ingest.sentry.io"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,rum.browser-intake-datadoghq.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,setup.workos.com"
+    },
+    {
+      "basis": "retained_reviewed_policy_not_current_network_evidence",
+      "evidence_rules": [],
+      "layer": "manual_fallback",
+      "rule": "DOMAIN,workos.imgix.net"
+    }
+  ],
+  "schema_version": 1,
+  "source_urls": {
+    "acl4ssr": "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list",
+    "apple_news": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AppleNews/AppleNews.list",
+    "blackmatrix7": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list",
+    "johnshall": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf",
+    "metacubex": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list",
+    "v2fly": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai",
+    "voice": "https://openai.com/chatgpt-voice.json"
+  }
+}
