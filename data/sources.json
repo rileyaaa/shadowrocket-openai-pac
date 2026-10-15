@@ -37,7 +37,7 @@
       "IP-CIDR,64.23.132.171/32,no-resolve"
     ],
     "official_evidence_available": false,
-    "official_evidence_error": "HTTP 403",
+    "official_evidence_error": "HTTP 403 (Cloudflare challenge)",
     "schema_version": 1
   },
   "settings": {
