@@ -190,6 +190,17 @@ class PipelineHardeningTests(unittest.TestCase):
         self.assertTrue(report["review_warnings"])
         self.assertIn("DOMAIN,news-new-search.apple.com,General Test", build.CONFIG.read_text())
 
+    def test_missing_review_config_warns_without_interrupting_sync(self):
+        self.run_build()
+        before = build.CONFIG.read_bytes()
+        (self.root / "config/review-decisions.json").unlink()
+        self.run_build()
+        report = json.loads((self.root / "report.json").read_text())
+        self.assertTrue(report["review_warnings"])
+        self.assertTrue(report["review_decisions_changed"])
+        self.assertFalse(report["config_changed"])
+        self.assertEqual(build.CONFIG.read_bytes(), before)
+
     def test_manual_rejection_changes_report_but_not_routing(self):
         self.run_build()
         before_config = build.CONFIG.read_bytes()

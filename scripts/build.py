@@ -706,6 +706,12 @@ def run():
         + "# Dedicated first-party and explicitly verified hosted domains\n"
         + "\n".join(emitted_auto) + "\n"
     )
+    # Rejection metadata is optional for routing; a missing file is warned about
+    # by review_queue.evaluate(), not treated as a failed upstream download.
+    try:
+        decision_bytes = (ROOT / "config/review-decisions.json").read_bytes()
+    except OSError:
+        decision_bytes = b""
     source_state = {
         "sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                     for name, (url, data) in source_data.items()},
@@ -714,9 +720,7 @@ def run():
         "review": {
             "excluded_auto_rules": list(excluded_candidates),
             # Track manual rejection file separately from upstream and routing changes.
-            "decisions_sha256": hashlib.sha256(
-                (ROOT / "config/review-decisions.json").read_bytes()
-            ).hexdigest(),
+            "decisions_sha256": hashlib.sha256(decision_bytes).hexdigest(),
         },
     }
     for name, (url, _) in RULESET_SOURCES.items():
