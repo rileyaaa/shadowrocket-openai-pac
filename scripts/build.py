@@ -605,6 +605,10 @@ def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
         sorted(set(excluded_now) - set(excluded_before)) if has_baseline else []
     )
     origin = excluded_sources or {}
+    old_review = old_state.get("review", {})
+    current_review = current.get("review", {})
+    previous_decisions_sha = old_review.get("decisions_sha256")
+    current_decisions_sha = current_review.get("decisions_sha256")
     return {
         "changed_sources": sorted(
             key for key, source in current["sources"].items()
@@ -612,6 +616,13 @@ def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
         ),
         "config_changed": config_changed,
         "settings_changed": old_state.get("settings") != current["settings"],
+        # Compare only against a previously published audit fingerprint.
+        # Adding the fingerprint to an old repo should not claim a new decision.
+        "review_decisions_changed": (
+            isinstance(previous_decisions_sha, str)
+            and isinstance(current_decisions_sha, str)
+            and previous_decisions_sha != current_decisions_sha
+        ),
         "statistics": current["statistics"],
         "stat_deltas": {
             k: v - old_stats[k] for k, v in current["statistics"].items()
@@ -700,7 +711,13 @@ def run():
                     for name, (url, data) in source_data.items()},
         "settings": settings, "statistics": stats,
         # Only a review baseline: never feed these rejected rules into .conf.
-        "review": {"excluded_auto_rules": list(excluded_candidates)},
+        "review": {
+            "excluded_auto_rules": list(excluded_candidates),
+            # Track manual rejection file separately from upstream and routing changes.
+            "decisions_sha256": hashlib.sha256(
+                (ROOT / "config/review-decisions.json").read_bytes()
+            ).hexdigest(),
+        },
     }
     for name, (url, _) in RULESET_SOURCES.items():
         source_state["sources"][name]["rule_count"] = len(rulesets[url])

@@ -211,11 +211,32 @@ def render_queue(review: dict) -> str:
     return "\n".join(rows) + "\n"
 
 
+def current_review_candidates(path: Path) -> set[str]:
+    """Only published, exact review candidates can receive a NEW rejection."""
+    snapshot = path.parent.parent / "data/sources.json"
+    try:
+        rules = json.loads(snapshot.read_text(encoding="utf-8"))["review"]["excluded_auto_rules"]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError("无法读取已发布的待审核基线 data/sources.json；请先成功同步规则") from exc
+    if (not isinstance(rules, list)
+            or any(not isinstance(item, str) or not item for item in rules)):
+        raise ValueError("已发布待审核基线格式无效；拒绝写入未经核实的新规则")
+    return set(rules)
+
+
 def record_rejection(path: Path, rule: str, reason: str, months: int | None = None,
                      on: date | None = None) -> None:
     on = on or today()
+    nonempty_text(rule, "rule")
+    nonempty_text(reason, "reason")
     data = validate_policy(json.loads(path.read_text(encoding="utf-8")), on)
     existing = next((item for item in data["rejected_rules"] if item["rule"] == rule), {})
+    if not existing and rule not in current_review_candidates(path):
+        raise ValueError(
+            "规则不在当前已发布的待审核列表："
+            + rule + "；请从 data/review-queue.md 复制完整规则，或先运行一次正常同步"
+        )
+    # A recorded rejection can still be renewed after its upstream candidate vanishes.
     item = {**existing, "rule": rule, "reason": reason, "reviewed_at": on.isoformat()}
     if months is not None:
         item["review_after_months"] = months

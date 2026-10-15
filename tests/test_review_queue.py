@@ -29,6 +29,8 @@ class ManualReviewTests(unittest.TestCase):
         self.policy = review.default_policy()
         self.on = date(2026, 10, 15)
         review.write_json(self.policy_path, self.policy)
+        review.write_json(self.root / "data/sources.json",
+                          {"review": {"excluded_auto_rules": [self.rule]}})
 
     def reject(self, at="2026-04-15", months=None, rule=None):
         item = {"rule": rule or self.rule, "reason": "证据不足，半年后复核", "reviewed_at": at}
@@ -81,6 +83,42 @@ class ManualReviewTests(unittest.TestCase):
         self.ack(late, date(2026, 11, 4))
         self.assertEqual(self.evaluate(date(2026, 11, 10))["due_candidates"], [])
         self.assertEqual(len(self.evaluate(date(2026, 11, 11))["due_candidates"]), 1)
+
+    def test_manual_rejection_requires_exact_published_candidate(self):
+        before = self.policy_path.read_bytes()
+        for typo in ("DOMAIN,typo.vendor.example", "domain-suffix,vendor.example",
+                     "DOMAIN-SUFFIX,vendor.example,Proxy"):
+            with self.subTest(typo=typo), self.assertRaisesRegex(ValueError, "不在当前已发布"):
+                review.record_rejection(self.policy_path, typo, "无法确认来源", on=self.on)
+            self.assertEqual(self.policy_path.read_bytes(), before)
+        review.record_rejection(self.policy_path, self.rule, "已核实暂不放行", on=self.on)
+        recorded = json.loads(self.policy_path.read_text())["rejected_rules"]
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0]["rule"], self.rule)
+
+    def test_missing_or_corrupt_candidate_baseline_blocks_new_rejection(self):
+        state = self.root / "data/sources.json"
+        before = self.policy_path.read_bytes()
+        state.unlink()
+        with self.assertRaisesRegex(ValueError, "待审核基线"):
+            review.record_rejection(self.policy_path, self.rule, "未经核实", on=self.on)
+        state.write_text("{broken")
+        with self.assertRaisesRegex(ValueError, "待审核基线"):
+            review.record_rejection(self.policy_path, self.rule, "未经核实", on=self.on)
+        review.write_json(state, {"review": {"excluded_auto_rules": "bad"}})
+        with self.assertRaisesRegex(ValueError, "基线格式无效"):
+            review.record_rejection(self.policy_path, self.rule, "未经核实", on=self.on)
+        self.assertEqual(self.policy_path.read_bytes(), before)
+
+    def test_existing_rejection_can_be_renewed_after_candidate_disappears(self):
+        review.record_rejection(self.policy_path, self.rule, "初次审核", on=self.on)
+        review.write_json(self.root / "data/sources.json",
+                          {"review": {"excluded_auto_rules": []}})
+        review.record_rejection(self.policy_path, self.rule, "来源已移除，仍保留决定",
+                                on=date(2026, 10, 16))
+        entry = json.loads(self.policy_path.read_text())["rejected_rules"][0]
+        self.assertEqual(entry["reviewed_at"], "2026-10-16")
+        self.assertEqual(entry["reason"], "来源已移除，仍保留决定")
 
     def test_re_review_renews_date_and_retains_per_rule_month_override(self):
         self.reject(at="2025-10-15", months=12)

@@ -70,6 +70,19 @@ class SyncReportTests(unittest.TestCase):
         self.assertIn("检查成功，无变化", text)
         self.assertIn("定时运行", text)
 
+    def test_manual_review_file_change_is_reported_separately_from_routes(self):
+        old = {"statistics": self.stats, "settings": {}, "sources": {},
+               "review": {"excluded_auto_rules": [], "decisions_sha256": "a" * 64}}
+        current = {**old, "review": {"excluded_auto_rules": [], "decisions_sha256": "b" * 64}}
+        report = build.make_sync_report(old, current, "", "", False)
+        self.assertTrue(report["review_decisions_changed"])
+        text = notify_telegram.format_report(report, "workflow_dispatch", "", "")
+        self.assertIn("人工审核记录文件已变更，分流配置无变化", text)
+        self.assertNotIn("检查成功，无变化", text)
+        self.assertFalse(build.make_sync_report(current, current, "", "", False)["review_decisions_changed"])
+        initial = {**old, "review": {"excluded_auto_rules": []}}
+        self.assertFalse(build.make_sync_report(initial, current, "", "", False)["review_decisions_changed"])
+
     def test_excluded_rules_are_deduplicated_and_have_provenance(self):
         sources = {
             "metacubex": ["DOMAIN-SUFFIX,chatgpt.com", "DOMAIN,brand-new.vendor.example"],

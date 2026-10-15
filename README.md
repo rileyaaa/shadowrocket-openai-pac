@@ -136,7 +136,7 @@ python scripts/build.py
 
 ```json
 {
-  "rule": "DOMAIN,unverified.vendor.example",
+  "rule": "DOMAIN-SUFFIX,algolia.net",
   "reason": "暂缺可核实的 OpenAI 使用依据，后续重新核对",
   "reviewed_at": "2026-10-15",
   "review_after_months": 6
@@ -151,12 +151,12 @@ python scripts/build.py
 2. `reject_reason` 填本次不通过原因。
 3. `review_months` 可填 `6` 或 `12`；留空时保留该条已有设置，或者使用全局默认。
 
-程序自动填写当天审核日期；同一规则更新原记录，不重复新增。同步成功后保存至仓库。如本次同步失败，人工记录尚未提交，需要重新运行。也可以直接编辑 JSON，只更新对应 `reviewed_at` 并提交，下一次复审日期就会重新计算。全局默认月数的变更影响所有未单独指定间隔的记录。
+程序自动填写当天审核日期；同一规则更新原记录，不重复新增。**新登记的规则必须与当前已发布的 `data/review-queue.md` / `data/sources.json` 待审核基线完全一致**（包括规则类型及参数），不接受拼写错误或未出现过的规则；新上游候选请先完成一次正常同步。已经记录过的规则即使后来从上游消失，仍可更新审核日期。同步成功后保存至仓库。如本次同步失败，人工记录尚未提交，需要重新运行。也可以直接编辑 JSON，只更新对应 `reviewed_at` 并提交，下一次复审日期就会重新计算。全局默认月数的变更影响所有未单独指定间隔的记录。
 
 本地操作等价于：
 
 ```bash
-python scripts/review_queue.py --rule 'DOMAIN,unverified.vendor.example' --reason '仍需更多依据' --months 12
+python scripts/review_queue.py --rule 'DOMAIN-SUFFIX,algolia.net' --reason '仍需更多依据' --months 12
 ```
 
 审核通过时，按原维护流程修改允许规则或手工规则，并删除对应的不通过记录；**仅删除不通过记录、收到提醒或到期，都不会自动放行**。已有允许规则的审批要求仍然有效。
@@ -167,6 +167,7 @@ python scripts/review_queue.py --rule 'DOMAIN,unverified.vendor.example' --reaso
 - 到期还未处理时，默认每 7 天再提醒一次；更新审核日期后重新进入半年或一年周期。候选从上游消失则暂不提醒，人工记录保留；以后再次出现仍按原决定和日期处理。
 - 新的未审核项随原通知报告；发送失败时保持待送达，下一次成功同步重试。已送达的新候选不每天重复报“新增”，仍保留在审核清单中。
 - 只有 Telegram 返回成功才记录送达日期；发送失败、缺少 Secret 都不会提前消耗提醒。送达状态保存在 `data/review-notifications.json`，通知后另行提交；若发送成功但回执提交失败，下次可能重复提醒，避免静默漏报。
+- 人工审核记录文件变更由 `data/sources.json` 中的审查指纹识别，Telegram 会单独提示「人工审核记录文件已变更，分流配置无变化」，不会再错误地显示「检查成功，无变化」；初次建立审查指纹不会误报成新审核决定。
 - 初次启用沿用已有排除项基线，不把旧候选报成新增。实际已被自动或手工 OpenAI 规则覆盖的候选免重复审核，但不会删除独立手工兜底规则。
 - **OpenAI 专用层的 IP 只采用官方 `https://openai.com/chatgpt-voice.json` 的语音目的地址。** 社区 IP/ASN 只保留来源记录，不进入人工域名复审提醒或任何新增 OpenAI IP 列表。官方数据仍执行格式、范围和覆盖变化检查；它是 Voice 目的 IP 来源，不代替其他 OpenAI 业务的域名规则，也不改变 Johnshall 原有 IP 规则。
 - 未识别的 `regexp:`、`include:`、`keyword:` 等非 IP 规则继续进入人工审核，不静默丢弃。审核 JSON 或通知状态格式错误会在报告中警告并暂停相应免提醒，不阻塞正常分流更新；上游内容本身的完整性与范围校验仍照常阻止异常发布。

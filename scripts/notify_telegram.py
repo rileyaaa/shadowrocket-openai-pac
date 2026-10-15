@@ -35,6 +35,11 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     sources = report["changed_sources"]
     result = ("配置已更新" if report["config_changed"] else
               "上游发生变化，最终配置无变化" if sources else "检查成功，无变化")
+    if report.get("review_decisions_changed"):
+        # The audit record can change while the actual Shadowrocket route stays identical.
+        # A malformed record is still a file change, not a successful approval.
+        result = (result + "；人工审核记录文件已变更" if report["config_changed"] or sources
+                  else "人工审核记录文件已变更，分流配置无变化")
     lines = [
         "✅ Shadowrocket GitHub Actions 成功",
         f"时间：{when} (UTC+8)", f"触发：{EVENTS.get(event, event)}",

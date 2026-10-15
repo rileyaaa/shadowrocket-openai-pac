@@ -190,12 +190,37 @@ class PipelineHardeningTests(unittest.TestCase):
         self.assertTrue(report["review_warnings"])
         self.assertIn("DOMAIN,news-new-search.apple.com,General Test", build.CONFIG.read_text())
 
+    def test_manual_rejection_changes_report_but_not_routing(self):
+        self.run_build()
+        before_config = build.CONFIG.read_bytes()
+        before_auto = (self.root / "rules/openai-auto.list").read_bytes()
+        source = build.DOMAIN_SOURCES["acl4ssr"][0]
+        candidate = "DOMAIN-SUFFIX,auth0.com"
+        self.sources[source] += ("\n" + candidate + "\n").encode()
+        self.run_build()  # Refresh the published review candidates.
+        review_queue.record_rejection(self.root / "config/review-decisions.json",
+                                      candidate, "社区共享域名，暂不放行", on=date(2026, 10, 15))
+        with patch.object(review_queue, "today", return_value=date(2026, 10, 15)):
+            self.run_build()
+        report = json.loads((self.root / "report.json").read_text())
+        self.assertTrue(report["review_decisions_changed"])
+        self.assertFalse(report["config_changed"])
+        self.assertEqual(build.CONFIG.read_bytes(), before_config)
+        self.assertEqual((self.root / "rules/openai-auto.list").read_bytes(), before_auto)
+        text = notify_telegram.format_report(report, "workflow_dispatch", "test/repo", "")
+        self.assertIn("人工审核记录文件已变更，分流配置无变化", text)
+        self.run_build()
+        repeated = json.loads((self.root / "report.json").read_text())
+        self.assertFalse(repeated["review_decisions_changed"])
+
     def test_expiring_rejection_reaches_report_without_changing_routes(self):
         self.run_build()
         before = build.CONFIG.read_bytes()
         candidate = "DOMAIN,unverified.vendor.example"
         typed_url = build.DOMAIN_SOURCES["acl4ssr"][0]
         self.sources[typed_url] += ("\n" + candidate + "\n").encode()
+        # Publish the candidate to the review queue before recording a rejection.
+        self.run_build()
         review_queue.record_rejection(self.root / "config/review-decisions.json", candidate,
                                       "暂缺依据", on=date(2026, 1, 31))
         with patch.object(review_queue, "today", return_value=date(2026, 7, 30)):
