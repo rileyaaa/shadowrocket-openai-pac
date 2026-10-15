@@ -39,7 +39,7 @@ jobs:
         run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
       - name: Commit only when upstream changes
         run: |
-          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json
+          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json data/openai-review.json
           if git diff --cached --quiet; then
             echo "No changes; already in sync."
             exit 0

@@ -14,6 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import build
 import notify_telegram
+import review_rules
 
 
 def http_response(body, headers):
@@ -84,6 +85,7 @@ class PipelineHardeningTests(unittest.TestCase):
         self.sources = {
             build.BASE_URL: self.base,
             build.VOICE_URL: json.dumps(self.voice).encode(),
+            review_rules.NETWORK_URL: (Path(__file__).parent / "fixtures/official-network.html").read_bytes(),
             self.apple_url: b"# NAME: AppleNews\n# TOTAL: 2\nDOMAIN,gspe1-ssl.ls.apple.com\nDOMAIN,news-client-search.apple.com\n",
         }
         for name, (url, fmt) in build.DOMAIN_SOURCES.items():

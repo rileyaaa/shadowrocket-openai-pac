@@ -534,7 +534,7 @@ class BuildTest(unittest.TestCase):
         same_rule = "DOMAIN-SUFFIX,chatgpt.com,美国US-1,force-remote-dns"
         self.assertEqual(output.count(same_rule), 2)
         self.assertLess(
-            output.index("# [1b] OpenAI automatic rules - public domain rules"),
+            output.index("# [1b] OpenAI automatic rules - reviewed domains and official network allowlist"),
             output.index("# [2] Independent manual OpenAI fallback"),
         )
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com,美国US-1,force-remote-dns", output)
