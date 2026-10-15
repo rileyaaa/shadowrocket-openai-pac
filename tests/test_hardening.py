@@ -1,6 +1,7 @@
 """Regression tests for the four 2026-10-15 audit findings, without network I/O."""
 import contextlib
 import copy
+from datetime import date
 import hashlib
 import http.client
 import io
@@ -14,6 +15,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import build
 import notify_telegram
+import review_queue
 
 
 def http_response(body, headers):
@@ -77,6 +79,7 @@ class PipelineHardeningTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "config").mkdir()
         (self.root / "config/manual-openai.rules").write_bytes(self.manual)
+        review_queue.write_json(self.root / "config/review-decisions.json", review_queue.default_policy())
         self.voice = {"prefixes": [{"ipv4Prefix": f"8.8.4.{i}/32"} for i in range(1, 6)]}
         domains = ["openai.com", "chatgpt.com", "oaistatic.com", "oaiusercontent.com",
                    "oaistatsig.com", "sora.com", "crixet.com", "chat.com",
@@ -164,16 +167,50 @@ class PipelineHardeningTests(unittest.TestCase):
         self.run_build()
         report = json.loads((self.root / "report.json").read_text())
         actual = {item["rule"]: item["sources"] for item in report["new_excluded_candidates"]}
-        self.assertEqual(actual, {**{rule: ["v2fly"] for rule in candidates},
-                                  "IP-ASN,20473,no-resolve": ["acl4ssr"]})
+        self.assertEqual(actual, {rule: ["v2fly"] for rule in candidates})
+        self.assertEqual(report["manual_review_counts"]["official_ip_only"], 1)
+        self.assertIn("IP-ASN,20473,no-resolve", (self.root / "data/review-queue.md").read_text())
         output = build.CONFIG.read_text()
         message = notify_telegram.format_report(report, "push", "test/repo", "")
         for rule in candidates:
             self.assertIn(rule, message)
             self.assertNotIn(rule, output)
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com,OpenAI Test", output)
+        review_queue.acknowledge(report, self.root / "data/review-notifications.json")
         self.run_build()
         self.assertEqual(json.loads((self.root / "report.json").read_text())["new_excluded_candidates"], [])
+
+    def test_bad_review_config_warns_without_freezing_route_updates(self):
+        self.run_build()
+        (self.root / "config/review-decisions.json").write_text("invalid JSON")
+        self.sources[self.apple_url] = self.sources[self.apple_url].replace(b"news-client-search", b"news-new-search")
+        self.run_build()
+        report = json.loads((self.root / "report.json").read_text())
+        self.assertTrue(report["config_changed"])
+        self.assertTrue(report["review_warnings"])
+        self.assertIn("DOMAIN,news-new-search.apple.com,General Test", build.CONFIG.read_text())
+
+    def test_expiring_rejection_reaches_report_without_changing_routes(self):
+        self.run_build()
+        before = build.CONFIG.read_bytes()
+        candidate = "DOMAIN,unverified.vendor.example"
+        typed_url = build.DOMAIN_SOURCES["acl4ssr"][0]
+        self.sources[typed_url] += ("\n" + candidate + "\n").encode()
+        review_queue.record_rejection(self.root / "config/review-decisions.json", candidate,
+                                      "暂缺依据", on=date(2026, 1, 31))
+        with patch.object(review_queue, "today", return_value=date(2026, 7, 30)):
+            self.run_build()
+        early = json.loads((self.root / "report.json").read_text())
+        self.assertEqual(early["review_due_candidates"], [])
+        self.assertEqual(early["new_excluded_candidates"], [])
+        with patch.object(review_queue, "today", return_value=date(2026, 7, 31)):
+            self.run_build()
+        due = json.loads((self.root / "report.json").read_text())
+        self.assertEqual(due["review_due_candidates"][0]["rule"], candidate)
+        message = notify_telegram.format_report(due, "schedule", "test/repo", "")
+        self.assertIn("到期复审", message)
+        self.assertIn(candidate, message)
+        self.assertEqual(build.CONFIG.read_bytes(), before)
 
     def test_missing_footer_or_mitm_preserves_published_files(self):
         self.run_build()

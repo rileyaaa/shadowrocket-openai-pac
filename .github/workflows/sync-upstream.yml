@@ -2,6 +2,19 @@ name: Sync Johnshall and OpenAI rules
 
 on:
   workflow_dispatch:
+    inputs:
+      reject_rule:
+        description: '可选：人工不通过或续期的完整规则；留空只同步'
+        required: false
+        type: string
+      reject_reason:
+        description: '不通过原因；填写规则时必填'
+        required: false
+        type: string
+      review_months:
+        description: '复审月数（如 6 或 12）；留空保留已有设置或用全局默认'
+        required: false
+        type: string
   schedule:
     # Johnshall publishes around 07:04 Asia/Taipei daily.
     # MetaCubeX is the latest regular daily source; recent builds completed around 09:09-10:27.
@@ -35,11 +48,23 @@ jobs:
           python-version: '3.12'
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
+      - name: Record explicit manual rejection or renew its review date
+        if: github.event_name == 'workflow_dispatch' && inputs.reject_rule != ''
+        env:
+          REVIEW_RULE: ${{ inputs.reject_rule }}
+          REVIEW_REASON: ${{ inputs.reject_reason }}
+          REVIEW_MONTHS: ${{ inputs.review_months }}
+        run: |
+          args=(--rule "$REVIEW_RULE" --reason "$REVIEW_REASON")
+          if [ -n "$REVIEW_MONTHS" ]; then
+            args+=(--months "$REVIEW_MONTHS")
+          fi
+          python scripts/review_queue.py "${args[@]}"
       - name: Generate verified Shadowrocket config
         run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
       - name: Commit only when upstream changes
         run: |
-          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json
+          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json data/review-queue.md data/review-notifications.json config/review-decisions.json
           if git diff --cached --quiet; then
             echo "No changes; already in sync."
             exit 0
@@ -49,9 +74,22 @@ jobs:
           git commit -m "chore: sync Johnshall and OpenAI rules"
           git push origin HEAD:main
       - name: Telegram report after successful Actions run
+        id: telegram
         if: success()
         continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/notify_telegram.py --report-file "$RUNNER_TEMP/sync-report.json"
+        run: python scripts/notify_telegram.py --report-file "$RUNNER_TEMP/sync-report.json" --review-state-file data/review-notifications.json
+      - name: Persist delivered review reminders
+        if: steps.telegram.outcome == 'success'
+        run: |
+          git add -- data/review-notifications.json
+          if git diff --cached --quiet; then
+            echo "No review receipt changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: record delivered review reminders"
+          git push origin HEAD:main

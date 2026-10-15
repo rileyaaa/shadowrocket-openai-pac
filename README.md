@@ -80,7 +80,7 @@ python -m unittest discover -s tests -v
 python scripts/build.py
 ```
 
-构建失败时不会提交不完整结果；成功时只提交更新的完整 `.conf`、自动列表和数据源校验信息。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf` 和自动 `.list`**，否则下次同步会覆盖。
+构建失败时不会提交不完整结果；成功时提交更新的完整 `.conf`、自动列表、数据源校验信息和审核清单。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf` 和自动 `.list`**，否则下次同步会覆盖。
 
 ## GitHub Actions 成功后 Telegram 推送
 
@@ -117,14 +117,59 @@ python scripts/build.py
 
 全部七个上游下载（含构建时内嵌的 Apple News 规则）采用最多两次请求：初次失败后延迟 2 秒重试 1 次。响应提供 `Content-Length` 时，必须与实际接收字节数一致；分块传输不完整、HTTP/网络错误及大小异常同样触发重试。两次都失败则停止构建并保留上一次成功发布的 `.conf`。Johnshall 文件还必须保留预期结尾标记、非空 URL Rewrite 及 MITM hostname，避免末尾缺失却仍满足规则条数检查。
 
-## 上游新增但被排除的域名审查
+## 人工不通过记录与定期复审
 
-每次成功构建时，安全白名单继续严格筛选四份社区 OpenAI 规则源。对于未获准进入 OpenAI 自动规则的域名，以及解析器未支持的原始规则，程序会把完整排序清单保存到 data/sources.json 的 review.excluded_auto_rules 中，作为下一次构建的观察基线。v2fly 的未知 `regexp:`、`include:`、`keyword:` 和 typed 源中未转换的 IP/ASN 等条目会保留原文、标注来源并进入同一审核报告；不会静默丢弃，也不会自动扩大分流范围。v2fly 的 `domain:` 按后缀规则解析后仍需通过原有白名单。
+继续使用现有人工审核：固定允许规则照常更新，白名单之外的候选不自动放行。无需 AI API，也不抓取带 Cloudflare 验证的帮助中心网页。完整来源记录仍保留在 `data/sources.json` 的 `review.excluded_auto_rules`；[人工审核清单](data/review-queue.md) 展示每条候选的来源、状态、上次审核和下次复审日期。
 
-- 初次启用时先建立旧排除项基线，不把已经存在的规则误报成新增。
-- 后续上游出现新的排除项，Actions 成功后原 Telegram 消息会列出新增规则、来源及数量（最多展示前 8 条），Actions Summary 展示完整新增清单。
-- 本次没有新的排除项，就报告无新增，不反复提醒旧候选。
-- 这些规则只用于人工审核，从未自动加入 .conf、自动列表或手工兜底。共享第三方域名不会因为出现在上游就被直接导向 OpenAI 节点。
+[config/review-decisions.json](config/review-decisions.json) 是人工不通过记录表，只影响提醒，不是第三份分流规则或额外 IP 可信清单。新建时为空，旧排除项不冒充人工已审核结果。字段如下：
+
+| 字段 | 含义 |
+|---|---|
+| `default_review_months` | 默认复审间隔，初始 6 个日历月，可改为 12 |
+| `reminder_interval_days` | 已到期但未处理时，两次成功提醒之间的间隔，初始 7 天 |
+| `rejected_rules[].rule` | 完整规则，精确匹配；拒绝父域规则不自动拒绝子域或不同写法 |
+| `reason` | 人工不通过的原因 |
+| `reviewed_at` | 上次人工审核日期，格式 `YYYY-MM-DD`，按台北日期计算 |
+| `review_after_months` | 可选的单条复审间隔；未填写时使用全局默认 |
+
+例如，人工确实审核不通过后，可以加入下面这样的记录（仅为填写示例，未预置到实际记录表）：
+
+```json
+{
+  "rule": "DOMAIN,unverified.vendor.example",
+  "reason": "暂缺可核实的 OpenAI 使用依据，后续重新核对",
+  "reviewed_at": "2026-10-15",
+  "review_after_months": 6
+}
+```
+
+### 记录不通过结果或续期
+
+在 GitHub **Actions → Sync Johnshall and OpenAI rules → Run workflow**：
+
+1. `reject_rule` 填审核清单中的完整规则；留空时只执行原同步。
+2. `reject_reason` 填本次不通过原因。
+3. `review_months` 可填 `6` 或 `12`；留空时保留该条已有设置，或者使用全局默认。
+
+程序自动填写当天审核日期；同一规则更新原记录，不重复新增。同步成功后保存至仓库。如本次同步失败，人工记录尚未提交，需要重新运行。也可以直接编辑 JSON，只更新对应 `reviewed_at` 并提交，下一次复审日期就会重新计算。全局默认月数的变更影响所有未单独指定间隔的记录。
+
+本地操作等价于：
+
+```bash
+python scripts/review_queue.py --rule 'DOMAIN,unverified.vendor.example' --reason '仍需更多依据' --months 12
+```
+
+审核通过时，按原维护流程修改允许规则或手工规则，并删除对应的不通过记录；**仅删除不通过记录、收到提醒或到期，都不会自动放行**。已有允许规则的审批要求仍然有效。
+
+### 提醒与更新的行为
+
+- 未到复审日期的拒绝项跳过提醒。到期当天或之后第一次成功同步时，原 Telegram 消息会列出复审项、上次审核日期和到期日期；Actions Summary 展示完整清单和此前原因。月底按实际月末计算，例如 8 月 31 日的半年后为次年 2 月末。
+- 到期还未处理时，默认每 7 天再提醒一次；更新审核日期后重新进入半年或一年周期。候选从上游消失则暂不提醒，人工记录保留；以后再次出现仍按原决定和日期处理。
+- 新的未审核项随原通知报告；发送失败时保持待送达，下一次成功同步重试。已送达的新候选不每天重复报“新增”，仍保留在审核清单中。
+- 只有 Telegram 返回成功才记录送达日期；发送失败、缺少 Secret 都不会提前消耗提醒。送达状态保存在 `data/review-notifications.json`，通知后另行提交；若发送成功但回执提交失败，下次可能重复提醒，避免静默漏报。
+- 初次启用沿用已有排除项基线，不把旧候选报成新增。实际已被自动或手工 OpenAI 规则覆盖的候选免重复审核，但不会删除独立手工兜底规则。
+- **OpenAI 专用层的 IP 只采用官方 `https://openai.com/chatgpt-voice.json` 的语音目的地址。** 社区 IP/ASN 只保留来源记录，不进入人工域名复审提醒或任何新增 OpenAI IP 列表。官方数据仍执行格式、范围和覆盖变化检查；它是 Voice 目的 IP 来源，不代替其他 OpenAI 业务的域名规则，也不改变 Johnshall 原有 IP 规则。
+- 未识别的 `regexp:`、`include:`、`keyword:` 等非 IP 规则继续进入人工审核，不静默丢弃。审核 JSON 或通知状态格式错误会在报告中警告并暂停相应免提醒，不阻塞正常分流更新；上游内容本身的完整性与范围校验仍照常阻止异常发布。
 
 没有新增定时任务，继续随每天 11:00、手动和配置修改触发的 GitHub Actions 成功运行后推送。
 

@@ -17,6 +17,7 @@ import sys
 import time
 import urllib.request
 from urllib.parse import quote
+import review_queue
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
@@ -708,12 +709,25 @@ def run():
         old_state, source_state, old_auto, automatic_source, changed,
         excluded_sources=excluded_candidates,
     )
+    review, delivery = review_queue.evaluate(
+        excluded_candidates, (old_state or {}).get("review", {}).get("excluded_auto_rules"),
+        emitted_auto + emitted_manual, domain_rule_covers, ROOT,
+    )
+    report.update(
+        new_excluded_candidates=review["new_candidates"],
+        review_due_candidates=review["due_candidates"],
+        manual_review_counts=review["counts"],
+        review_reminder_interval_days=review["reminder_interval_days"],
+        review_warnings=review["warnings"],
+    )
     # All validation is complete before touching generated output files.
     write_if_changed(CONFIG, built)
     write_if_changed(auto_path, automatic_source)
     for name, (_, snapshot_path) in RULESET_SOURCES.items():
         write_if_changed(ROOT / snapshot_path, source_data[name][1].decode("utf-8"))
     write_if_changed(state_path, json.dumps(source_state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+    write_if_changed(ROOT / "data/review-queue.md", review_queue.render_queue(review))
+    review_queue.write_json(ROOT / "data/review-notifications.json", delivery)
     if opt.report_file:
         write_if_changed(opt.report_file, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(stats, ensure_ascii=False))

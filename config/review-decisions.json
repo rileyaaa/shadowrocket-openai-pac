@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "default_review_months": 6,
+  "reminder_interval_days": 7,
+  "rejected_rules": []
+}

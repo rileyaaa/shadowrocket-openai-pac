@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.request
 from zoneinfo import ZoneInfo
+import review_queue
 
 NAMES = {
     "johnshall": "Johnshall", "voice": "OpenAI Voice", "metacubex": "MetaCubeX",
@@ -48,7 +49,7 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     if "embedded_ruleset_rules" in report["statistics"]:
         lines.append(f"已校验内嵌规则：{report['statistics']['embedded_ruleset_rules']:,}")
     if "unparsed_upstream_rules" in report["statistics"]:
-        lines.append(f"未支持格式待审核：{report['statistics']['unparsed_upstream_rules']:,}")
+        lines.append(f"未转换原始规则留档：{report['statistics']['unparsed_upstream_rules']:,}")
     if report.get("settings_changed"):
         lines.append("节点名称：已更新")
     added, removed = report["auto_added"], report["auto_removed"]
@@ -61,20 +62,39 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     candidates = report.get("new_excluded_candidates", [])
     reviewed_total = report.get("excluded_review_total", 0)
     lines.append("")
-    if report.get("excluded_review_baseline_created", False):
+    if report.get("excluded_review_baseline_created", False) and not candidates:
         lines.append(f"🔎 待审核基线已建立：现有 {reviewed_total} 条旧排除项，不计为新增")
     elif not candidates:
         lines.append(f"🔎 上游新增待审核规则：无（当前排除项 {reviewed_total} 条）")
     else:
-        lines.append(f"🔎 上游新增待审核规则：{len(candidates)} 条（未自动分流）")
-        for item in candidates[:8]:
+        lines.append(f"🔎 上游新增待审核规则：{len(candidates)} 条（含未送达重试，未自动分流）")
+        for item in candidates[:4]:
             where = ", ".join(NAMES.get(s, s) for s in item["sources"])
-            lines.append(f"· {item['rule']} [{where or '来源待查'}]")
-        if len(candidates) > 8:
-            lines.append(f"其余 {len(candidates)-8} 条请查看本次 Actions 摘要")
+            lines.append(f"· {item['rule'][:160]} [{where or '来源待查'}]")
+        if len(candidates) > 4:
+            lines.append(f"其余 {len(candidates)-4} 条请查看本次 Actions 摘要")
+    due = report.get("review_due_candidates", [])
+    if due:
+        lines.extend(["", f"⏰ 人工不通过记录到期复审：{len(due)} 条（到期不自动放行）"])
+        for item in due[:4]:
+            lines.append(f"· {item['rule'][:160]}（上次 {item['reviewed_at']}；到期 {item['review_due_on']}）")
+        if len(due) > 4:
+            lines.append(f"其余 {len(due)-4} 条请查看本次 Actions 摘要")
+        lines.append("仍不通过：更新 reviewed_at 或用 Run workflow 记录；通过需另改允许规则。")
+    counts = report.get("manual_review_counts")
+    if counts is not None:
+        lines.append(f"审核状态：待审 {counts['pending']} / 暂不提醒 {counts['cooling']} / 到期 {counts['due']}")
+        lines.append(f"免重复审核：已覆盖 {counts['covered']} / 社区 IP、ASN 留档 {counts['official_ip_only']}")
+        if counts["due"]:
+            lines.append(f"未处理到期项每 {report['review_reminder_interval_days']} 天提醒一次。")
+    for warning in report.get("review_warnings", []):
+        lines.append("⚠️ " + warning)
+    message = "\n".join(lines)
+    if len(message) > 3400:
+        message = message[:3300] + "\n…完整清单请查看 Actions 摘要。"
     if run_url:
-        lines.extend(["", f"Actions：{run_url}"])
-    return "\n".join(lines)[:3900]
+        message += f"\n\nActions：{run_url}"
+    return message
 
 
 def send(bot_token: str, chat_id: str, text: str) -> None:
@@ -103,6 +123,7 @@ def send(bot_token: str, chat_id: str, text: str) -> None:
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--report-file", type=Path, required=True)
+    p.add_argument("--review-state-file", type=Path, help="仅在 Telegram 成功后更新送达状态")
     args = p.parse_args()
     report = json.loads(args.report_file.read_text(encoding="utf-8"))
     repo = os.environ.get("GITHUB_REPOSITORY", "")
@@ -120,6 +141,14 @@ def main() -> int:
                 for item in candidates:
                     where = ", ".join(NAMES.get(s, s) for s in item["sources"])
                     summary.write(f"- {item['rule']} — {where or '来源待查'}\n")
+            due = report.get("review_due_candidates", [])
+            if due:
+                summary.write("\n### 到期复审完整清单（未自动放行）\n\n")
+                for item in due:
+                    where = ", ".join(NAMES.get(s, s) for s in item["sources"])
+                    summary.write(f"- {item['rule']} — {where}\n"
+                                  f"  上次审核：{item['reviewed_at']}；到期：{item['review_due_on']}；"
+                                  f"此前原因：{item['reason']}\n")
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not token or not chat_id:
@@ -131,6 +160,12 @@ def main() -> int:
         print("::warning::Telegram message not sent; check Secret, chat ID, and /start.")
         return 1
     print("Telegram report sent.")
+    if args.review_state_file:
+        try:
+            review_queue.acknowledge(report, args.review_state_file)
+        except (OSError, ValueError, TypeError):
+            print("::warning::Telegram delivered, but receipt could not be saved; next run may repeat the reminder.")
+            return 1
     return 0
 
 
