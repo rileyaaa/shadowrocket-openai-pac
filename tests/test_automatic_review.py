@@ -225,6 +225,49 @@ class AutomaticReviewPipelineTests(unittest.TestCase):
                 self.run_build()
         self.assertEqual(self.published_files(), before)
 
+    def test_strict_recovery_requires_live_evidence_and_changes_no_outputs_on_failure(self):
+        self.run_build()
+        before = self.published_files()
+        with patch.object(sys, "argv", ["build.py", "--require-fresh-network"]), \
+                patch.object(build, "fetch", side_effect=self.unavailable_network):
+            with self.assertRaisesRegex(RuntimeError, "Live official network evidence required: HTTP 403"):
+                self.run_build()
+        self.assertEqual(self.published_files(), before)
+
+    def test_strict_recovery_rechecks_pending_rules_with_live_evidence(self):
+        rule = "DOMAIN,new.vendor.example"
+        self.sources[build.DOMAIN_SOURCES["acl4ssr"][0]] += ("\n" + rule).encode()
+        self.run_build()
+        self.assertNotIn(rule, build.CONFIG.read_text())
+        self.append_official("new.vendor.example")
+        with patch.object(sys, "argv", ["build.py", "--require-fresh-network"]):
+            self.run_build()
+        self.assertIn(rule + ",OpenAI Test,force-remote-dns", build.CONFIG.read_text())
+        self.assertTrue(self.read_audit()["evidence"]["official_network"]["available"])
+
+    def test_strict_recovery_cannot_substitute_an_offline_snapshot(self):
+        before = self.published_files()
+        with patch.object(sys, "argv", ["build.py", "--require-fresh-network",
+                                       "--official-network-file", str(Path(__file__).parent / "fixtures/official-network.html")]):
+            with self.assertRaises(SystemExit) as result:
+                self.run_build()
+        self.assertEqual(result.exception.code, 2)
+        self.assertEqual(self.published_files(), before)
+
+    def test_challenge_diagnostic_is_explicit_without_leaking_response_headers(self):
+        self.run_build()
+        def unavailable(url, *args, **kwargs):
+            if url == review.NETWORK_URL:
+                raise urllib.error.HTTPError(url, 403, "Forbidden", {
+                    "cf-mitigated": "challenge", "Set-Cookie": "do-not-log-this",
+                }, None)
+            return self.sources[url]
+        with patch.object(build, "fetch", side_effect=unavailable):
+            self.run_build()
+        report = json.loads((self.root / "report.json").read_text())
+        self.assertEqual(report["automatic_review"]["official_evidence_error"], "HTTP 403 (Cloudflare challenge)")
+        self.assertNotIn("do-not-log-this", json.dumps(report))
+
     def test_network_outage_cannot_hold_tampered_published_artifacts(self):
         self.run_build()
         path = self.root / "rules/openai-auto.list"
