@@ -203,7 +203,7 @@ class ManualReviewTests(unittest.TestCase):
                 review.validate_policy(self.policy, self.on)
 
     def test_corrupt_delivery_state_requeues_and_warns(self):
-        self.state_path.parent.mkdir(parents=True)
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.state_path.write_text("{}")
         result = self.evaluate()
         self.assertTrue(result["warnings"])
