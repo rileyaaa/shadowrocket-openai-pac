@@ -7,7 +7,6 @@ without changing the existing published file.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import hashlib
 import http.client
 import ipaddress
@@ -16,11 +15,8 @@ from pathlib import Path
 import re
 import sys
 import time
-import urllib.error
 import urllib.request
-from urllib.parse import quote, urlsplit
-
-import review_rules
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
@@ -45,8 +41,9 @@ MAX_DOWNLOAD_BYTES = 13_000_000
 VOICE_MIN_PREFIX = {4: 24, 6: 48}
 RULE_TYPES = {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-KEYWORD", "DOMAIN-WILDCARD"}
 
-# Previously reviewed routing scopes. New shared endpoints require fresh
-# official evidence in review_rules; community labels alone grant no trust.
+# Only domains dedicated to OpenAI may override the original Johnshall route.
+# OpenAI rule-set providers also include unrelated shared services such as
+# stripe.com, auth0.com, sentry.io and launchdarkly.com: NEVER import those.
 OPENAI_SPECIFIC_SUFFIXES = frozenset({
     "openai.com", "chatgpt.com", "chatgpt.site", "chat.com",
     "oaistatic.com", "oaistatsig.com", "oaiusercontent.com",
@@ -166,14 +163,6 @@ def fetch(url: str, minimum: int = 50) -> bytes:
             with urllib.request.urlopen(request, timeout=75) as response:
                 if not 200 <= response.status < 300:
                     raise ValueError(f"Unexpected HTTP status for {url}: {response.status}")
-                if url in {VOICE_URL, review_rules.NETWORK_URL}:
-                    final, requested = urlsplit(response.geturl()), urlsplit(url)
-                    origins = {requested.netloc}
-                    if url == VOICE_URL:
-                        origins.add("www.openai.com")
-                    if (final.scheme != "https" or final.netloc not in origins
-                            or final.path.rstrip("/") != requested.path.rstrip("/")):
-                        raise ValueError("Official evidence redirected outside its pinned source")
                 declared = response.headers.get("Content-Length")
                 if declared is not None:
                     if not re.fullmatch(r"[0-9]+", declared.strip()):
@@ -207,8 +196,6 @@ def domain_rule(kind: str, value: str) -> str:
         raise ValueError(f"Invalid domain rule {kind},{value}")
     if kind != "DOMAIN-WILDCARD" and ("*" in value or "?" in value):
         raise ValueError(f"Unexpected wildcard {kind},{value}")
-    if kind in {"DOMAIN", "DOMAIN-SUFFIX"} and not review_rules.valid_host(value):
-        raise ValueError(f"Invalid hostname {kind},{value}")
     return f"{kind},{value}"
 
 
@@ -225,7 +212,7 @@ def parse_domain_list(source: str, fmt: str, *, unparsed: list[str] | None = Non
                 rules.append(domain_rule("DOMAIN", line))
         elif fmt == "typed":
             parts = line.split(",")
-            if len(parts) == 2 and parts[0].strip().upper() in RULE_TYPES:
+            if len(parts) >= 2 and parts[0].strip().upper() in RULE_TYPES:
                 rules.append(domain_rule(parts[0], parts[1]))
             elif unparsed is not None:
                 # Broad IP/ASN entries and new syntax are review-only.
@@ -300,7 +287,15 @@ def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
     DOMAIN,example.com does NOT cover sub.example.com.
     Wildcards are only deduplicated when the rule is exactly identical.
     """
-    return review_rules.covers(broad_rule, narrow_rule)
+    if broad_rule == narrow_rule:
+        return True
+    broad_type, broad_host = broad_rule.split(",", 1)
+    narrow_type, narrow_host = narrow_rule.split(",", 1)
+    return (
+        broad_type == "DOMAIN-SUFFIX"
+        and narrow_type in {"DOMAIN", "DOMAIN-SUFFIX"}
+        and (narrow_host == broad_host or narrow_host.endswith("." + broad_host))
+    )
 
 
 def compact_rules_within_layer(rules: list[str]) -> list[str]:
@@ -518,7 +513,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         + "[General]\n" + "\n".join(general_lines) + "\n\n" + render_dns(settings) + "\n"
         + "[Rule]\n"
         + "# [1a] OpenAI automatic rules - official Voice destination IPs\n" + "\n".join(openai_ip_rules) + "\n\n"
-        + "# [1b] OpenAI automatic rules - reviewed domains and official network allowlist\n" + "\n".join(openai_auto_domains) + "\n\n"
+        + "# [1b] OpenAI automatic rules - public domain rules\n" + "\n".join(openai_auto_domains) + "\n\n"
         + "# [2] Independent manual OpenAI fallback (no cross-layer dedup)\n"
         + "\n".join(openai_manual) + "\n\n"
         + "# [3] Johnshall full original rules, Proxy mapped to exact configured node\n"
@@ -591,46 +586,6 @@ def active_auto_rules(text: str) -> set[str]:
             if row.strip() and not row.lstrip().startswith("#")}
 
 
-def frozen_published_domains(old_auto: str, old_config: str, old_state: dict | None) -> list[str]:
-    """An evidence outage may hold existing routes, never authorize new ones.
-
-    Check BOTH previously emitted artifacts and their saved hashes. A review
-    decision, manually supplied HTML or candidate list cannot extend this set.
-    """
-    if not old_state or not old_auto or not old_config:
-        raise ValueError("Cannot hold domain routes without published artifacts")
-    hashes = old_state.get("published_artifacts")
-    if hashes is not None:
-        for key, value in (("automatic_sha256", old_auto), ("config_sha256", old_config)):
-            if hashes.get(key) != hashlib.sha256(value.encode()).hexdigest():
-                raise ValueError("Published artifact baseline is inconsistent; cannot hold routes")
-    section = re.search(
-        r"(?ms)^# \[1b\] OpenAI automatic rules[^\n]*\n(.*?)^# \[2\] Independent manual OpenAI fallback",
-        old_config,
-    )
-    if section is None:
-        raise ValueError("Published automatic domain section is missing")
-    domains = [row.strip() for row in old_auto.splitlines()
-               if row.strip() and not row.lstrip().startswith(("#", "IP-"))]
-    node = old_state["settings"]["openai_node_name"]
-    expected = []
-    for rule in domains:
-        kind, _, value = rule.partition(",")
-        if kind not in {"DOMAIN", "DOMAIN-SUFFIX", "DOMAIN-WILDCARD"}:
-            raise ValueError("Unexpected published domain type")
-        domain_rule(kind, value)
-        if hashes is None and not is_openai_specific_rule(rule):
-            # The migration baseline predates dynamic approvals and hashes.
-            raise ValueError("Unverified dynamic rule in pre-review baseline")
-        option = "" if kind == "DOMAIN-WILDCARD" else ",force-remote-dns"
-        expected.append(f"{rule},{node}{option}")
-    actual = [row.strip() for row in section[1].splitlines()
-              if row.strip() and not row.lstrip().startswith("#")]
-    if not domains or actual != expected:
-        raise ValueError("Published automatic list/config disagree; cannot hold routes")
-    return domains
-
-
 def make_sync_report(old_state: dict | None, current: dict, before_auto: str,
                      after_auto: str, config_changed: bool,
                      excluded_sources: dict[str, list[str]] | None = None) -> dict:
@@ -678,51 +633,11 @@ def run():
     args.add_argument("--voice-file", type=Path)
     args.add_argument("--domain-dir", type=Path)
     args.add_argument("--ruleset-dir", type=Path, help="Offline snapshots named apple_news.txt, etc.")
-    args.add_argument("--official-network-file", type=Path, help="Offline snapshot of the pinned official allowlist article")
-    args.add_argument("--require-fresh-network", action="store_true",
-                      help="Recovery acceptance: require a live official article; do not hold old domains")
     args.add_argument("--report-file", type=Path)
     opt = args.parse_args()
-    if opt.require_fresh_network and opt.official_network_file:
-        args.error("--require-fresh-network cannot use --official-network-file")
     settings = load_settings()
-    now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    state_path = ROOT / "data/sources.json"
-    old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
-    auto_path = ROOT / "rules/openai-auto.list"
-    old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
-    review_path = ROOT / "data/openai-review.json"
-    old_review = json.loads(review_path.read_text(encoding="utf-8")) if review_path.exists() else None
-    if (old_state or {}).get("review", {}).get("schema_version") == 1 and old_review is None:
-        raise ValueError("Published review history is missing; refusing to reset it")
     original = opt.upstream_file.read_bytes() if opt.upstream_file else fetch(BASE_URL, 1_000_000)
     voice_raw = opt.voice_file.read_bytes() if opt.voice_file else fetch(VOICE_URL)
-    network_error = None
-    held_domains = None
-    try:
-        network_raw = (opt.official_network_file.read_bytes() if opt.official_network_file
-                       else fetch(review_rules.NETWORK_URL))
-    except (OSError, http.client.HTTPException) as exc:
-        if opt.official_network_file:
-            raise  # Explicit offline input errors are never silently ignored.
-        network_error = f"HTTP {exc.code}" if isinstance(exc, urllib.error.HTTPError) else type(exc).__name__
-        # Report only a known, non-sensitive response signal. Do not log the
-        # challenge body, cookies, arbitrary headers or exception URLs.
-        if (isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
-                and exc.headers.get("cf-mitigated", "").lower() == "challenge"):
-            network_error += " (Cloudflare challenge)"
-        if opt.require_fresh_network:
-            raise RuntimeError(f"Live official network evidence required: {network_error}") from exc
-        held_domains = frozen_published_domains(
-            old_auto, CONFIG.read_text(encoding="utf-8") if CONFIG.exists() else "", old_state)
-        official = []  # NEVER turn stale evidence into new authority.
-        print(f"NETWORK REVIEW PAUSED: {network_error}; published domain layer held", file=sys.stderr)
-    else:
-        # Delivered but malformed or implausibly changed evidence still fails
-        # the whole build. Transport unavailability can hold a known good layer.
-        official = review_rules.parse_official_network(network_raw)
-        review_rules.validate_official_change(
-            official, old_state, (old_review or {}).get("evidence", {}).get("official_network", {}).get("rules"))
     source_data = {"johnshall": (BASE_URL, original), "voice": (VOICE_URL, voice_raw)}
     source_lists = {}
     unparsed_sources = {}
@@ -738,34 +653,15 @@ def run():
         rulesets[url] = parse_embedded_ruleset(raw.decode("utf-8-sig"))
     ips = parse_voice(voice_raw)
     all_auto_domains = list(dict.fromkeys(rule for one in source_lists.values() for rule in one))
-    legacy_domains = filter_auto_domains(all_auto_domains)
+    domains = filter_auto_domains(all_auto_domains)
+    excluded_candidates = excluded_auto_rule_sources(source_lists, domains, unparsed_sources)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
-    domains, audit = review_rules.review_candidates(
-        source_lists, unparsed_sources, official, ips, legacy_domains, manual,
-        previous=old_review,
-        initial_exclusions=(old_state or {}).get("review", {}).get("excluded_auto_rules", []), now=now,
-        official_available=network_error is None,
-    )
-    excluded_candidates = {row["rule"]: row["active_sources"] for row in audit["candidates"]
-                           if row["status"] in {"pending", "rejected"} and row["active_sources"]}
     emitted_auto, emitted_manual = compact_openai_rules(domains, manual)
-    if held_domains is None:
-        review_rules.validate_emitted(ips, emitted_auto, emitted_manual, official, legacy_domains)
-    else:
-        domains = emitted_auto = held_domains
-    legacy_count = len(compact_rules_within_layer(legacy_domains))
-    if old_state is not None:
-        old_stats = old_state.get("statistics", {})
-        before_legacy = old_stats.get("reviewed_community_domains", old_stats.get("automatic_openai_domains"))
-        if (type(before_legacy) is not int or before_legacy <= 0
-                or not before_legacy * 0.75 <= legacy_count <= before_legacy * 2):
-            raise ValueError("Reviewed community domain count changed unexpectedly")
     built, stats = generate(
         original.decode("utf-8-sig"), ips, emitted_auto, emitted_manual, settings=settings, rulesets=rulesets
     )
-    stats["excluded_shared_auto_domains"] = sum(rule in excluded_candidates for rule in all_auto_domains)
+    stats["excluded_shared_auto_domains"] = len(all_auto_domains) - len(domains)
     stats["auto_input_rules"] = len(domains)
-    stats["reviewed_community_domains"] = legacy_count
     stats["manual_backup_rules"] = len(manual)
     stats["suppressed_redundant_auto_rules"] = len(domains) - len(emitted_auto)
     stats["suppressed_redundant_manual_rules"] = len(manual) - len(emitted_manual)
@@ -773,6 +669,10 @@ def run():
         set(emitted_auto) & set(emitted_manual)
     )
     stats["auto_total_ip_and_domain_rules"] = len(ips) + len(emitted_auto)
+    state_path = ROOT / "data/sources.json"
+    old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
+    auto_path = ROOT / "rules/openai-auto.list"
+    old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
     stats.update(validate_voice_coverage(ips, old_auto, has_baseline=old_state is not None))
     stats["unparsed_upstream_rules"] = len({rule for rules in unparsed_sources.values() for rule in rules})
     stats["embedded_ruleset_rules"] = sum(len(rules) for rules in rulesets.values())
@@ -787,34 +687,20 @@ def run():
 
     # Both OpenAI sources remain independent; do not change routing semantics.
     automatic_source = (
-        "# OpenAI automatic rules: official Voice IPs + evidence-reviewed domains\n"
+        "# OpenAI automatic rules: official Voice destination IPs + public domains\n"
         "# No node name here: route is supplied while merging into .conf\n"
         "# Voice IPs (destination-only); never use OpenAI egress source ranges\n"
         + "\n".join(f"{rule},no-resolve" for rule in ips) + "\n"
-        + "# Reviewed domain scopes and current official network dependencies\n"
+        + "# Dedicated first-party and explicitly verified hosted domains\n"
         + "\n".join(emitted_auto) + "\n"
     )
     source_state = {
         "sources": {name: {"url": url, "sha256": hashlib.sha256(data).hexdigest()}
                     for name, (url, data) in source_data.items()},
         "settings": settings, "statistics": stats,
-        "published_artifacts": {"automatic_sha256": hashlib.sha256(automatic_source.encode()).hexdigest(),
-                                "config_sha256": hashlib.sha256(built.encode()).hexdigest()},
-        "review": {"schema_version": 1, "excluded_auto_rules": list(excluded_candidates),
-                   "decision_counts": audit["counts"], "audit_file": "data/openai-review.json",
-                   "official_evidence_available": network_error is None,
-                   "official_evidence_error": network_error},
+        # Only a review baseline: never feed these rejected rules into .conf.
+        "review": {"excluded_auto_rules": list(excluded_candidates)},
     }
-    # Hash normalized evidence: unrelated page styling/scripts are not rule changes.
-    if network_error is None:
-        source_state["sources"]["official_network"] = {
-            "url": review_rules.NETWORK_URL, "sha256": review_rules.rules_hash(official),
-            "rule_count": len(official), "hash_basis": "sorted_normalized_allowlist_rules",
-        }
-    elif "official_network" in (old_state or {}).get("sources", {}):
-        # Last successfully observed evidence is retained for future change
-        # comparisons, explicitly unavailable this run and NOT used for approval.
-        source_state["sources"]["official_network"] = old_state["sources"]["official_network"]
     for name, (url, _) in RULESET_SOURCES.items():
         source_state["sources"][name]["rule_count"] = len(rulesets[url])
     changed = not CONFIG.exists() or CONFIG.read_text(encoding="utf-8") != built
@@ -822,51 +708,12 @@ def run():
         old_state, source_state, old_auto, automatic_source, changed,
         excluded_sources=excluded_candidates,
     )
-    # Every candidate is reconsidered. Decisions and actual output coverage are
-    # recorded separately: approval does not imply a wider route was published.
-    for row in audit["candidates"]:
-        normalized = review_rules.canonical(row["rule"])
-        row["automatic_coverage"] = bool(normalized and (
-            (normalized.startswith("IP-") and review_rules.review_one(
-                normalized, [], ips, [], [])["reason"] == "official_voice_destination")
-            or any(review_rules.covers(rule, normalized) for rule in emitted_auto)))
-        row["manual_coverage"] = bool(normalized and any(
-            review_rules.covers(rule, normalized) for rule in emitted_manual))
-        if row["rule"] in emitted_auto:  # includes the vetted literal wildcard
-            row["automatic_coverage"] = True
-        if row["rule"] in emitted_manual:
-            row["manual_coverage"] = True
-    report["automatic_review"] = {
-        "checked_at": now, "counts": audit["counts"],
-        "official_evidence_available": network_error is None,
-        "official_evidence_error": network_error,
-        "domain_publication_mode": "held" if network_error else "fresh_evidence",
-        "changes": audit.pop("changes"), "baseline_created": old_review is None,
-        "candidates": audit["candidates"],
-    }
-    network_evidence = ({**source_state["sources"]["official_network"], "rules": official}
-                        if network_error is None else
-                        (old_review or {}).get("evidence", {}).get("official_network", {}))
-    audit["evidence"] = {"official_network": {**network_evidence, "url": review_rules.NETWORK_URL,
-                                              "available": network_error is None,
-                                              "error": network_error},
-                         "voice": {**source_state["sources"]["voice"], "rules": ips}}
-    audit["inventory"] = review_rules.inventory(ips, emitted_auto, emitted_manual, official)
-    if network_error:
-        for row in audit["inventory"]:
-            if row["layer"] == "automatic_domains":
-                row["basis"] = "published_domain_layer_held_evidence_unavailable"
-    audit["source_urls"] = {name: source["url"] for name, source in source_state["sources"].items()}
-    report["automatic_review"]["inventory_counts"] = {
-        basis: sum(row["basis"] == basis for row in audit["inventory"])
-        for basis in sorted({row["basis"] for row in audit["inventory"]})}
     # All validation is complete before touching generated output files.
     write_if_changed(CONFIG, built)
     write_if_changed(auto_path, automatic_source)
     for name, (_, snapshot_path) in RULESET_SOURCES.items():
         write_if_changed(ROOT / snapshot_path, source_data[name][1].decode("utf-8"))
     write_if_changed(state_path, json.dumps(source_state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
-    write_if_changed(review_path, json.dumps(audit, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     if opt.report_file:
         write_if_changed(opt.report_file, json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(stats, ensure_ascii=False))

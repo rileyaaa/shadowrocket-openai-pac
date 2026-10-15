@@ -1,19 +1,8 @@
 {
-  "published_artifacts": {
-    "automatic_sha256": "f14b6a569ca3964f6dc9d2324b7a75ec08bb154c84ab265d19316c705b0e92ca",
-    "config_sha256": "d291e44780db76e890ac27afb9df7a7ecf0be88351081390cde7e21341d9454d"
-  },
   "review": {
-    "audit_file": "data/openai-review.json",
-    "decision_counts": {
-      "approved": 0,
-      "covered": 26,
-      "pending": 14,
-      "rejected": 8,
-      "withdrawn": 0
-    },
     "excluded_auto_rules": [
       "DOMAIN,browser-intake-datadoghq.com",
+      "DOMAIN,o33249.ingest.sentry.io",
       "DOMAIN,static.cloudflareinsights.com",
       "DOMAIN-KEYWORD,openai",
       "DOMAIN-SUFFIX,ai.com",
@@ -25,6 +14,8 @@
       "DOMAIN-SUFFIX,events.statsigapi.net",
       "DOMAIN-SUFFIX,featuregates.org",
       "DOMAIN-SUFFIX,identrust.com",
+      "DOMAIN-SUFFIX,intercom.io",
+      "DOMAIN-SUFFIX,intercomcdn.com",
       "DOMAIN-SUFFIX,launchdarkly.com",
       "DOMAIN-SUFFIX,observeit.net",
       "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
@@ -35,10 +26,7 @@
       "IP-ASN,20473,no-resolve",
       "IP-CIDR,24.199.123.28/32,no-resolve",
       "IP-CIDR,64.23.132.171/32,no-resolve"
-    ],
-    "official_evidence_available": false,
-    "official_evidence_error": "HTTP 403 (Cloudflare challenge)",
-    "schema_version": 1
+    ]
   },
   "settings": {
     "johnshall_proxy_node_name": "星链台湾1",
@@ -76,19 +64,18 @@
     }
   },
   "statistics": {
-    "auto_input_rules": 22,
+    "auto_input_rules": 23,
     "auto_total_ip_and_domain_rules": 45,
     "automatic_openai_domains": 22,
     "cross_layer_duplicate_rules_retained": 21,
     "embedded_ruleset_rules": 2,
-    "excluded_shared_auto_domains": 19,
+    "excluded_shared_auto_domains": 22,
     "johnshall_lines": 87854,
     "manual_backup_rules": 43,
     "manual_openai_rules": 43,
     "mapped_proxy_to_johnshall_node": 30239,
     "retained_ad_rules": 57528,
-    "reviewed_community_domains": 22,
-    "suppressed_redundant_auto_rules": 0,
+    "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "unparsed_upstream_rules": 3,
     "voice_ipv4_addresses": 23,

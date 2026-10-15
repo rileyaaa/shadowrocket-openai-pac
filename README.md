@@ -1,5 +1,7 @@
 # Shadowrocket · OpenAI 专用出口 + Johnshall 原样分流
 
+> **2026-10-15 稳定性回退**：撤回依赖官方帮助中心网页的新增自动审批功能，恢复到 `216c431` 的同步与待审核流程。构建不再请求该网页，也不再因其 Cloudflare 验证冻结自动域名更新。官方 Voice、四份社区规则、Johnshall 和 Apple News 继续按原有七来源流程同步；白名单外的新候选仍报告后审核，不直接加入规则。Voice 范围保护、下载完整性、未知格式待审和 Apple News 内嵌校验这四项修复全部保留，节点、手工兜底及每日 11:00 排程保持原样。官方网页仅作为人工查证资料。
+
 ## V1.0 稳定基线：最高优先级与验收原则
 
 > **第一目标：尽最大可能让所有 OpenAI、ChatGPT、Codex、语音、登录验证及相关依赖流量走你指定的 OpenAI 节点。**
@@ -10,7 +12,7 @@
 2. **不以节点性能决定收录**：节点延迟、地区、线路质量和出口优化由用户负责，不作为取消或拒绝 OpenAI 相关分流规则的理由。
 3. **保持分流边界可验证**：当官方确认的是某个精确主机，就使用精确主机；当官方明确给出通配子域或语音目的 IP 范围，再按相应范围覆盖。共享目标被纳入后，其他使用同一目标的应用也可能走 OpenAI 专用节点，这是覆盖优先所接受的副作用。没有依据时不扩大为整个供应商域名、所有 IP/ASN 或全局 UDP 端口规则。
 4. **其余流量保留 Johnshall**：未被 OpenAI 专用层匹配的连接继续遵循 Johnshall 原有的 `Proxy` / `DIRECT` / `REJECT` 与最终直连规则，不新增无关策略组，不擅自改变两个实际节点名称。
-5. **持续审查而非冻结域名**：每次同步重新核对全部候选和历史待审项。现行官方证据充分且范围合适才自动加入；范围过宽拒绝，证据不足继续待审。结合官方资料与 Shadowrocket 连接日志补充自动证据源尚未覆盖的新场景。
+5. **持续审查而非冻结域名**：定期同步官方 Voice 目的 IP 和上游域名源；上游新增却被筛选排除的候选规则报告给用户审核。OpenAI 推出新主机、修改基础设施或存在纯域名规则无法辨别的共享请求时，结合官方资料与 Shadowrocket 连接日志继续补齐。
 
 **版本定位**：截至 2026-10-12，现有双节点架构、两层 OpenAI 规则、自动更新、异常保护、测试及成功后 Telegram 报告构成 **V1.0 稳定基线**，可以长期按此架构使用。所谓“终版”指**核心架构和上述分流优先级定版**，不表示域名清单从此不更新，更不能宣称静态规则已数学保证未来所有 OpenAI 连接 100% 命中指定节点。实际设备上的登录、Voice、Codex 和上传行为仍应以 Shadowrocket 连接记录验收。
 
@@ -36,13 +38,13 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 
 | 顺序 | 唯一来源 | 维护方式和内容 |
 |---|---|---|
-| 1. 自动优先 | [`rules/openai-auto.list`](rules/openai-auto.list) | GitHub Actions 从官方 Voice **目标 IP**、官方网络白名单及四份社区候选下载、核对证据与范围、层内去重后生成 |
+| 1. 自动优先 | [`rules/openai-auto.list`](rules/openai-auto.list) | GitHub Actions 每天从官方 ChatGPT Voice **目标 IP** 和多个公共 OpenAI geosite / Shadowrocket / ACL4SSR 域名文件下载、筛选、层内去重后自动生成 |
 | 2. 手工兜底 | [`config/manual-openai.rules`](config/manual-openai.rules) | 独立保留第一方、专属第三方及官方确认的共享网络依赖规则；只在**手工文件内部**有确定父子域包含关系时才去重，**不和自动层去重** |
 | 3. 非 OpenAI | Johnshall 原始规则 | `Proxy` 改为 `johnshall_proxy_node_name` 指定的实际节点；其他原始规则及相对顺序全部保留；未匹配 `FINAL,direct` |
 
 在最终完整 `.conf` 中，自动层先放官方 Voice 目的 IP，再放自动域名，之后才放独立手工兜底，最后放 Johnshall 原规则。**最终仍只有一个可直接订阅的 `.conf` 文件**。不需要用户再导入两份列表。
 
-社区候选来源：[v2fly/domain-list-community](https://github.com/v2fly/domain-list-community/blob/master/data/openai)、[MetaCubeX](https://github.com/MetaCubeX/meta-rules-dat)、[ACL4SSR](https://github.com/ACL4SSR/ACL4SSR)、[blackmatrix7](https://github.com/blackmatrix7/ios_rule_script)。自动证据来源：[OpenAI 官方网络指南](https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps)的指定白名单段落，以及 [OpenAI 官方 ChatGPT Voice IP](https://openai.com/chatgpt-voice.json)。**不会将 OpenAI 发往外部的“出站源 IP”或 DNS 解析出的共享 CDN IP 错用于客户端目标 IP 分流**。
+自动域名来源：[v2fly/domain-list-community](https://github.com/v2fly/domain-list-community/blob/master/data/openai)、[MetaCubeX](https://github.com/MetaCubeX/meta-rules-dat)、[ACL4SSR](https://github.com/ACL4SSR/ACL4SSR)、[blackmatrix7](https://github.com/blackmatrix7/ios_rule_script)，以及 [OpenAI 官方 ChatGPT Voice IP](https://openai.com/chatgpt-voice.json)。**不会将 OpenAI 发往外部的“出站源 IP”错误用于客户端访问目标 IP 分流**。
 
 ### 手工规则的保留与安全边界
 
@@ -54,9 +56,9 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - `gpt(all, udp/3478)` 会误伤其他应用的 UDP 3478。改为自动更新的官方 Voice 目的 IP，不能把“所有 UDP/3478”直接划为 OpenAI。
 - **截至 2026-10，Sora 产品和 API 已停止服务**；`sora.com` 仍按你要求保留为历史兼容规则，不代表该服务仍在线。
 
-官方 ChatGPT 指南明确列出的共享依赖按受审查的范围走 OpenAI 专用节点，不要求其是 OpenAI 独占域名。其他社区新增但未获官方证据确认的第三方主机继续待审，下次同步自动复查；单靠域名分流无法区分同一共享域名上的 ChatGPT 请求与其他应用请求。
+官方 ChatGPT 指南明确列出的共享依赖已经作为白名单例外强制走 OpenAI 专用节点，不再要求其是 OpenAI 独占域名。其他社区新增但未获官方确认的第三方主机仍需人工审核；单靠域名分流无法区分同一共享域名上的 ChatGPT 请求与其他应用请求。
 
-自动源保留既有受审查范围，并用当前官方证据判断新候选；`IP-ASN,20473`、关键词匹配、全局端口匹配等范围过宽的规则直接拒绝。官方 Voice JSON 只包含语音目的 IP，不能当作整个 OpenAI 的全量 IP 库。**因此不能保证“100% 所有 OpenAI 依赖都只走日本，同时所有非 OpenAI 流量绝不改变”**：共享第三方主机无法用纯域名分流同时满足这两个要求。
+自动源使用安全的专属域名筛选；对于 `IP-ASN,20473` 或其他社区发布的宽泛服务商 IP / ASN 不强制日本，以免截走无关流量。官方 Voice JSON 只包含语音目的 IP，不能当作整个 OpenAI 的全量 IP 库。**因此不能保证“100% 所有 OpenAI 依赖都只走日本，同时所有非 OpenAI 流量绝不改变”**：共享第三方主机无法用纯域名分流同时满足这两个要求。
 
 ## 加密 DNS
 
@@ -78,13 +80,13 @@ python -m unittest discover -s tests -v
 python scripts/build.py
 ```
 
-构建失败时不会提交不完整结果；成功时提交更新的完整 `.conf`、自动列表、数据源校验信息及逐条审核记录。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf`、自动 `.list` 或审核 JSON**，否则下次同步会覆盖；修改旧审核结论也不能授权新规则。
+构建失败时不会提交不完整结果；成功时只提交更新的完整 `.conf`、自动列表和数据源校验信息。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf` 和自动 `.list`**，否则下次同步会覆盖。
 
 ## GitHub Actions 成功后 Telegram 推送
 
 **Telegram 没有单独的每日定时任务**：原 Actions 每天 11:00 检查上游，但只在某次 Actions 的测试、生成和提交步骤成功后立即发一次报告。此行为适用于定时、手动、修改配置触发的 Actions。**没有上游变化也会发送检查成功、无变化。** 构建失败不会发送误导性的成功通知。
 
-报告记录：触发来源、变化的上游、规则数量与变化量、实际发布的自动层增删、通过/已覆盖/待证据/拒绝/撤回数量及理由。Telegram 展示重点变化，Actions Summary 列出全部候选；可通过运行链接和 [`data/openai-review.json`](data/openai-review.json) 追溯逐条证据。
+报告记录：触发来源、变化的上游、规则数量与变化量、新增和删除的自动规则示例及 Actions 运行链接。相同摘要也写入 Actions Summary。
 
 在仓库 Settings → Secrets and variables → Actions → New repository secret 创建两条密钥：`TELEGRAM_BOT_TOKEN`（BotFather Token）以及 `TELEGRAM_CHAT_ID`（个人 Telegram Chat ID）。两者均由 GitHub Secrets 注入，不再在当前工作流里写明文 Chat ID。先向自己的机器人发送 /start，确保它可以发消息。即使是私有仓库也不要直接把 Token 或 Chat ID 写入源码。若旧 Token 曾在聊天中暴露，建议撤销旧 Token 并更换为新 Token。
 
@@ -109,41 +111,22 @@ python scripts/build.py
 
 官方来源：https://developers.openai.com/showcase/openai-fm 、https://developers.openai.com/showcase/chatkit-world 、https://developers.openai.com/showcase/openai-imagegen-demo 、https://developers.openai.com/showcase/solar-system-demo 。
 
-未引入 `DOMAIN-SUFFIX,vercel.app` 等共享平台规则。这四个演示入口继续保留在独立手工兜底；2026-10-15 起自动层另接入官方网络白名单的证据审核，两层规则不会互相去重。
+未引入 `DOMAIN-SUFFIX,vercel.app` 等共享平台规则。新域名只加入维护中的独立手工兜底，自动规则仍严格来自官方 Voice 目的 IP 与原四份社区规则；两层规则不会互相去重。
 
 ## 上游下载失败重试
 
-全部八个上游下载（含官方网络指南和构建时内嵌的 Apple News 规则）采用最多两次请求：初次失败后延迟 2 秒重试 1 次。响应提供 `Content-Length` 时，必须与实际接收字节数一致；分块传输不完整、HTTP/网络错误及大小异常同样触发重试。原有七个必需上游两次都失败则停止构建。新增官方网络网页遇到 HTTP/网络不可用时，按下文冻结已发布自动域名、暂停新增域名审批；不会拿旧证据批准新规则。官方证据必须来自固定 HTTPS 来源及文章路径；Johnshall 文件还必须保留预期结尾标记、非空 URL Rewrite 及 MITM hostname。
+全部七个上游下载（含构建时内嵌的 Apple News 规则）采用最多两次请求：初次失败后延迟 2 秒重试 1 次。响应提供 `Content-Length` 时，必须与实际接收字节数一致；分块传输不完整、HTTP/网络错误及大小异常同样触发重试。两次都失败则停止构建并保留上一次成功发布的 `.conf`。Johnshall 文件还必须保留预期结尾标记、非空 URL Rewrite 及 MITM hostname，避免末尾缺失却仍满足规则条数检查。
 
-## 自动审核：证据、范围与真实发布
+## 上游新增但被排除的域名审查
 
-这是有明确边界的证据判断程序，不是收到候选就批准，也不使用语言模型臆测域名归属。每次运行重新拉取证据，复核当前候选和全部历史待审项。社区多个来源可能互相抄录，不能靠“票数多”放行；域名包含 OpenAI 字样、证书、可连通、DNS 解析或 ASN 归属也不作为新增 IP 的批准依据。
+每次成功构建时，安全白名单继续严格筛选四份社区 OpenAI 规则源。对于未获准进入 OpenAI 自动规则的域名，以及解析器未支持的原始规则，程序会把完整排序清单保存到 data/sources.json 的 review.excluded_auto_rules 中，作为下一次构建的观察基线。v2fly 的未知 `regexp:`、`include:`、`keyword:` 和 typed 源中未转换的 IP/ASN 等条目会保留原文、标注来源并进入同一审核报告；不会静默丢弃，也不会自动扩大分流范围。v2fly 的 `domain:` 按后缀规则解析后仍需通过原有白名单。
 
-| 结论 | 判断 | 路由处理 |
-|---|---|---|
-| 通过 | 当前官方白名单明确覆盖，且范围门槛通过 | 纳入自动层，全部发布检查通过后生效 |
-| 已覆盖 | 已有规则完整覆盖，或候选 IP 已包含于官方 Voice 目的地址 | 不误报漏收；官方确认的域名可独立进入自动层，手工层仍保留 |
-| 待证据 | 当前证据不足、未知语法、需要人工核定的新整域通配 | 不新增路由，下次重新判断 |
-| 拒绝 | 整 ASN、关键词、全局协议/端口、整个共享平台或超出证据的范围 | 不加入，记录具体理由 |
-| 已撤回 | 来源撤回且不能继续自动授权 | 不沿用历史审批 |
+- 初次启用时先建立旧排除项基线，不把已经存在的规则误报成新增。
+- 后续上游出现新的排除项，Actions 成功后原 Telegram 消息会列出新增规则、来源及数量（最多展示前 8 条），Actions Summary 展示完整新增清单。
+- 本次没有新的排除项，就报告无新增，不反复提醒旧候选。
+- 这些规则只用于人工审核，从未自动加入 .conf、自动列表或手工兜底。共享第三方域名不会因为出现在上游就被直接导向 OpenAI 节点。
 
-官方文章只提取 **OpenAI/ChatGPT domains to allowlist** 段落的一份列表，不从导航、脚本、其他段落、故障排查链接中任意搜域名。精确主机保持 `DOMAIN`，官方通配按受审查范围转换为 `DOMAIN-SUFFIX`；不能用一个主机批准其整域。新整域通配仍待范围核验，整个云平台范围直接拒绝，这些过宽条目也不能间接为其子域提供自动批准依据。已有 Intercom 等官方整域例外继续有效。
-
-IP 只采用本次官方 Voice 目的前缀；社区 IP 完全包含其中时标为已覆盖，部分相交不能批准整个候选网段。旧审批、旧生成列表、旧审核 JSON 都不能证明新地址合法。动态批准的域名失去当前证据时退出自动层；独立手工兜底和此前明确接受的固定范围保持原政策，在审计中单独标明，绝不冒充新官方确认。
-
-官方页面身份、段落结构、闭合列表、核心域名、条数均需通过检查。官方条数下降超过 25% 或增长超过 50%，或规则增删总数超过上次的 25%（至少允许 5 条小幅变化）时停止发布；原社区规则数量保护也单独保留，不能被新增官方规则掩盖。已有 Voice 地址数、Johnshall 完整性等保护照常生效。官方页面已返回但内容不完整、结构异常或变化超限时，仍停止整次发布；基线丢失也不能继续。
-
-**证据不可读时的降级运行**：实测 GitHub 托管运行器读取官方帮助中心会返回 HTTP 403，普通 HTTP/1.1 和 HTTP/2 客户端均如此。程序不绕过访问限制，也不更换非官方镜像。此时仅冻结上次已发布的自动域名层，不批准任何新增域名；两份已发布产物必须逐条一致，后续还必须通过 SHA-256 基线验证。官方 Voice JSON、Johnshall 和其余源仍重新下载、校验，合法更新可以继续，避免新功能阻断原有每日同步。缺少或不一致的已发布基线时直接失败。
-
-已有审批记录或缓存网页都不能扩大被冻结的范围。域名证据恢复可读后恢复全量判断；届时确实被官方撤掉的动态规则退出自动层。网络中断与证据被撤回是不同情况。Actions / Telegram 明确显示“新增域名审批暂停”、错误原因和实际发布变化，不把这种运行报告成全部证据已核验。
-
-**恢复验收**：本地执行 `python scripts/build.py --require-fresh-network`，或手动运行 Actions 时勾选 `require_fresh_network`，必须实时取得固定官方文章并通过全部原有校验；证据不可读直接失败，保留旧文件，不发送成功通知。严格模式禁止同时传入离线网页。默认每日同步仍允许上述降级，但 Actions 会产生醒目的审批暂停警告；官方响应明确标记 Cloudflare challenge 时一并记录，便于区分传输故障。一次本地成功不代表 GitHub 运行器已恢复，应以对应运行器的实时结果为准。
-
-独立的 `Verify live OpenAI evidence` 工作流在相关 PR 或手动触发时执行相同的严格构建，权限只读，不提交产物、不使用 Telegram Secrets。它用于验收实时证据恢复，失败不会修改生产配置，也不是每日同步任务。
-
-[`data/openai-review.json`](data/openai-review.json) 保存每条候选的来源、首次发现时间、结论变化时间、理由、对应证据、自动/手工实际覆盖，以及全部最终 OpenAI 规则的逐条清点。证据 URL、规范化规则及 SHA-256 随记录保存；页面无关样式变化不计作证据变化。每次实际核验时间写入 Actions 报告，Git 历史保留审核变化。旧 `review.excluded_auto_rules` 仅保留当前仍未获准的条目用于兼容，不用于授权。
-
-首次全量审查结果见 [2026-10-15 OpenAI 清单审查](docs/openai-audit-2026-10-15.md)。不增加定时任务，继续使用每天 11:00、手动及配置修改触发的现有 Actions，成功发布后才报告实际变更。
+没有新增定时任务，继续随每天 11:00、手动和配置修改触发的 GitHub Actions 成功运行后推送。
 
 ## 2026-10-15 审查修复与发布保护
 
@@ -174,6 +157,6 @@ https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-
 
 已将官方所列的共享第三方目标加入 config/manual-openai.rules，精确主机保持 DOMAIN，官方通配子域（ct.sendgrid.net、intercom.io、intercomcdn.com）使用 DOMAIN-SUFFIX。它们不属于 OpenAI 独占服务，可能连带让其他网站的对应主机流量走 OpenAI 出口。
 
-包含 WorkOS 身份验证组件、Cloudflare 验证、Intercom 支持资源、SendGrid、Stripe 脚本、Sentry 与 Datadog 监控、Apple 检测。2026-10-15 起，当前官方确认的这些范围也通过证据审核进入自动层，原独立手工兜底继续保留；Voice 官方目的 IP、原 Johnshall 规则和两节点变量不因这次功能改变。
+包含 WorkOS 身份验证组件、Cloudflare 验证、Intercom 支持资源、SendGrid、Stripe 脚本、Sentry 与 Datadog 监控、Apple 检测。自动上游仍只采纳 OpenAI 专属域名，官方共享依赖由独立手工兜底承接；Voice 官方目的 IP、原 Johnshall 规则和两节点变量都未改变。
 
 安全边界：不引入 DOMAIN-SUFFIX,workos.com、DOMAIN-SUFFIX,stripe.com、DOMAIN-SUFFIX,cloudflare.com 等未获官方明确要求的整个供应商域名，也不使用 DOMAIN-KEYWORD,openai。静态域名和官方 Voice 目的 IP 不可能预知所有未来服务或隐藏直连目标，因此无法数学保证 100% 的 OpenAI 流量；新增目标应结合已建立的待审核规则报告及 Shadowrocket 连接日志查证。

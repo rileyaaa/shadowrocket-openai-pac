@@ -1,4 +1,4 @@
-# OpenAI automatic rules: official Voice IPs + evidence-reviewed domains
+# OpenAI automatic rules: official Voice destination IPs + public domains
 # No node name here: route is supplied while merging into .conf
 # Voice IPs (destination-only); never use OpenAI egress source ranges
 IP-CIDR,4.151.200.38/32,no-resolve
@@ -24,7 +24,7 @@ IP-CIDR,172.203.39.49/32,no-resolve
 IP-CIDR,172.207.173.200/32,no-resolve
 IP-CIDR,172.214.226.198/32,no-resolve
 IP-CIDR,191.233.251.27/32,no-resolve
-# Reviewed domain scopes and current official network dependencies
+# Dedicated first-party and explicitly verified hosted domains
 DOMAIN,openaiapi-site.azureedge.net
 DOMAIN,openaiassets.blob.core.windows.net
 DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net

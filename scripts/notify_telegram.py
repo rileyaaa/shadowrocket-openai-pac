@@ -3,7 +3,6 @@
 from __future__ import annotations
 import argparse
 from datetime import datetime
-import html
 import json
 import os
 from pathlib import Path
@@ -12,16 +11,11 @@ import urllib.error
 import urllib.request
 from zoneinfo import ZoneInfo
 
-from review_rules import REASONS
-
 NAMES = {
     "johnshall": "Johnshall", "voice": "OpenAI Voice", "metacubex": "MetaCubeX",
     "v2fly": "v2fly", "acl4ssr": "ACL4SSR", "blackmatrix7": "blackmatrix7",
     "apple_news": "Apple News 内嵌规则",
-    "official_network": "OpenAI 官方网络清单",
 }
-DECISIONS = {"approved": "通过", "covered": "已覆盖", "pending": "待证据",
-             "rejected": "拒绝", "withdrawn": "已撤回"}
 EVENTS = {"push": "代码提交", "schedule": "定时运行", "workflow_dispatch": "手动执行"}
 COUNT_FIELDS = (
     ("automatic_openai_domains", "OpenAI 自动域名"),
@@ -40,8 +34,6 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     sources = report["changed_sources"]
     result = ("配置已更新" if report["config_changed"] else
               "上游发生变化，最终配置无变化" if sources else "检查成功，无变化")
-    if not report.get("automatic_review", {}).get("official_evidence_available", True):
-        result += "；新增域名审批暂停"
     lines = [
         "✅ Shadowrocket GitHub Actions 成功",
         f"时间：{when} (UTC+8)", f"触发：{EVENTS.get(event, event)}",
@@ -56,8 +48,7 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     if "embedded_ruleset_rules" in report["statistics"]:
         lines.append(f"已校验内嵌规则：{report['statistics']['embedded_ruleset_rules']:,}")
     if "unparsed_upstream_rules" in report["statistics"]:
-        label = "特殊格式已逐条审核" if "automatic_review" in report else "未支持格式待审核"
-        lines.append(f"{label}：{report['statistics']['unparsed_upstream_rules']:,}")
+        lines.append(f"未支持格式待审核：{report['statistics']['unparsed_upstream_rules']:,}")
     if report.get("settings_changed"):
         lines.append("节点名称：已更新")
     added, removed = report["auto_added"], report["auto_removed"]
@@ -66,32 +57,7 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
         lines.append("新增：" + "；".join(added[:5]) + ("…" if len(added) > 5 else ""))
     if removed:
         lines.append("删除：" + "；".join(removed[:5]) + ("…" if len(removed) > 5 else ""))
-    if "automatic_review" in report:
-        review = report["automatic_review"]
-        lines.extend(["", "🔎 证据审核（每次重新判断）",
-                      " / ".join(f"{DECISIONS[key]} {review['counts'].get(key, 0)}"
-                                 for key in DECISIONS)])
-        if not review.get("official_evidence_available", True):
-            lines.append(f"⚠️ 新增域名审批暂停：官方网络证据不可读（{review['official_evidence_error']}）")
-            lines.append("自动域名保持上次发布范围；未批准新增域名。Voice 和 Johnshall 仍按当前来源核验。")
-        lines.append(f"实际发布的自动层变化：+{len(added)} / -{len(removed)}；已覆盖不代表新增分流")
-        changes = review["changes"]
-        noteworthy = [item for item in changes if item["status"] != "covered"]
-        noteworthy.sort(key=lambda item: (not item["rule"].startswith("IP-"), item["status"] != "approved", item["rule"]))
-        if review.get("baseline_created"):
-            lines.append("首次全量审查，已有候选不冒充本次新增")
-        elif not changes:
-            lines.append("本次审核结论无变化，旧待审项已复查")
-        for item in noteworthy[:8]:
-            lines.append(f"· {DECISIONS[item['status']]} {item['rule']}：{REASONS[item['reason']]}")
-        if len(noteworthy) > 8:
-            lines.append(f"其余 {len(noteworthy)-8} 条结论见 Actions 摘要")
-        if repo:
-            lines.append(f"逐条审计：https://github.com/{repo}/blob/main/data/openai-review.json")
-        if run_url:
-            lines.extend(["", f"Actions：{run_url}"])
-        return "\n".join(lines)[:3900]
-    # Compatibility for reports produced before automatic review was enabled.
+    # Newly rejected domain/rule candidates are REVIEW ONLY.
     candidates = report.get("new_excluded_candidates", [])
     reviewed_total = report.get("excluded_review_total", 0)
     lines.append("")
@@ -109,24 +75,6 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     if run_url:
         lines.extend(["", f"Actions：{run_url}"])
     return "\n".join(lines)[:3900]
-
-
-def review_summary(report: dict) -> str:
-    review = report.get("automatic_review")
-    if review is None:
-        return ""
-    def cell(value):
-        return html.escape(str(value)).replace("|", "&#124;").replace("`", "&#96;").replace("\n", " ")
-    rows = ["\n### 全量自动审核结果\n", f"核验时间：{review['checked_at']}\n",
-            "审批结论与实际路由覆盖分别记录。自动层和手工层保持独立。\n",
-            "| 规则 | 结论 | 理由 | 自动覆盖 / 手工覆盖 | 当前来源 |",
-            "|---|---|---|---|---|"]
-    for item in review["candidates"]:
-        rows.append("| " + " | ".join(cell(value) for value in (
-            item["rule"], DECISIONS[item["status"]], REASONS[item["reason"]],
-            f"{'是' if item['automatic_coverage'] else '否'} / {'是' if item['manual_coverage'] else '否'}",
-            ", ".join(item["active_sources"]) or "当前无可用来源")) + " |")
-    return "\n".join(rows) + "\n"
 
 
 def send(bot_token: str, chat_id: str, text: str) -> None:
@@ -166,8 +114,7 @@ def main() -> int:
     if summary_path:
         with open(summary_path, "a", encoding="utf-8") as summary:
             summary.write("## Shadowrocket 同步成功摘要\n\n~~~text\n" + message + "\n~~~\n")
-            summary.write(review_summary(report))
-            candidates = report.get("new_excluded_candidates", []) if "automatic_review" not in report else []
+            candidates = report.get("new_excluded_candidates", [])
             if candidates:
                 summary.write("\n### 完整新增待审核规则清单（未自动分流）\n\n")
                 for item in candidates:

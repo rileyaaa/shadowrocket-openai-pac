@@ -2,11 +2,6 @@ name: Sync Johnshall and OpenAI rules
 
 on:
   workflow_dispatch:
-    inputs:
-      require_fresh_network:
-        description: 'Require live official network evidence (fail instead of holding domains)'
-        type: boolean
-        default: false
   schedule:
     # Johnshall publishes around 07:04 Asia/Taipei daily.
     # MetaCubeX is the latest regular daily source; recent builds completed around 09:09-10:27.
@@ -41,29 +36,10 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Generate verified Shadowrocket config
-        env:
-          REQUIRE_FRESH_NETWORK: ${{ inputs.require_fresh_network == true }}
-        run: |
-          extra=()
-          if [ "$REQUIRE_FRESH_NETWORK" = 'true' ]; then
-            extra+=(--require-fresh-network)
-          fi
-          python scripts/build.py "${extra[@]}" --report-file "$RUNNER_TEMP/sync-report.json"
-      - name: Show official evidence status
-        run: |
-          python - "$RUNNER_TEMP/sync-report.json" <<'PY'
-          import json
-          import sys
-          with open(sys.argv[1], encoding="utf-8") as source:
-              review = json.load(source)["automatic_review"]
-          if not review["official_evidence_available"]:
-              print("::warning::Domain approvals remain paused: " + review["official_evidence_error"])
-          else:
-              print("Live official evidence verified; domain approvals are active.")
-          PY
+        run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
       - name: Commit only when upstream changes
         run: |
-          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json data/openai-review.json
+          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json
           if git diff --cached --quiet; then
             echo "No changes; already in sync."
             exit 0
