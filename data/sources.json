@@ -22,7 +22,10 @@
       "DOMAIN-SUFFIX,openaicom.imgix.net",
       "DOMAIN-SUFFIX,segment.io",
       "DOMAIN-SUFFIX,sentry.io",
-      "DOMAIN-SUFFIX,stripe.com"
+      "DOMAIN-SUFFIX,stripe.com",
+      "IP-ASN,20473,no-resolve",
+      "IP-CIDR,24.199.123.28/32,no-resolve",
+      "IP-CIDR,64.23.132.171/32,no-resolve"
     ]
   },
   "settings": {
@@ -34,12 +37,17 @@
       "sha256": "c4f839e4dda6cb96e4373349c72b4e5f848b8ae03564c0d0eae0873955310129",
       "url": "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list"
     },
+    "apple_news": {
+      "rule_count": 2,
+      "sha256": "ec57625e5b938396b92034c0d71eadbd0c4a1adbff8243f05d8bb97441ad1b26",
+      "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AppleNews/AppleNews.list"
+    },
     "blackmatrix7": {
       "sha256": "6f4047cdbf6953cf5d9b38c4ccd6da7bc6f1acb91b7a87134f25d5b8f5d2408b",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
     "johnshall": {
-      "sha256": "5059eab51374b41a7c57853dd1f85ef90a2f8ef1bccd6117810bb5bd8a04c6e9",
+      "sha256": "3ec15e876dc6c3ae47bdab35f0e82891001c30b3c3b15c0fb7865578145dae61",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -60,14 +68,18 @@
     "auto_total_ip_and_domain_rules": 45,
     "automatic_openai_domains": 22,
     "cross_layer_duplicate_rules_retained": 21,
+    "embedded_ruleset_rules": 2,
     "excluded_shared_auto_domains": 22,
-    "johnshall_lines": 87883,
+    "johnshall_lines": 87854,
     "manual_backup_rules": 43,
     "manual_openai_rules": 43,
     "mapped_proxy_to_johnshall_node": 30239,
-    "retained_ad_rules": 57557,
+    "retained_ad_rules": 57528,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
+    "unparsed_upstream_rules": 3,
+    "voice_ipv4_addresses": 23,
+    "voice_ipv6_addresses": 0,
     "voice_prefixes": 23
   }
 }
