@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -160,6 +161,11 @@ class DecisionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unauthorised"):
             review.validate_emitted([], [rule], [], [], [])
 
+    def test_unavailable_evidence_cannot_be_replaced_with_a_cached_allowlist(self):
+        with self.assertRaisesRegex(ValueError, "Unavailable evidence"):
+            review.review_candidates({}, {}, ["DOMAIN,new.vendor.example"], [], [], [],
+                                     official_available=False)
+
 
 class AutomaticReviewPipelineTests(unittest.TestCase):
     # Share fixture setup/helpers without re-running the inherited test methods.
@@ -174,6 +180,60 @@ class AutomaticReviewPipelineTests(unittest.TestCase):
 
     def read_audit(self):
         return json.loads((self.root / "data/openai-review.json").read_text())
+
+    def unavailable_network(self, url, *args, **kwargs):
+        if url == review.NETWORK_URL:
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, None)
+        return self.sources[url]
+
+    def test_official_outage_holds_domains_without_approving_new_candidates(self):
+        rule = "DOMAIN,previously-approved.vendor.example"
+        self.append_official(rule.split(",")[1])
+        self.run_build()
+        before = (self.root / "rules/openai-auto.list").read_text()
+        new_rule = "DOMAIN,new.vendor.example"
+        self.sources[build.DOMAIN_SOURCES["acl4ssr"][0]] += ("\n" + new_rule).encode()
+        with patch.object(build, "fetch", side_effect=self.unavailable_network):
+            self.run_build()
+        self.assertEqual((self.root / "rules/openai-auto.list").read_text(), before)
+        self.assertNotIn(new_rule, build.CONFIG.read_text())
+        self.assertIn(rule, build.CONFIG.read_text())
+        report = json.loads((self.root / "report.json").read_text())
+        self.assertEqual(report["automatic_review"]["domain_publication_mode"], "held")
+        self.assertEqual(report["automatic_review"]["counts"]["approved"], 0)
+        self.assertFalse(report["automatic_review"]["official_evidence_available"])
+        self.assertIn("新增域名审批暂停", notify_telegram.format_report(report, "schedule", "test/repo", ""))
+        self.assertFalse(self.read_audit()["evidence"]["official_network"]["available"])
+        # On recovery, a real removal (unlike an outage) revokes the dynamic rule.
+        self.sources[review.NETWORK_URL] = FIXTURE
+        self.run_build()
+        self.assertNotIn(rule, build.CONFIG.read_text())
+
+    def test_network_outage_does_not_block_fresh_voice_destinations(self):
+        self.run_build()
+        self.voice["prefixes"][0]["ipv4Prefix"] = "8.8.8.8/32"
+        self.sources[build.VOICE_URL] = json.dumps(self.voice).encode()
+        with patch.object(build, "fetch", side_effect=self.unavailable_network):
+            self.run_build()
+        self.assertIn("IP-CIDR,8.8.8.8/32,OpenAI Test,no-resolve", build.CONFIG.read_text())
+        self.assertEqual(json.loads((self.root / "report.json").read_text())["automatic_review"]["domain_publication_mode"], "held")
+
+    def test_network_outage_without_published_baseline_is_fatal(self):
+        before = self.published_files()
+        with patch.object(build, "fetch", side_effect=self.unavailable_network):
+            with self.assertRaisesRegex(ValueError, "without published artifacts"):
+                self.run_build()
+        self.assertEqual(self.published_files(), before)
+
+    def test_network_outage_cannot_hold_tampered_published_artifacts(self):
+        self.run_build()
+        path = self.root / "rules/openai-auto.list"
+        path.write_text(path.read_text() + "DOMAIN,new.vendor.example\n")
+        before = self.published_files()
+        with patch.object(build, "fetch", side_effect=self.unavailable_network):
+            with self.assertRaisesRegex(ValueError, "baseline is inconsistent"):
+                self.run_build()
+        self.assertEqual(self.published_files(), before)
 
     def test_pending_then_approved_then_evidence_removed_in_real_build(self):
         rule = "DOMAIN,new.vendor.example"
@@ -222,6 +282,8 @@ class AutomaticReviewPipelineTests(unittest.TestCase):
     def test_every_final_openai_rule_has_an_inventory_record_and_no_unknown_ips(self):
         url = build.DOMAIN_SOURCES["acl4ssr"][0]
         self.sources[url] += b"\nIP-CIDR,24.199.123.28/32,no-resolve\nIP-CIDR,64.23.132.171/32,no-resolve\nIP-ASN,20473,no-resolve\n"
+        self.sources[build.DOMAIN_SOURCES["v2fly"][0]] += (
+            "\n" + r"regexp:^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$").encode()
         self.run_build()
         audit = self.read_audit()
         auto = build.active_auto_rules((self.root / "rules/openai-auto.list").read_text())
@@ -229,6 +291,9 @@ class AutomaticReviewPipelineTests(unittest.TestCase):
         actual = {row["rule"] for row in audit["inventory"] if row["layer"] != "manual_fallback"}
         self.assertEqual(actual, expected)
         self.assertEqual(sum(row["layer"] == "manual_fallback" for row in audit["inventory"]), 43)
+        wildcard = next(row for row in audit["candidates"] if row["rule"].startswith("DOMAIN-WILDCARD,"))
+        self.assertTrue(wildcard["manual_coverage"])
+        self.assertTrue(wildcard["automatic_coverage"])
         output = build.CONFIG.read_text()
         for value in ("24.199.123.28", "64.23.132.171", "IP-ASN,20473"):
             self.assertNotIn(value, output)

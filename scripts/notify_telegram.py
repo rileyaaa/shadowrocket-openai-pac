@@ -40,6 +40,8 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
     sources = report["changed_sources"]
     result = ("配置已更新" if report["config_changed"] else
               "上游发生变化，最终配置无变化" if sources else "检查成功，无变化")
+    if not report.get("automatic_review", {}).get("official_evidence_available", True):
+        result += "；新增域名审批暂停"
     lines = [
         "✅ Shadowrocket GitHub Actions 成功",
         f"时间：{when} (UTC+8)", f"触发：{EVENTS.get(event, event)}",
@@ -69,6 +71,9 @@ def format_report(report: dict, event: str, repo: str, run_url: str,
         lines.extend(["", "🔎 证据审核（每次重新判断）",
                       " / ".join(f"{DECISIONS[key]} {review['counts'].get(key, 0)}"
                                  for key in DECISIONS)])
+        if not review.get("official_evidence_available", True):
+            lines.append(f"⚠️ 新增域名审批暂停：官方网络证据不可读（{review['official_evidence_error']}）")
+            lines.append("自动域名保持上次发布范围；未批准新增域名。Voice 和 Johnshall 仍按当前来源核验。")
         lines.append(f"实际发布的自动层变化：+{len(added)} / -{len(removed)}；已覆盖不代表新增分流")
         changes = review["changes"]
         noteworthy = [item for item in changes if item["status"] != "covered"]
@@ -120,7 +125,7 @@ def review_summary(report: dict) -> str:
         rows.append("| " + " | ".join(cell(value) for value in (
             item["rule"], DECISIONS[item["status"]], REASONS[item["reason"]],
             f"{'是' if item['automatic_coverage'] else '否'} / {'是' if item['manual_coverage'] else '否'}",
-            ", ".join(item["active_sources"]) or "来源已撤回")) + " |")
+            ", ".join(item["active_sources"]) or "当前无可用来源")) + " |")
     return "\n".join(rows) + "\n"
 
 

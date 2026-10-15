@@ -36,19 +36,7 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Generate verified Shadowrocket config
-        run: |
-          # Use the runner's standard HTTP/2 client for this public HTML source.
-          # Keep our real project identity, TLS verification, fixed URL and size
-          # limits. No cookies, browser impersonation or third-party mirrors.
-          official_status="$(curl --disable --http2 --silent --show-error --fail \
-            --proto '=https' --max-time 75 --max-filesize 13000000 \
-            --retry 1 --retry-all-errors --retry-delay 2 \
-            --user-agent 'shadowrocket-openai-pac/1.0' \
-            --header 'Accept: text/html' --header 'Accept-Encoding: identity' \
-            --output "$RUNNER_TEMP/official-network.html" --write-out '%{http_code}' \
-            'https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps')"
-          test "$official_status" = '200'
-          python scripts/build.py --official-network-file "$RUNNER_TEMP/official-network.html" --report-file "$RUNNER_TEMP/sync-report.json"
+        run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
       - name: Commit only when upstream changes
         run: |
           git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json data/openai-review.json

@@ -49,6 +49,7 @@ REASONS = {
     "candidate_exceeds_evidence_scope": "候选规则比已确认的主机或子域范围更宽",
     "no_current_official_evidence": "缺少当前官方证据，社区收录次数不构成证明",
     "no_current_source": "当前来源已撤回，历史审批不能继续授权",
+    "official_evidence_unavailable": "官方网络证据暂不可读，暂停新增域名授权",
 }
 HOST_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
 
@@ -274,7 +275,10 @@ def review_one(rule: str, official: list[str], voice: list[str],
 def review_candidates(source_lists: dict[str, list[str]], unparsed: dict[str, list[str]],
                       official: list[str], voice: list[str], legacy: list[str],
                       manual: list[str], previous: dict | None = None,
-                      initial_exclusions: list[str] = (), now: str | None = None) -> tuple[list[str], dict]:
+                      initial_exclusions: list[str] = (), now: str | None = None,
+                      official_available: bool = True) -> tuple[list[str], dict]:
+    if not official_available and official:
+        raise ValueError("Unavailable evidence must not authorize new candidates")
     now = now or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     origins: dict[str, set[str]] = {}
     for source, rules in list(source_lists.items()) + list(unparsed.items()) + [("official_network", official)]:
@@ -291,10 +295,12 @@ def review_candidates(source_lists: dict[str, list[str]], unparsed: dict[str, li
     changes = []
     for rule in candidates:
         decision = review_one(rule, official, voice, legacy, manual)
+        if not official_available and decision["reason"] == "no_current_official_evidence":
+            decision["reason"] = "official_evidence_unavailable"
         active = sorted(origins.get(rule, ()))
         # Removed upstream entries do not survive because an old report approved
         # them. Old pending/rejected entries remain visible and are re-evaluated.
-        if not active and decision["status"] in {"approved", "covered"}:
+        if official_available and not active and decision["status"] in {"approved", "covered"}:
             decision = {"status": "withdrawn", "reason": "no_current_source",
                         "evidence_rules": [], "permit_auto": False}
         prior = old.get(rule, {})
