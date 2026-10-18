@@ -1,5 +1,7 @@
 {
-  "pending_new": [],
+  "pending_new": [
+    "DOMAIN-SUFFIX,openai.org"
+  ],
   "sent": {},
   "version": 1
 }

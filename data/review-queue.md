@@ -24,6 +24,7 @@
 | DOMAIN-SUFFIX,intercomcdn.com | acl4ssr, blackmatrix7 | 已由现有 OpenAI 规则覆盖 | — | — | DOMAIN-SUFFIX,intercomcdn.com |
 | DOMAIN-SUFFIX,launchdarkly.com | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | LaunchDarkly 是第三方共享功能配置平台；未见官方要求代理其整个域。 |
 | DOMAIN-SUFFIX,observeit.net | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | 第三方共享监控服务，缺乏当前 OpenAI 官方必需域名证据。 |
+| DOMAIN-SUFFIX,openai.org | metacubex, v2fly | 待人工审核 | — | — | — |
 | DOMAIN-SUFFIX,openaiapi-site.azureedge.net | acl4ssr, blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | 精确主机 openaiapi-site.azureedge.net 已有 DOMAIN 规则；全部子域尚无核实依据。 |
 | DOMAIN-SUFFIX,openaicom.imgix.net | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | 精确主机 openaicom.imgix.net 已有 DOMAIN 规则；全部子域尚无核实依据。 |
 | DOMAIN-SUFFIX,segment.io | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | Segment 为第三方共享分析平台；官方未要求该域全部子域的 OpenAI 分流。 |
