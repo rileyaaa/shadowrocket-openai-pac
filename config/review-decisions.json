@@ -64,6 +64,11 @@
       "reviewed_at": "2026-10-15"
     },
     {
+      "rule": "DOMAIN-SUFFIX,openai.org",
+      "reason": "v2fly 社区虽已加入 openai.org，但其维护者明确提出域名归属缺乏证明；提出者只称 api.openai.org 用于部分隧道客户端，OpenAI 官方域名资料尚未证实该域及所有子域属于 ChatGPT/API 必需目标。暂不扩大 OpenAI 节点分流，待官方证据后复审。",
+      "reviewed_at": "2026-10-19"
+    },
+    {
       "rule": "DOMAIN-SUFFIX,openaiapi-site.azureedge.net",
       "reason": "精确主机 openaiapi-site.azureedge.net 已有 DOMAIN 规则；全部子域尚无核实依据。",
       "reviewed_at": "2026-10-15"
