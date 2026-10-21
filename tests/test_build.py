@@ -206,6 +206,26 @@ class BuildTest(unittest.TestCase):
                 self.assertNotIn(unsafe, manual)
                 self.assertNotIn(unsafe, build.OFFICIAL_CHATGPT_SHARED_RULES)
 
+    def test_official_codex_feedback_sentry_is_exact_host_only(self):
+        # OpenAI's Codex source specifies this Sentry feedback endpoint,
+        # but other tenants and the entire sentry.io domain are unverified.
+        approved = "DOMAIN,o33249.ingest.us.sentry.io"
+        manual = build.parse_manual(build.ROOT / "config/manual-openai.rules")
+        self.assertIn(approved, manual)
+        self.assertIn(approved, build.OFFICIAL_CODEX_SHARED_RULES)
+        self.assertFalse(build.is_openai_specific_rule(approved))
+        self.assertTrue(build.domain_rule_covers(approved, approved))
+        for unrelated in (
+            "DOMAIN,another.ingest.us.sentry.io",
+            "DOMAIN,sub.o33249.ingest.us.sentry.io",
+            "DOMAIN-SUFFIX,ingest.us.sentry.io",
+            "DOMAIN-SUFFIX,sentry.io",
+        ):
+            with self.subTest(unrelated=unrelated):
+                self.assertFalse(build.domain_rule_covers(approved, unrelated))
+                self.assertNotIn(unrelated, manual)
+                self.assertNotIn(unrelated, build.OFFICIAL_CODEX_SHARED_RULES)
+
     def test_voice(self):
         doc = json.dumps({"prefixes": [
             {"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 6)

@@ -53,6 +53,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowro
 - `DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com` 是 ChatGPT 专用 Azure Web PubSub 主机匹配，不是 `*.azure.com` 或通用云域名。
 - `openai-api.arkoselabs.com`、`openai.qualtrics.com`、`cdn.openaimerge.com` 等可明确识别的主机只使用精确 `DOMAIN`。不要无证据扩大为 `DOMAIN-SUFFIX,arkoselabs.com` 等第三方整站。
 - **OpenAI 覆盖优先**：官方 ChatGPT 网络清单明确列出的 WorkOS、Cloudflare 验证、Intercom、SendGrid、Sentry、Apple 相关检测等共享依赖，现已按完整主机或官方通配子域纳入手工规则；Voice 所需 LiveKit 规则也继续生效。其他使用这些共享主机的应用也可能转到 OpenAI 节点。这是覆盖优先的取舍，不表示它们为 OpenAI 独占域名。
+- **Codex 反馈端点审核（2026-10-21）**：OpenAI 官方 [Codex 源码](https://github.com/openai/codex/blob/main/codex-rs/feedback/src/lib.rs) 的反馈上传 Sentry DSN 明确指向 `o33249.ingest.us.sentry.io`。已审核通过其精确主机规则 `DOMAIN,o33249.ingest.us.sentry.io`，放在独立手工兜底层；不会批准整个 `sentry.io` 或 `ingest.us.sentry.io` 后缀。该地址用于反馈/诊断上传，不代表聊天 API 必须连接它。
 - `gpt(all, udp/3478)` 会误伤其他应用的 UDP 3478。改为自动更新的官方 Voice 目的 IP，不能把“所有 UDP/3478”直接划为 OpenAI。
 - **截至 2026-10，Sora 产品和 API 已停止服务**；`sora.com` 仍按你要求保留为历史兼容规则，不代表该服务仍在线。
 

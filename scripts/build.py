@@ -95,6 +95,12 @@ OFFICIAL_CHATGPT_SHARED_RULES = frozenset({
     "DOMAIN,setup.workos.com",
     "DOMAIN,workos.imgix.net",
 })
+# OpenAI's own Codex feedback uploader uses this exact shared Sentry host.
+# Do not allowlist the Sentry parent domain or other Sentry tenants.
+# https://github.com/openai/codex/blob/main/codex-rs/feedback/src/lib.rs
+OFFICIAL_CODEX_SHARED_RULES = frozenset({
+    "DOMAIN,o33249.ingest.us.sentry.io",
+})
 DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
 PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
 CONFIG = ROOT / "Shadowrocket_Johnshall_OpenAI.conf"
@@ -436,10 +442,11 @@ def parse_manual(path: Path) -> list[str]:
             raise ValueError(f"Invalid manual rule {line}")
         normalized = domain_rule(parts[0], parts[1])
         if (not is_openai_specific_rule(normalized)
-                and normalized not in OFFICIAL_CHATGPT_SHARED_RULES):
+                and normalized not in OFFICIAL_CHATGPT_SHARED_RULES
+                and normalized not in OFFICIAL_CODEX_SHARED_RULES):
             raise ValueError(
                 "Manual rule is neither verified OpenAI-specific nor an "
-                "explicitly approved official ChatGPT shared dependency: "
+                "explicitly approved official OpenAI shared dependency: "
                 + normalized
             )
         result.append(normalized)

@@ -57,6 +57,9 @@ DOMAIN,images.workoscdn.com
 DOMAIN,js.stripe.com
 DOMAIN,o207216.ingest.sentry.io
 DOMAIN,o33249.ingest.sentry.io
+# Codex feedback upload: exact Sentry tenant from the official OpenAI source.
+# https://github.com/openai/codex/blob/main/codex-rs/feedback/src/lib.rs
+DOMAIN,o33249.ingest.us.sentry.io
 DOMAIN,rum.browser-intake-datadoghq.com
 DOMAIN,setup.workos.com
 DOMAIN,workos.imgix.net
