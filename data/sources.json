@@ -4,6 +4,7 @@
     "excluded_auto_rules": [
       "DOMAIN,browser-intake-datadoghq.com",
       "DOMAIN,o33249.ingest.sentry.io",
+      "DOMAIN,o33249.ingest.us.sentry.io",
       "DOMAIN,static.cloudflareinsights.com",
       "DOMAIN-KEYWORD,openai",
       "DOMAIN-SUFFIX,ai.com",
@@ -49,15 +50,15 @@
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
     "johnshall": {
-      "sha256": "446157d5b024fdca7ae6af0109d192e8ce9cc01e840fdc4aa58e424a1966ded3",
+      "sha256": "c9f7f4e2adbe38433e904f72d010a6d08a84e451ef5b9722183940c68240cabd",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
-      "sha256": "679d8831b88237bf5ead520effc56d17db7ab1cc3dd8fd3e5fed7cb9f630caed",
+      "sha256": "8a4f1b16302f882117d3c106d2ac21f108acbd4714dd7373d403745c0f338aa8",
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
     },
     "v2fly": {
-      "sha256": "5276ab68c1a2d44db2cd745a9146d1645ef3dd3c388fdd1079b6b49267d60ddc",
+      "sha256": "ec1043e63c31bbef51efe13a3e2af29a3f66b8b4692f517d75a864cbc4a3d88d",
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai"
     },
     "voice": {
@@ -71,12 +72,12 @@
     "automatic_openai_domains": 22,
     "cross_layer_duplicate_rules_retained": 21,
     "embedded_ruleset_rules": 2,
-    "excluded_shared_auto_domains": 23,
-    "johnshall_lines": 89595,
+    "excluded_shared_auto_domains": 24,
+    "johnshall_lines": 89942,
     "manual_backup_rules": 43,
     "manual_openai_rules": 43,
     "mapped_proxy_to_johnshall_node": 30242,
-    "retained_ad_rules": 59266,
+    "retained_ad_rules": 59613,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "unparsed_upstream_rules": 3,

@@ -1,5 +1,7 @@
 {
-  "pending_new": [],
+  "pending_new": [
+    "DOMAIN,o33249.ingest.us.sentry.io"
+  ],
   "sent": {},
   "version": 1
 }

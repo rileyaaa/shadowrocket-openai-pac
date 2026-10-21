@@ -9,6 +9,7 @@
 |---|---|---|---|---|---|
 | DOMAIN,browser-intake-datadoghq.com | blackmatrix7, metacubex, v2fly | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | OpenAI 官方清单仅列 rum.browser-intake-datadoghq.com；裸域名未核实为 ChatGPT 必需目标，暂不扩大。 |
 | DOMAIN,o33249.ingest.sentry.io | metacubex, v2fly | 已由现有 OpenAI 规则覆盖 | — | — | DOMAIN,o33249.ingest.sentry.io |
+| DOMAIN,o33249.ingest.us.sentry.io | metacubex, v2fly | 待人工审核 | — | — | — |
 | DOMAIN,static.cloudflareinsights.com | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | Cloudflare 通用网站分析主机；未列入 OpenAI 官方网络清单，未核实为专用依赖。 |
 | DOMAIN-KEYWORD,openai | acl4ssr, blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | 关键字匹配可命中含 openai 字样的无关第三方域名；现有明确域名规则更精确。 |
 | DOMAIN-SUFFIX,ai.com | blackmatrix7 | 人工不通过，暂不提醒 | 2026-10-15 | 2027-04-15 | 现有官方网络清单未将 ai.com 全域及子域列为必需目的地址，缺乏扩大分流依据。 |
