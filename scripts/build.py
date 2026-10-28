@@ -391,9 +391,19 @@ def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool
         previous = before[key]
         if ((previous == 0 and after > 0)
                 or (previous > 0 and (after * 10 < previous * 7 or after > previous * 2))):
+            # Include exact CIDR differences so an operator can review the
+            # official feed without weakening the growth threshold.
+            old_ips = {",".join(rule.split(",")[:2])
+                       for rule in active_auto_rules(old_auto)
+                       if rule.startswith(("IP-CIDR,", "IP-CIDR6,"))}
+            new_ips = set(ips)
+            added = sorted(new_ips - old_ips)
+            removed = sorted(old_ips - new_ips)
             raise ValueError(
                 f"VOICE COVERAGE ANOMALY: {key}: {previous} -> {after}; "
-                "review official ranges before changing the published baseline"
+                "review official ranges before changing the published baseline; "
+                f"added({len(added)}): {', '.join(added[:80])}; "
+                f"removed({len(removed)}): {', '.join(removed[:80])}"
             )
     return current
 
@@ -692,7 +702,20 @@ def run():
     old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
     auto_path = ROOT / "rules/openai-auto.list"
     old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
-    stats.update(validate_voice_coverage(ips, old_auto, has_baseline=old_state is not None))
+    try:
+        stats.update(validate_voice_coverage(ips, old_auto, has_baseline=old_state is not None))
+    except ValueError as exc:
+        if "VOICE COVERAGE ANOMALY" in str(exc):
+            voice_doc = json.loads(voice_raw.decode("utf-8-sig"))
+            print(
+                "Official Voice source audit: "
+                f"url={VOICE_URL} "
+                f"sha256={hashlib.sha256(voice_raw).hexdigest()} "
+                f"creationTime={voice_doc.get('creationTime', 'not provided')} "
+                f"prefixes={len(ips)}",
+                file=sys.stderr,
+            )
+        raise
     stats["unparsed_upstream_rules"] = len({rule for rules in unparsed_sources.values() for rule in rules})
     stats["embedded_ruleset_rules"] = sum(len(rules) for rules in rulesets.values())
     for name, (url, _) in RULESET_SOURCES.items():

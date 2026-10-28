@@ -136,6 +136,18 @@ class PipelineHardeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "baseline is missing"):
             self.run_build()
 
+    def test_voice_expansion_error_reports_exact_cidr_diff_without_publishing(self):
+        self.run_build()
+        before = self.published_files()
+        self.voice["prefixes"][0]["ipv4Prefix"] = "8.8.4.0/25"
+        self.sources[build.VOICE_URL] = json.dumps(self.voice).encode()
+        with self.assertRaisesRegex(ValueError, "VOICE COVERAGE ANOMALY") as raised:
+            self.run_build()
+        message = str(raised.exception)
+        self.assertIn("added(1): IP-CIDR,8.8.4.0/25", message)
+        self.assertIn("removed(1): IP-CIDR,8.8.4.1/32", message)
+        self.assertEqual(self.published_files(), before)
+
     def test_voice_rotation_is_allowed_and_overlaps_count_once(self):
         self.run_build()
         voice = copy.deepcopy(self.voice)
