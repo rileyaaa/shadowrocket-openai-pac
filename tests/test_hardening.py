@@ -123,7 +123,6 @@ class PipelineHardeningTests(unittest.TestCase):
         self.run_build()
         previous_state = json.loads((self.root / "data/sources.json").read_text())
         previous_files = self.published_files()
-        after = initial.replace(extra[:0], b"")  # keep source unchanged for scope
         dropped = b"".join(
             f"DOMAIN,extrabad{i}.example,Reject\n".encode() for i in range(5500)
         )
@@ -164,6 +163,10 @@ class PipelineHardeningTests(unittest.TestCase):
         self.assertEqual(updated["sources"]["johnshall"]["sha256"],
                          hashlib.sha256(after).hexdigest())
         self.assertIn("DOMAIN,before.example,General Test", build.CONFIG.read_text())
+        # The next run uses the newly published baseline normally, without
+        # needing to reauthorize the one-time ad-list reduction.
+        self.run_build()
+        self.assertFalse(json.loads((self.root / "report.json").read_text())["config_changed"])
 
     def test_voice_same_count_expansion_preserves_published_files(self):
         self.run_build()
@@ -233,6 +236,10 @@ class PipelineHardeningTests(unittest.TestCase):
         # Original routing labels and all unrelated rules remain unchanged.
         self.assertIn("DOMAIN,before.example,General Test", build.CONFIG.read_text())
         self.assertIn("DOMAIN,after.example,General Test", build.CONFIG.read_text())
+        # Once the reviewed 12-host batch is published, subsequent normal
+        # syncs succeed on the updated baseline without a special bypass.
+        self.run_build()
+        self.assertFalse(json.loads((self.root / "report.json").read_text())["config_changed"])
 
     def test_reviewed_voice_approval_rejects_mismatch_or_broad_cidrs(self):
         self.run_build()
