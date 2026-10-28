@@ -32,7 +32,7 @@
     ]
   },
   "settings": {
-    "johnshall_proxy_node_name": "Leaseweb🇯🇵东京",
+    "johnshall_proxy_node_name": "铁柱免费分享",
     "openai_node_name": "Oracle🇯🇵东京-Argo"
   },
   "sources": {
@@ -50,7 +50,7 @@
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
     "johnshall": {
-      "sha256": "293a011c1a53782fb2ac98ae0ac231dab16f26f24259e9a83e0304a68221ef2b",
+      "sha256": "c896bd357bbd13afc4104e4c017e852d7817baddcc95ccaa43feefb1f62c1d90",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -58,31 +58,31 @@
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
     },
     "v2fly": {
-      "sha256": "ec1043e63c31bbef51efe13a3e2af29a3f66b8b4692f517d75a864cbc4a3d88d",
+      "sha256": "25d53e9af3e04d926210d6436bd791594ef4b86f2dc3c108510ac8059d76d969",
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai"
     },
     "voice": {
-      "sha256": "8f03f3c594165eeff009915c7e2beb4bdfb9d429fb1955c205e3b33ec781899a",
+      "sha256": "d2923918cc4cd6bf382f379b1601af871fbff66d8fefb81d4457f2ccba1ec959",
       "url": "https://openai.com/chatgpt-voice.json"
     }
   },
   "statistics": {
     "auto_input_rules": 23,
-    "auto_total_ip_and_domain_rules": 45,
+    "auto_total_ip_and_domain_rules": 424,
     "automatic_openai_domains": 22,
     "cross_layer_duplicate_rules_retained": 21,
     "embedded_ruleset_rules": 2,
     "excluded_shared_auto_domains": 24,
-    "johnshall_lines": 91335,
+    "johnshall_lines": 80778,
     "manual_backup_rules": 44,
     "manual_openai_rules": 44,
     "mapped_proxy_to_johnshall_node": 30249,
-    "retained_ad_rules": 60999,
+    "retained_ad_rules": 50442,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "unparsed_upstream_rules": 3,
-    "voice_ipv4_addresses": 23,
+    "voice_ipv4_addresses": 402,
     "voice_ipv6_addresses": 0,
-    "voice_prefixes": 23
+    "voice_prefixes": 402
   }
 }
