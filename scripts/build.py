@@ -408,6 +408,70 @@ def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool
     return current
 
 
+def is_reviewed_voice_expansion(
+    ips: list[str], old_auto: str, voice_raw: bytes, old_state: dict | None,
+) -> bool:
+    """Authorize ONLY the exact official Voice /32 batch explicitly audited.
+
+    The normal coverage and count gates are never disabled for other updates.
+    If the input, published baseline, or any CIDR differs, fail closed.
+    """
+    path = ROOT / "config/reviewed-voice-expansion.json"
+    if not path.exists():
+        return False
+    try:
+        approval = json.loads(path.read_text(encoding="utf-8"))
+        doc = json.loads(voice_raw.decode("utf-8-sig"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("Invalid reviewed Voice expansion authorization") from exc
+    if not isinstance(approval, dict):
+        raise ValueError("Reviewed Voice expansion authorization must be a JSON object")
+    expected_keys = {
+        "version", "reviewed_at", "source_url", "previous_voice_sha256",
+        "approved_voice_sha256", "creation_time", "previous_ipv4_addresses",
+        "approved_ipv4_addresses", "review_reason",
+    }
+    if set(approval) != expected_keys:
+        raise ValueError("Unexpected reviewed Voice expansion authorization fields")
+    prior_source = (old_state or {}).get("sources", {}).get("voice", {})
+    prior_stats = (old_state or {}).get("statistics", {})
+    if not isinstance(prior_source, dict) or not isinstance(prior_stats, dict):
+        return False
+    previous_ips = {
+        ",".join(rule.split(",")[:2])
+        for rule in active_auto_rules(old_auto)
+        if rule.startswith(("IP-CIDR,", "IP-CIDR6,"))
+    }
+    current_ips = set(ips)
+    return (
+        type(approval["version"]) is int
+        and approval["version"] == 1
+        and isinstance(approval["reviewed_at"], str)
+        and bool(approval["reviewed_at"])
+        and isinstance(approval["review_reason"], str)
+        and bool(approval["review_reason"])
+        and approval["source_url"] == VOICE_URL
+        and approval["previous_voice_sha256"] == prior_source.get("sha256")
+        and approval["approved_voice_sha256"] == hashlib.sha256(voice_raw).hexdigest()
+        and approval["creation_time"] == doc.get("creationTime")
+        and type(approval["previous_ipv4_addresses"]) is int
+        and type(approval["approved_ipv4_addresses"]) is int
+        and approval["previous_ipv4_addresses"] == prior_stats.get("voice_ipv4_addresses")
+        and approval["previous_ipv4_addresses"] == len(previous_ips)
+        and approval["approved_ipv4_addresses"] == len(ips)
+        and len(ips) > len(previous_ips) * 2
+        and len(ips) == len(current_ips)
+        and bool(previous_ips)
+        and previous_ips.issubset(current_ips)
+        and all(rule.startswith("IP-CIDR,") and rule.endswith("/32")
+                for rule in previous_ips | current_ips)
+        and voice_address_counts(ips) == {
+            "voice_ipv4_addresses": approval["approved_ipv4_addresses"],
+            "voice_ipv6_addresses": 0,
+        }
+    )
+
+
 def parse_embedded_ruleset(source: str) -> list[str]:
     """The reviewed Apple News list contains policy-free domain rules only."""
     rules = []
@@ -561,7 +625,10 @@ UPSTREAM_SIZE_GUARDS = {
 }
 
 
-def validate_upstream_change(stats: dict[str, int], old_state: dict | None) -> None:
+def validate_upstream_change(
+    stats: dict[str, int], old_state: dict | None, *,
+    reviewed_voice_expansion: bool = False,
+) -> None:
     """Compare with the last published snapshot; reject implausible changes."""
     if old_state is None:
         return
@@ -570,6 +637,10 @@ def validate_upstream_change(stats: dict[str, int], old_state: dict | None) -> N
         raise ValueError("Previous source statistics missing")
     anomalies = []
     for key, (minimum, maximum) in UPSTREAM_SIZE_GUARDS.items():
+        # A verified ONE-TIME official Voice /32 expansion has its own
+        # snapshot approval. All other source anomaly guards remain active.
+        if key == "voice_prefixes" and reviewed_voice_expansion:
+            continue
         before, after = old_stats.get(key), stats.get(key)
         if (type(before) is not int or type(after) is not int
                 or before <= 0 or after <= 0):
@@ -702,20 +773,33 @@ def run():
     old_state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
     auto_path = ROOT / "rules/openai-auto.list"
     old_auto = auto_path.read_text(encoding="utf-8") if auto_path.exists() else ""
+    reviewed_growth = False
     try:
         stats.update(validate_voice_coverage(ips, old_auto, has_baseline=old_state is not None))
     except ValueError as exc:
-        if "VOICE COVERAGE ANOMALY" in str(exc):
-            voice_doc = json.loads(voice_raw.decode("utf-8-sig"))
-            print(
-                "Official Voice source audit: "
-                f"url={VOICE_URL} "
-                f"sha256={hashlib.sha256(voice_raw).hexdigest()} "
-                f"creationTime={voice_doc.get('creationTime', 'not provided')} "
-                f"prefixes={len(ips)}",
-                file=sys.stderr,
-            )
-        raise
+        if not str(exc).startswith("VOICE COVERAGE ANOMALY"):
+            raise
+        voice_doc = json.loads(voice_raw.decode("utf-8-sig"))
+        print(
+            "Official Voice source audit: "
+            f"url={VOICE_URL} "
+            f"sha256={hashlib.sha256(voice_raw).hexdigest()} "
+            f"creationTime={voice_doc.get('creationTime', 'not provided')} "
+            f"prefixes={len(ips)}",
+            file=sys.stderr,
+        )
+        if not is_reviewed_voice_expansion(ips, old_auto, voice_raw, old_state):
+            raise
+        # The source hash, creationTime, old baseline and every /32 CIDR
+        # were verified against the explicitly reviewed snapshot.
+        reviewed_growth = True
+        stats.update(voice_address_counts(ips))
+        print(
+            f"Reviewed official Voice /32 expansion authorized: "
+            f"{len(active_auto_rules(old_auto) & set(ips))} existing rules; "
+            f"{len(ips)} current IPv4 hosts; "
+            f"sha256={hashlib.sha256(voice_raw).hexdigest()}"
+        )
     stats["unparsed_upstream_rules"] = len({rule for rules in unparsed_sources.values() for rule in rules})
     stats["embedded_ruleset_rules"] = sum(len(rules) for rules in rulesets.values())
     for name, (url, _) in RULESET_SOURCES.items():
@@ -725,7 +809,7 @@ def run():
             if (type(previous) is not int or previous <= 0
                     or not previous * 0.85 <= len(rulesets[url]) <= previous * 1.50):
                 raise ValueError(f"Embedded ruleset count changed unexpectedly: {name}")
-    validate_upstream_change(stats, old_state)
+    validate_upstream_change(stats, old_state, reviewed_voice_expansion=reviewed_growth)
 
     # Both OpenAI sources remain independent; do not change routing semantics.
     automatic_source = (

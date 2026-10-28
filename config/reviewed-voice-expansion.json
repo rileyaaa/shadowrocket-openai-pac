@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-10-28",
+  "source_url": "https://openai.com/chatgpt-voice.json",
+  "previous_voice_sha256": "8f03f3c594165eeff009915c7e2beb4bdfb9d429fb1955c205e3b33ec781899a",
+  "approved_voice_sha256": "d2923918cc4cd6bf382f379b1601af871fbff66d8fefb81d4457f2ccba1ec959",
+  "creation_time": "2026-10-27T22:28:21.782457+00:00",
+  "previous_ipv4_addresses": 23,
+  "approved_ipv4_addresses": 402,
+  "review_reason": "GitHub Actions fetched the official source; 379 added, zero removed. Accept only if every published and new prefix is IPv4 /32. Keep all other anomaly protections."
+}

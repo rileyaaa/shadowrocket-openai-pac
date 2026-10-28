@@ -34,6 +34,20 @@ class SyncReportTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
                     build.validate_upstream_change({**self.stats, key: value}, self.baseline)
 
+    def test_reviewed_voice_growth_does_not_disable_other_source_anomalies(self):
+        previous = {**self.stats}
+        new = {**previous, "voice_prefixes": 402}
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            build.validate_upstream_change(new, {"statistics": previous})
+        build.validate_upstream_change(
+            new, {"statistics": previous}, reviewed_voice_expansion=True
+        )
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            build.validate_upstream_change(
+                {**new, "johnshall_lines": 50000},
+                {"statistics": previous}, reviewed_voice_expansion=True
+            )
+
     def test_invalid_prior_statistics_stop_publication(self):
         with self.assertRaises(ValueError):
             build.validate_upstream_change(self.stats, {"statistics": {}})

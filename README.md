@@ -181,6 +181,8 @@ python scripts/review_queue.py --rule 'DOMAIN-SUFFIX,algolia.net' --reason '仍�
 
 触发保护时，应先核对官方原始 Voice JSON、上次发布快照及具体地址差异；确认合法后，在受审查的提交中调整相应阈值或更新已核验的基线，再重新构建。不要通过删除基线、关闭校验或把所有未知条目自动放行来恢复更新。
 
+**2026-10-28 官方 Voice 单 IP 扩容的特批**：上次成功发布的 23 条 IPv4 /32 地址继续存在，官方 `chatgpt-voice.json`（生成时间 2026-10-27T22:28:21.782457+00:00）新增 379 条，达到 402 条。为了不让本次合规扩容持续阻断全部同步，在 `config/reviewed-voice-expansion.json` 固定本次官方原始 JSON 的 SHA-256、新旧官方源指纹、生成时间及精确计数，允许仅这一次经过核实的 **23 → 402 个 IPv4 /32** 变更。批准时还强制要求所有旧 IP 都保留、所有新 IP 都是单个 /32、不能引入 IPv6 或任何较宽网段。只有完整验证通过才临时跳过本次 Voice 条数增长保护；其余 Johnshall、域名、Apple News 的保护全部照常生效。同步成功后新基线会自动成为 402 条，以后的未知大幅扩容、新地址族、宽网段仍会被正常拦截。特批文件不能用于任意 JSON 或单纯放大阈值。
+
 **Apple News 远程依赖**：Johnshall 中原来的 Apple News `RULE-SET` 已改为构建时下载、核对 `# TOTAL` 与实际条数、校验规则格式，再于原位置内嵌。原策略继续使用 Johnshall 指定节点，原有规则顺序保持不变；手机仅刷新完整 `.conf` 即可，不再单独拉取该规则集。原始快照保存为 `rules/johnshall-apple-news.list`，URL、SHA-256、条数写入 `data/sources.json`，源变化进入现有 Actions / Telegram 摘要。这不是新增的 OpenAI 规则层。
 
 内嵌规则源条数比上次下降超过 15% 或增长超过 50% 时停止发布；规则自带策略、嵌套远程引用、未知新 `RULE-SET` / `DOMAIN-SET`、缺失或不一致的条数声明也会阻止发布，等待审核。下载和全部校验成功前，不修改已发布文件。

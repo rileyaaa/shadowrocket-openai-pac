@@ -136,6 +136,106 @@ class PipelineHardeningTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "baseline is missing"):
             self.run_build()
 
+    def test_exact_reviewed_voice_host_expansion_succeeds_with_all_guards(self):
+        self.run_build()
+        old_state = json.loads((self.root / "data/sources.json").read_text())
+        old_auto = (self.root / "rules/openai-auto.list").read_text()
+        extended = copy.deepcopy(self.voice)
+        extended["creationTime"] = "2026-10-27T22:28:21.782457+00:00"
+        extended["prefixes"].extend(
+            {"ipv4Prefix": f"8.8.5.{i}/32"} for i in range(1, 8)
+        )
+        new_raw = json.dumps(extended).encode()
+        self.sources[build.VOICE_URL] = new_raw
+        before_files = self.published_files()
+        with self.assertRaisesRegex(ValueError, "VOICE COVERAGE ANOMALY"):
+            self.run_build()
+        self.assertEqual(self.published_files(), before_files)
+
+        approval = {
+            "version": 1,
+            "reviewed_at": "2026-10-28",
+            "source_url": build.VOICE_URL,
+            "previous_voice_sha256": old_state["sources"]["voice"]["sha256"],
+            "approved_voice_sha256": hashlib.sha256(new_raw).hexdigest(),
+            "creation_time": extended["creationTime"],
+            "previous_ipv4_addresses": 5,
+            "approved_ipv4_addresses": 12,
+            "review_reason": "12 exact IPv4 /32 hosts; old five preserved",
+        }
+        review_path = self.root / "config/reviewed-voice-expansion.json"
+        review_path.write_text(json.dumps(approval))
+        self.assertTrue(build.is_reviewed_voice_expansion(
+            build.parse_voice(new_raw), old_auto, new_raw, old_state
+        ))
+        self.run_build()
+        updated = json.loads((self.root / "data/sources.json").read_text())
+        self.assertEqual(updated["statistics"]["voice_ipv4_addresses"], 12)
+        self.assertEqual(updated["statistics"]["voice_prefixes"], 12)
+        self.assertEqual(updated["sources"]["voice"]["sha256"],
+                         hashlib.sha256(new_raw).hexdigest())
+        self.assertIn("IP-CIDR,8.8.5.7/32,OpenAI Test,no-resolve",
+                      build.CONFIG.read_text())
+        # Original routing labels and all unrelated rules remain unchanged.
+        self.assertIn("DOMAIN,before.example,General Test", build.CONFIG.read_text())
+        self.assertIn("DOMAIN,after.example,General Test", build.CONFIG.read_text())
+
+    def test_reviewed_voice_approval_rejects_mismatch_or_broad_cidrs(self):
+        self.run_build()
+        old_state = json.loads((self.root / "data/sources.json").read_text())
+        old_auto = (self.root / "rules/openai-auto.list").read_text()
+        extended = copy.deepcopy(self.voice)
+        extended["creationTime"] = "2026-10-27T22:28:21.782457+00:00"
+        extended["prefixes"].extend(
+            {"ipv4Prefix": f"8.8.5.{i}/32"} for i in range(1, 8)
+        )
+        new_raw = json.dumps(extended).encode()
+        self.sources[build.VOICE_URL] = new_raw
+        approval = {
+            "version": 1,
+            "reviewed_at": "2026-10-28",
+            "source_url": build.VOICE_URL,
+            "previous_voice_sha256": old_state["sources"]["voice"]["sha256"],
+            "approved_voice_sha256": "0" * 64,
+            "creation_time": extended["creationTime"],
+            "previous_ipv4_addresses": 5,
+            "approved_ipv4_addresses": 12,
+            "review_reason": "Test fixture only",
+        }
+        approval_path = self.root / "config/reviewed-voice-expansion.json"
+        previous = self.published_files()
+        approval_path.write_text(json.dumps(approval))
+        with self.assertRaisesRegex(ValueError, "VOICE COVERAGE ANOMALY"):
+            self.run_build()
+        self.assertTrue(all(path in self.published_files() for path in previous))
+        approval["approved_voice_sha256"] = hashlib.sha256(new_raw).hexdigest()
+        approval["previous_voice_sha256"] = "0" * 64
+        approval_path.write_text(json.dumps(approval))
+        with self.assertRaisesRegex(ValueError, "VOICE COVERAGE ANOMALY"):
+            self.run_build()
+        approval["previous_voice_sha256"] = old_state["sources"]["voice"]["sha256"]
+        approval_path.write_text(json.dumps(approval))
+        removed_one = copy.deepcopy(extended)
+        removed_one["prefixes"] = [
+            x for x in removed_one["prefixes"] if x["ipv4Prefix"] != "8.8.4.1/32"
+        ]
+        removed_raw = json.dumps(removed_one).encode()
+        approval["approved_voice_sha256"] = hashlib.sha256(removed_raw).hexdigest()
+        approval["approved_ipv4_addresses"] = 11
+        approval_path.write_text(json.dumps(approval))
+        self.assertFalse(build.is_reviewed_voice_expansion(
+            build.parse_voice(removed_raw), old_auto, removed_raw, old_state
+        ))
+        broad = copy.deepcopy(extended)
+        broad["prefixes"][-1]["ipv4Prefix"] = "8.8.6.0/25"
+        broad_raw = json.dumps(broad).encode()
+        approval["approved_voice_sha256"] = hashlib.sha256(broad_raw).hexdigest()
+        approval["approved_ipv4_addresses"] = 12
+        approval_path.write_text(json.dumps(approval))
+        self.assertFalse(build.is_reviewed_voice_expansion(
+            build.parse_voice(broad_raw), old_auto, broad_raw, old_state
+        ))
+
     def test_voice_expansion_error_reports_exact_cidr_diff_without_publishing(self):
         self.run_build()
         before = self.published_files()
