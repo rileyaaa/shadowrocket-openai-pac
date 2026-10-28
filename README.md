@@ -183,6 +183,8 @@ python scripts/review_queue.py --rule 'DOMAIN-SUFFIX,algolia.net' --reason '仍�
 
 **2026-10-28 官方 Voice 单 IP 扩容的特批**：上次成功发布的 23 条 IPv4 /32 地址继续存在，官方 `chatgpt-voice.json`（生成时间 2026-10-27T22:28:21.782457+00:00）新增 379 条，达到 402 条。为了不让本次合规扩容持续阻断全部同步，在 `config/reviewed-voice-expansion.json` 固定本次官方原始 JSON 的 SHA-256、新旧官方源指纹、生成时间及精确计数，允许仅这一次经过核实的 **23 → 402 个 IPv4 /32** 变更。批准时还强制要求所有旧 IP 都保留、所有新 IP 都是单个 /32、不能引入 IPv6 或任何较宽网段。只有完整验证通过才临时跳过本次 Voice 条数增长保护；其余 Johnshall、域名、Apple News 的保护全部照常生效。同步成功后新基线会自动成为 402 条，以后的未知大幅扩容、新地址族、宽网段仍会被正常拦截。特批文件不能用于任意 JSON 或单纯放大阈值。
 
+**2026-10-28 Johnshall 广告规则下降的特批**：经核查，官方 [Johnshall release](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/tree/release) 夜间构建保留了完整配置区段、结束标记和 30,249 条 Proxy 规则，但广告 REJECT 规则从 60,999 条减少到 50,442 条（对比移除 11,612 条、加入 1,055 条）。`config/reviewed-johnshall-ad-decrease.json` 将本次审查绑定到上次成功发布的原始 SHA-256、这次官方 Git blob ID、构建时间、精确 REJECT 条数和 Proxy 条数。仅该 Git 文件可跳过这一次广告条数下降限制；其他 Johnshall 文件、其他来源、未来更大下降均保留原保护。更新采用上游实际规则，不会私自恢复上游已移除的广告域名。
+
 **Apple News 远程依赖**：Johnshall 中原来的 Apple News `RULE-SET` 已改为构建时下载、核对 `# TOTAL` 与实际条数、校验规则格式，再于原位置内嵌。原策略继续使用 Johnshall 指定节点，原有规则顺序保持不变；手机仅刷新完整 `.conf` 即可，不再单独拉取该规则集。原始快照保存为 `rules/johnshall-apple-news.list`，URL、SHA-256、条数写入 `data/sources.json`，源变化进入现有 Actions / Telegram 摘要。这不是新增的 OpenAI 规则层。
 
 内嵌规则源条数比上次下降超过 15% 或增长超过 50% 时停止发布；规则自带策略、嵌套远程引用、未知新 `RULE-SET` / `DOMAIN-SET`、缺失或不一致的条数声明也会阻止发布，等待审核。下载和全部校验成功前，不修改已发布文件。

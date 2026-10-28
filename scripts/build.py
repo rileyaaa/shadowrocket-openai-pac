@@ -472,6 +472,69 @@ def is_reviewed_voice_expansion(
     )
 
 
+def is_reviewed_johnshall_ad_decrease(
+    original: bytes, stats: dict[str, int], old_state: dict | None,
+) -> bool:
+    """Allow only the exact upstream Git blob audited for a one-time ad drop.
+
+    No change to Johnshall Proxy mappings, rule ordering, or general
+    upstream anomaly guards is authorized by this exception.
+    """
+    path = ROOT / "config/reviewed-johnshall-ad-decrease.json"
+    if not path.exists():
+        return False
+    try:
+        approval = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("Invalid reviewed Johnshall ad-decrease authorization") from exc
+    expected_keys = {
+        "version", "reviewed_at", "source_url", "upstream_commit",
+        "approved_git_blob_sha1", "previous_source_sha256",
+        "previous_retained_ad_rules", "approved_retained_ad_rules",
+        "previous_mapped_proxy_rules", "approved_mapped_proxy_rules",
+        "source_build_line", "review_reason",
+    }
+    if not isinstance(approval, dict) or set(approval) != expected_keys:
+        raise ValueError("Unexpected reviewed Johnshall ad-decrease authorization fields")
+    sources = (old_state or {}).get("sources", {})
+    baseline = (old_state or {}).get("statistics", {})
+    if not isinstance(sources, dict) or not isinstance(baseline, dict):
+        return False
+    old_source = sources.get("johnshall", {})
+    if not isinstance(old_source, dict):
+        return False
+    # Git's blob object ID pins the exact bytes of the audited release.
+    git_blob = hashlib.sha1(
+        b"blob " + str(len(original)).encode("ascii") + b"\0" + original
+    ).hexdigest()
+    header = original.decode("utf-8-sig").splitlines()[:4]
+    return (
+        type(approval["version"]) is int
+        and approval["version"] == 1
+        and isinstance(approval["reviewed_at"], str)
+        and bool(approval["reviewed_at"])
+        and isinstance(approval["review_reason"], str)
+        and bool(approval["review_reason"])
+        and approval["source_url"] == BASE_URL
+        and approval["previous_source_sha256"] == old_source.get("sha256")
+        and approval["approved_git_blob_sha1"] == git_blob
+        and approval["source_build_line"] in header
+        and type(approval["previous_retained_ad_rules"]) is int
+        and type(approval["approved_retained_ad_rules"]) is int
+        and type(approval["previous_mapped_proxy_rules"]) is int
+        and type(approval["approved_mapped_proxy_rules"]) is int
+        and approval["previous_retained_ad_rules"] == baseline.get("retained_ad_rules")
+        and approval["approved_retained_ad_rules"] == stats.get("retained_ad_rules")
+        and approval["previous_mapped_proxy_rules"] == baseline.get("mapped_proxy_to_johnshall_node")
+        and approval["approved_mapped_proxy_rules"] == stats.get("mapped_proxy_to_johnshall_node")
+        and approval["previous_mapped_proxy_rules"] == approval["approved_mapped_proxy_rules"]
+        and approval["approved_retained_ad_rules"] < (
+            approval["previous_retained_ad_rules"]
+            * UPSTREAM_SIZE_GUARDS["retained_ad_rules"][0]
+        )
+    )
+
+
 def parse_embedded_ruleset(source: str) -> list[str]:
     """The reviewed Apple News list contains policy-free domain rules only."""
     rules = []
@@ -628,6 +691,7 @@ UPSTREAM_SIZE_GUARDS = {
 def validate_upstream_change(
     stats: dict[str, int], old_state: dict | None, *,
     reviewed_voice_expansion: bool = False,
+    reviewed_johnshall_ad_decrease: bool = False,
 ) -> None:
     """Compare with the last published snapshot; reject implausible changes."""
     if old_state is None:
@@ -640,6 +704,8 @@ def validate_upstream_change(
         # A verified ONE-TIME official Voice /32 expansion has its own
         # snapshot approval. All other source anomaly guards remain active.
         if key == "voice_prefixes" and reviewed_voice_expansion:
+            continue
+        if key == "retained_ad_rules" and reviewed_johnshall_ad_decrease:
             continue
         before, after = old_stats.get(key), stats.get(key)
         if (type(before) is not int or type(after) is not int
@@ -796,7 +862,7 @@ def run():
         stats.update(voice_address_counts(ips))
         print(
             f"Reviewed official Voice /32 expansion authorized: "
-            f"{len(active_auto_rules(old_auto) & set(ips))} existing rules; "
+            f"{len({row for row in active_auto_rules(old_auto) if row.startswith(('IP-CIDR,', 'IP-CIDR6,'))})} existing rules; "
             f"{len(ips)} current IPv4 hosts; "
             f"sha256={hashlib.sha256(voice_raw).hexdigest()}"
         )
@@ -809,7 +875,27 @@ def run():
             if (type(previous) is not int or previous <= 0
                     or not previous * 0.85 <= len(rulesets[url]) <= previous * 1.50):
                 raise ValueError(f"Embedded ruleset count changed unexpectedly: {name}")
-    validate_upstream_change(stats, old_state, reviewed_voice_expansion=reviewed_growth)
+    old_stats = (old_state or {}).get("statistics", {})
+    previous_ads = old_stats.get("retained_ad_rules")
+    abnormal_ad_drop = (
+        type(previous_ads) is int
+        and previous_ads > 0
+        and stats["retained_ad_rules"] < previous_ads * UPSTREAM_SIZE_GUARDS["retained_ad_rules"][0]
+    )
+    reviewed_ad_drop = (
+        abnormal_ad_drop
+        and is_reviewed_johnshall_ad_decrease(original, stats, old_state)
+    )
+    if reviewed_ad_drop:
+        print(
+            "Reviewed Johnshall ad-list decrease authorized for exact upstream Git blob: "
+            f"{previous_ads} -> {stats['retained_ad_rules']}"
+        )
+    validate_upstream_change(
+        stats, old_state,
+        reviewed_voice_expansion=reviewed_growth,
+        reviewed_johnshall_ad_decrease=reviewed_ad_drop,
+    )
 
     # Both OpenAI sources remain independent; do not change routing semantics.
     automatic_source = (

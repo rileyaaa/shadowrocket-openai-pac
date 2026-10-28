@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-10-28",
+  "source_url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf",
+  "upstream_commit": "484576c5199bee897eead943b2d6b25d089cc9b4",
+  "approved_git_blob_sha1": "d497967be659439575ea347afb90c7e0dc5a1e7f",
+  "previous_source_sha256": "293a011c1a53782fb2ac98ae0ac231dab16f26f24259e9a83e0304a68221ef2b",
+  "previous_retained_ad_rules": 60999,
+  "approved_retained_ad_rules": 50442,
+  "previous_mapped_proxy_rules": 30249,
+  "approved_mapped_proxy_rules": 30249,
+  "source_build_line": "# build time: UTC 2026-10-27 23:03:01",
+  "review_reason": "Official Johnshall nightly release complete; compared 60,970 unique prior REJECT entries against 50,413 current: 11,612 removed, 1,055 added. 30,249 Proxy lines unchanged. Approve only this exact blob."
+}

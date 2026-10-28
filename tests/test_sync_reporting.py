@@ -48,6 +48,28 @@ class SyncReportTests(unittest.TestCase):
                 {"statistics": previous}, reviewed_voice_expansion=True
             )
 
+    def test_reviewed_johnshall_decrease_still_blocks_unrelated_anomalies(self):
+        previous = {**self.stats, "retained_ad_rules": 60999}
+        current = {**previous, "retained_ad_rules": 50442}
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            build.validate_upstream_change(current, {"statistics": previous})
+        build.validate_upstream_change(
+            current, {"statistics": previous},
+            reviewed_johnshall_ad_decrease=True,
+        )
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            build.validate_upstream_change(
+                {**current, "mapped_proxy_to_johnshall_node": 9000},
+                {"statistics": previous},
+                reviewed_johnshall_ad_decrease=True,
+            )
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            build.validate_upstream_change(
+                {**current, "voice_prefixes": 100},
+                {"statistics": previous},
+                reviewed_johnshall_ad_decrease=True,
+            )
+
     def test_invalid_prior_statistics_stop_publication(self):
         with self.assertRaises(ValueError):
             build.validate_upstream_change(self.stats, {"statistics": {}})

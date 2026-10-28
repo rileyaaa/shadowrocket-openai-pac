@@ -111,6 +111,60 @@ class PipelineHardeningTests(unittest.TestCase):
         return {str(path.relative_to(self.root)): path.read_bytes()
                 for path in self.root.rglob("*") if path.is_file()}
 
+    def test_johnshall_ad_decrease_needs_exact_reviewed_release_blob(self):
+        # The regular fixture has 20,001 rejects. Start with 30,001 so a
+        # 5,500-rule reduction stays above generate()'s hard safety minimum.
+        extra = b"".join(
+            f"DOMAIN,extrabad{i}.example,Reject\n".encode() for i in range(10000)
+        )
+        initial = self.base.replace(b"DOMAIN,before.example,Proxy\n",
+                                    extra + b"DOMAIN,before.example,Proxy\n")
+        self.sources[build.BASE_URL] = initial
+        self.run_build()
+        previous_state = json.loads((self.root / "data/sources.json").read_text())
+        previous_files = self.published_files()
+        after = initial.replace(extra[:0], b"")  # keep source unchanged for scope
+        dropped = b"".join(
+            f"DOMAIN,extrabad{i}.example,Reject\n".encode() for i in range(5500)
+        )
+        after = initial.replace(dropped, b"")
+        self.sources[build.BASE_URL] = after
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            self.run_build()
+        self.assertEqual(self.published_files(), previous_files)
+
+        def git_blob_sha(raw):
+            return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+
+        approval = {
+            "version": 1,
+            "reviewed_at": "2026-10-28",
+            "source_url": build.BASE_URL,
+            "upstream_commit": "test-repo-fixture",
+            "approved_git_blob_sha1": "0" * 40,
+            "previous_source_sha256": previous_state["sources"]["johnshall"]["sha256"],
+            "previous_retained_ad_rules": 30001,
+            "approved_retained_ad_rules": 24501,
+            "previous_mapped_proxy_rules": previous_state["statistics"]["mapped_proxy_to_johnshall_node"],
+            "approved_mapped_proxy_rules": previous_state["statistics"]["mapped_proxy_to_johnshall_node"],
+            "source_build_line": "# offline Johnshall fixture",
+            "review_reason": "Approved fixed offline fixture ad drop",
+        }
+        path = self.root / "config/reviewed-johnshall-ad-decrease.json"
+        path.write_text(json.dumps(approval))
+        with self.assertRaisesRegex(ValueError, "UPSTREAM ANOMALY"):
+            self.run_build()
+        approval["approved_git_blob_sha1"] = git_blob_sha(after)
+        path.write_text(json.dumps(approval))
+        self.run_build()
+        updated = json.loads((self.root / "data/sources.json").read_text())
+        self.assertEqual(updated["statistics"]["retained_ad_rules"], 24501)
+        self.assertEqual(updated["statistics"]["mapped_proxy_to_johnshall_node"],
+                         previous_state["statistics"]["mapped_proxy_to_johnshall_node"])
+        self.assertEqual(updated["sources"]["johnshall"]["sha256"],
+                         hashlib.sha256(after).hexdigest())
+        self.assertIn("DOMAIN,before.example,General Test", build.CONFIG.read_text())
+
     def test_voice_same_count_expansion_preserves_published_files(self):
         self.run_build()
         before = self.published_files()
