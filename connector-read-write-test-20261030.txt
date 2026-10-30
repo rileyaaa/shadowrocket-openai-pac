@@ -1,3 +1,0 @@
-GitHub connector read/write/delete verification
-Date: 2026-10-30
-Temporary test file. Safe to delete.
