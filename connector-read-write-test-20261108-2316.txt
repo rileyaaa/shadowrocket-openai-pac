@@ -1,6 +1,0 @@
-GitHub Connector read/write/delete smoke test
-Date: 2026-11-08 (UTC+8)
-Repository: rileyaaa/shadowrocket-openai-pac
-Purpose: verify UTF-8 create, exact read-back, and delete.
-Test marker: 20261108-2316-OPENAI-PAC
-中文校验：连通性测试，完成后删除。
