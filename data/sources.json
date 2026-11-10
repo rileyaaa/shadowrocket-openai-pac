@@ -50,7 +50,7 @@
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
     "johnshall": {
-      "sha256": "6dcd11b79a378946f06510ded612c51ada522f8f7a69d726625d60fe540b48c9",
+      "sha256": "77bf770a48dad5f01ffce38b1610746837689cb9d3177803c7f6c22ddd1849d9",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -73,11 +73,11 @@
     "cross_layer_duplicate_rules_retained": 21,
     "embedded_ruleset_rules": 2,
     "excluded_shared_auto_domains": 24,
-    "johnshall_lines": 84630,
+    "johnshall_lines": 81943,
     "manual_backup_rules": 44,
     "manual_openai_rules": 44,
     "mapped_proxy_to_johnshall_node": 30255,
-    "retained_ad_rules": 54288,
+    "retained_ad_rules": 51601,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "unparsed_upstream_rules": 3,
