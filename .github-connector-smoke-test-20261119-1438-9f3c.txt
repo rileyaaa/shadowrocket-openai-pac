@@ -1,0 +1,6 @@
+GitHub connector read/write/delete verification
+Created by ChatGPT with user authorization
+Temporary file; safe to delete after verification
+Repository: rileyaaa/shadowrocket-openai-pac
+Branch: main
+Test date: 2026-11-19 (Asia/Taipei)
