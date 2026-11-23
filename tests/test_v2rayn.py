@@ -80,9 +80,16 @@ class ConversionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'FINAL must be the last'):
             core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
 
+    def test_massively_duplicated_ads_are_not_a_valid_update(self):
+        source = '\n'.join([f'DOMAIN,proxy{i}.example,Proxy' for i in range(10001)]
+                           + ['DOMAIN,one-ad.example,REJECT'] * 20001
+                           + ['FINAL,direct'])
+        with self.assertRaisesRegex(ValueError, 'unique coverage collapsed'):
+            core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
+
     def test_full_source_sample_and_ads_hoisted(self):
-        source = '\n'.join(['DOMAIN,a.com,Proxy'] * 10001
-                           + ['DOMAIN,ads.example,REJECT'] * 20001
+        source = '\n'.join([f'DOMAIN,proxy{i}.example,Proxy' for i in range(10001)]
+                           + [f'DOMAIN,ads{i}.example,REJECT' for i in range(20001)]
                            + ['IP-CIDR6,2001:4860::/32,DIRECT', 'FINAL,direct'])
         blocked, normal, stats = core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
         self.assertEqual(len(blocked), 20001)
