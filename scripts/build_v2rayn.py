@@ -134,10 +134,11 @@ def safety_check(stats: dict, old: dict | None) -> None:
 
 
 def validate_voice_overlap(previous: set[str], current: set[str]) -> None:
-    """Require human review for a near-total same-count Voice IP rotation."""
-    if previous and current and (
-            len(previous & current) < min(len(previous), len(current)) * .50):
-        raise ValueError('V2RAYN VOICE COVERAGE ANOMALY: official destination set replaced')
+    """Shared address-union comparison, independent of CIDR partitioning."""
+    try:
+        legacy.validate_voice_interval_overlap(previous, current)
+    except ValueError as exc:
+        raise ValueError('V2RAYN ' + str(exc)) from exc
 
 
 def run(argv: list[str] | None = None) -> dict:
