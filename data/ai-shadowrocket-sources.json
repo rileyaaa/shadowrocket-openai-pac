@@ -3,12 +3,12 @@
     "claude_domains": 20,
     "claude_metacubex": 21,
     "claude_v2fly": 21,
-    "gemini_domains": 51,
+    "gemini_domains": 61,
     "gemini_metacubex": 49,
     "gemini_v2fly": 49
   },
-  "manual_ai_sha256": "c6cd98930af28c0e58d7ba2ee3c125503f3a7f806cf192f7a231053373305a02",
-  "output_sha256": "9dc34f619a75badfd307142ccfe3a9790b7a5606d04b95b806f6dffe8e604b85",
+  "manual_ai_sha256": "cf12f96f6baa582bc8b619e80f2732a02a58c7fce656ab9a6aea2691d1f30596",
+  "output_sha256": "232a0006289a7f076e0591d6845b5c0920d2c7a93734439dbd8dba12d98654eb",
   "review_candidates": [
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
@@ -105,12 +105,36 @@
         "claude_v2fly"
       ],
       "status": "pending"
+    },
+    {
+      "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
+      "rule": "DOMAIN-SUFFIX,geller-pa.googleapis.com",
+      "service": "gemini",
+      "sources": [
+        "gemini_metacubex",
+        "gemini_v2fly"
+      ],
+      "status": "pending"
+    },
+    {
+      "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
+      "rule": "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com",
+      "service": "gemini",
+      "sources": [
+        "gemini_metacubex",
+        "gemini_v2fly"
+      ],
+      "status": "pending"
     }
   ],
   "review_counts": {
     "cooling": 0,
     "due": 0,
-    "pending": 8
+    "pending": 10
   },
   "review_decisions_sha256": "a4ec6d6ebda62a9f32201c8b3ca16d120ee128367a701db22951f0435d15ff85",
   "schema_version": 1,
