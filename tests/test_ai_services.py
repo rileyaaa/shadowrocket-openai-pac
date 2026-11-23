@@ -1,6 +1,7 @@
 """Strict no-network checks for AI feed parsing and approval safeguards."""
 from __future__ import annotations
 import json
+from datetime import date
 from pathlib import Path
 import sys
 import tempfile
@@ -67,6 +68,36 @@ class AIInputTests(unittest.TestCase):
         self.assertTrue(any('cloudflare.com' in q['rule'] for q in data['review_candidates']))
         self.assertTrue(any('sentry.io' in q['rule'] for q in data['review_candidates']))
         self.assertIn('待审核',ai.render_review_queue(data))
+
+    def test_rejected_candidate_six_month_review_remains_rejected(self):
+        candidate = {'service': 'claude', 'rule': 'DOMAIN-SUFFIX,antspace.dev',
+                     'sources': ['claude_v2fly'], 'reason': 'Unverified'}
+        policy = {'version': 1, 'default_review_months': 6,
+                  'reminder_interval_days': 7,
+                  'rejected_rules': [{'service': 'claude', 'rule': 'DOMAIN-SUFFIX,antspace.dev',
+                                      'reason': 'Unconfirmed tenant domain', 'reviewed_at': '2026-01-31'}]}
+        records, counts = ai.evaluate_review_policy([candidate], policy, on=date(2026, 7, 30))
+        self.assertEqual(records[0]['review_due_on'], '2026-07-31')
+        self.assertEqual(records[0]['status'], 'cooling')
+        self.assertEqual(counts, {'pending': 0, 'cooling': 1, 'due': 0})
+        records, counts = ai.evaluate_review_policy([candidate], policy, on=date(2026, 7, 31))
+        self.assertEqual(records[0]['status'], 'due')
+        self.assertEqual(counts['due'], 1)
+        self.assertIn('到期复审', ai.render_review_queue({'review_candidates': records}))
+        policy['rejected_rules'][0]['reviewed_at'] = '2027-01-01'
+        with self.assertRaisesRegex(ValueError, 'future'):
+            ai.evaluate_review_policy([candidate],policy,on=date(2026,7,31))
+
+    def test_rejection_policy_validation(self):
+        p = {'version': 1, 'default_review_months': 6, 'reminder_interval_days': 7,
+             'rejected_rules': []}
+        rows, counts = ai.evaluate_review_policy([{'service': 'gemini',
+            'rule': 'DOMAIN,unknown.googleapis.com', 'sources': ['x']}],p,on=date(2026,11,23))
+        self.assertEqual(counts['pending'],1)
+        self.assertEqual(rows[0]['status'],'pending')
+        p['default_review_months'] = 0
+        with self.assertRaises(ValueError):
+            ai.evaluate_review_policy([],p)
 
     def test_anomaly_fails_publication(self):
         now={'gemini_domains':50,'claude_domains':15}

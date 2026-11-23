@@ -9,6 +9,8 @@ in the manually reviewed rules file. Nothing is widened to a provider ASN/IP.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date
+import calendar
 import hashlib
 import json
 from pathlib import Path
@@ -16,6 +18,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 MANUAL = ROOT / 'config/ai-services.rules'
+REVIEW_POLICY = ROOT / 'config/ai-review-decisions.json'
 SOURCES = {
     'gemini_v2fly': ('gemini', 'v2fly', 'https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google-deepmind'),
     'gemini_metacubex': ('gemini', 'meta', 'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google-gemini.list'),
@@ -136,7 +139,68 @@ def load_manual(text: str) -> dict[str, list[str]]:
     return {service: list(dict.fromkeys(items)) for service, items in parsed.items()}
 
 
+def add_months(day: date, months: int) -> date:
+    total = day.year * 12 + day.month - 1 + months
+    year, month = divmod(total, 12)
+    month += 1
+    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
+
+
+def evaluate_review_policy(candidates: list[dict], policy: dict,
+                           *, on: date | None = None) -> tuple[list[dict], dict]:
+    """Reject/renew entries remain rejected; expiry only schedules review."""
+    on = on or date.today()
+    if (not isinstance(policy, dict) or set(policy) != {'version', 'default_review_months',
+            'reminder_interval_days', 'rejected_rules'} or
+            type(policy['version']) is not int or policy['version'] != 1 or
+            type(policy['default_review_months']) is not int or
+            not 1 <= policy['default_review_months'] <= 120 or
+            type(policy['reminder_interval_days']) is not int or
+            not 1 <= policy['reminder_interval_days'] <= 365 or
+            not isinstance(policy['rejected_rules'], list)):
+        raise ValueError('Invalid independent Gemini/Claude review policy')
+    decisions = {}
+    for item in policy['rejected_rules']:
+        if not isinstance(item, dict) or set(item) != {'service', 'rule', 'reason', 'reviewed_at'}:
+            raise ValueError('Malformed AI rejection decision')
+        service, rule, reason, stamp = (item[x] for x in
+                                        ('service', 'rule', 'reason', 'reviewed_at'))
+        if (service not in ('gemini', 'claude') or not isinstance(rule, str) or
+                not rule.startswith(('DOMAIN,', 'DOMAIN-SUFFIX,'))):
+            raise ValueError('Invalid AI rejection rule type')
+        if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 2000:
+            raise ValueError('AI rejection needs meaningful reason')
+        try:
+            reviewed = date.fromisoformat(stamp)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('Invalid AI review date') from exc
+        if reviewed > on:
+            raise ValueError('AI rejection date cannot be in future')
+        key = (service, rule)
+        if key in decisions:
+            raise ValueError(f'Duplicate AI rejection: {key}')
+        decisions[key] = (item, reviewed)
+    output = []
+    counts = {'pending': 0, 'cooling': 0, 'due': 0}
+    for candidate in candidates:
+        item = dict(candidate)
+        decision = decisions.get((item['service'], item['rule']))
+        if decision is None:
+            item.update(status='pending', reviewed_at=None, review_due_on=None)
+            counts['pending'] += 1
+        else:
+            record, reviewed = decision
+            due = add_months(reviewed, policy['default_review_months'])
+            status = 'due' if on >= due else 'cooling'
+            counts[status] += 1
+            item.update(status=status, reviewed_at=reviewed.isoformat(),
+                        review_due_on=due.isoformat(), reason=record['reason'])
+        output.append(item)
+    return output, counts
+
+
 def collect(download, *, manual_path: Path = MANUAL,
+            review_policy_path: Path = REVIEW_POLICY,
             source_overrides: dict[str, bytes] | None = None) -> dict:
     """Collect four *current* sources and reviewed manual rules; no old snapshots.
 
@@ -169,16 +233,22 @@ def collect(download, *, manual_path: Path = MANUAL,
             raise ValueError(f'Missing mandatory approved {service} domain')
         if len(approved[service]) < (25 if service == 'gemini' else 8):
             raise ValueError(f'Approved {service} set unexpectedly small')
+    raw_candidates = [
+        {'service': service, 'rule': rule, 'sources': sorted(sources),
+         'reason': 'Unverified shared host or unapproved domain; not automatically routed'}
+        for (service, rule), sources in sorted(candidates.items())
+    ]
+    policy_bytes = review_policy_path.read_bytes()
+    review_candidates, review_counts = evaluate_review_policy(
+        raw_candidates, json.loads(policy_bytes.decode('utf-8-sig')))
     return {
         'rules': {service: sorted(rows) for service, rows in approved.items()},
         'records': records,
         'counts': {'gemini_domains': len(approved['gemini']),
                    'claude_domains': len(approved['claude']), **counts},
-        'review_candidates': [
-            {'service': service, 'rule': rule, 'sources': sorted(sources),
-             'reason': 'Unverified shared host or unapproved domain; not automatically routed'}
-            for (service, rule), sources in sorted(candidates.items())
-        ],
+        'review_candidates': review_candidates,
+        'review_counts': review_counts,
+        'review_decisions_sha256': hashlib.sha256(policy_bytes).hexdigest(),
         'manual_sha256': hashlib.sha256(manual_path.read_bytes()).hexdigest(),
     }
 
@@ -198,11 +268,16 @@ def validate_safety(current: dict, previous: dict | None) -> None:
 
 
 def render_review_queue(data: dict) -> str:
-    rows = ['# Gemini / Claude 上游待审核规则', '',
-            '这些规则未获自动批准，不会进入代理；人工核实来源与最小匹配范围后再修改允许列表。', '',
-            '| 服务 | 候选规则 | 来源 | 状态 |', '|---|---|---|---|']
+    rows = ['# Gemini / Claude 上游待审核及到期复审', '',
+            '候选未自动放行。拒绝决策写入 `config/ai-review-decisions.json`，默认六个月复审；'
+            '到期仅提醒，不自动批准。', '',
+            '| 服务 | 候选规则 | 来源 | 状态 | 上次审核 | 到期复审 |',
+            '|---|---|---|---|---|---|']
+    labels = {'pending': '待审核', 'cooling': '已拒绝，复审未到期', 'due': '到期复审（未放行）'}
     for item in data['review_candidates']:
-        rows.append(f"| {item['service']} | `{item['rule']}` | {', '.join(item['sources'])} | 待核实，不自动放行 |")
+        rows.append(f"| {item['service']} | `{item['rule']}` | {', '.join(item['sources'])} | "
+                    f"{labels[item['status']]} | {item.get('reviewed_at') or '—'} | "
+                    f"{item.get('review_due_on') or '—'} |")
     if not data['review_candidates']:
-        rows.append('| — | — | — | 无未审核的新来源项 |')
+        rows.append('| — | — | — | 无未审核的新来源项 | — | — |')
     return '\n'.join(rows) + '\n'

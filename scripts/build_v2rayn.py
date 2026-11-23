@@ -241,6 +241,7 @@ def run(argv: list[str] | None = None) -> dict:
                  'extra_openai': hashlib.sha256(OPENAI_EXTRA.read_bytes()).hexdigest(),
                  'verified_processes': hashlib.sha256(PROCESSES.read_bytes()).hexdigest(),
                  'manual_ai': ai['manual_sha256'],
+                 'ai_review_decisions': ai['review_decisions_sha256'],
              }}
     if old and old.get('schema_version') != 1:
         raise ValueError('Unknown previous v2rayN state format')
@@ -250,6 +251,7 @@ def run(argv: list[str] | None = None) -> dict:
     report = {'build_success': True, 'config_changed': changed,
               'statistics': stats, 'changed_sources': source_changes,
               'ai_review_candidates': ai['review_candidates'],
+              'ai_review_counts': ai['review_counts'],
               'warnings': [
                   'URL Rewrite and MITM are not v2rayN routing rules and cannot be carried over.',
                   'REJECT variants map to block; no-resolve is not a portable Xray routing modifier.',

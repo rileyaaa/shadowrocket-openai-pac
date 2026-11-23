@@ -133,6 +133,8 @@ def run(argv: list[str] | None = None) -> dict:
     state = {'schema_version': 1, 'sources': outputs, 'ai_counts': ai['counts'],
              'statistics': stats, 'manual_ai_sha256': ai['manual_sha256'],
              'review_candidates': ai['review_candidates'],
+             'review_counts': ai['review_counts'],
+             'review_decisions_sha256': ai['review_decisions_sha256'],
              'output_sha256': hashlib.sha256(enhanced.encode('utf-8')).hexdigest()}
     output_bytes = enhanced.encode('utf-8')
     changed = not OUTPUT.exists() or OUTPUT.read_bytes() != output_bytes
@@ -141,6 +143,7 @@ def run(argv: list[str] | None = None) -> dict:
               'changed_sources': [k for k, value in outputs.items()
                                   if value != (old or {}).get('sources', {}).get(k)],
               'ai_review_candidates': ai['review_candidates'],
+              'ai_review_counts': ai['review_counts'],
               'warnings': ['Shared Google authentication/static hosts may also proxy unrelated Google traffic.',
                            'Gemini/Claude rules depend on host/SNI; genuine client routing still needs testing.']}
     # All downloaded inputs, semantic checks, and both safety baselines were

@@ -84,7 +84,10 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
                                 ('conf_bytes', '订阅字节数')]:
                 if type(stats.get(prop)) is int:
                     lines.append(f'{label}：{stats[prop]}')
-            lines.append(f'AI 待审核：{len(report.get("ai_review_candidates", []))}')
+            review_counts = report.get('ai_review_counts', {})
+            lines.append('AI 审核：待审 {pending} / 暂缓 {cooling} / 到期 {due}'.format(
+                pending=review_counts.get('pending', '?'), cooling=review_counts.get('cooling', '?'),
+                due=review_counts.get('due', '?')))
         else:
             for prop, label in [('routing_objects', '路由对象'), ('domain_rules', '域名规则'),
                                 ('ip_rules', 'IP 规则'), ('process_rules', '进程规则'),
@@ -111,7 +114,9 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
     if not published:
         lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
     if shadow_ai and shadow_ai.get('ai_review_candidates'):
-        lines.append(f'⚠️ Gemini/Claude 新候选待审：{len(shadow_ai["ai_review_candidates"])}，未自动批准')
+        counts = shadow_ai.get('ai_review_counts', {})
+        lines.append('⚠️ Gemini/Claude 未批准候选：{}，其中到期复审 {}（不会自动放行）'.format(
+            len(shadow_ai['ai_review_candidates']), counts.get('due', 0)))
     docs_status = status.get('official_docs', {})
     if docs_status.get('exit_code', 0) != 0:
         lines.append('⚠️ 本周官方网络文档检查不可用；不影响规则更新：' +

@@ -301,3 +301,7 @@ GitHub Actions 分别记录三套真实构建状态、独立安全发布、失�
 ### 官方文件每周复审（不阻塞每日生成）
 
 每天同一个 Actions 的 `scripts/run_dual.py` 还会调用 `scripts/audit_ai_docs.py`；仅在**台湾时间周日的定时运行**检查 Google Gemini App 防火墙与 Anthropic Claude Code 的官方网络文档。提取并比较相关主机的集合，变化时写入 `data/ai-docs-review.md`，但**绝不会直接把网页上新出现的主机自动加入代理**。如果官方网页暂时不可访问或被安全验证阻断，保留旧快照，Telegram 会记录警告，不影响任何一套已经验证成功的规则。未修改原有唯一的每天 11:00 调度。非周日的普通推送不会发起官方网页请求。
+
+### Gemini / Claude 人工拒绝及六个月复审
+
+`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。现阶段 AI 复审日期及数量已纳入统一 Telegram 报告；`reminder_interval_days` 为预留配置，尚未实现像旧 OpenAI 那样的独立 7 天通知送达去重，不能当作已验收功能。
