@@ -138,7 +138,7 @@ def load_published_baseline() -> tuple[dict | None, dict | None, str]:
     if not isinstance(state, dict) or state.get('schema_version') not in (1, 2):
         raise ValueError('Unknown published Shadowrocket baseline version')
     required = ('output_sha256', 'ai_counts', 'statistics', 'sources')
-    if any(not isinstance(state.get(key), dict) for key in required[1:]):
+    if any(not isinstance(state.get(key), dict) or not state[key] for key in required[1:]):
         raise ValueError('Incomplete published Shadowrocket state: counts/sources/statistics')
     digest = state.get('output_sha256')
     if not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest):
