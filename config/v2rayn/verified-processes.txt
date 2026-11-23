@@ -1,0 +1,5 @@
+# Dedicated browser child process cited in https://doc.tkrmw.com/matrix/bitbrowser.html
+# Community evidence only, not a live Windows+TUN confirmation of this user's version.
+# Must check the active v2rayN logs and process tree on the actual Windows host.
+# Add ONLY user-verified full BitBrowser-specific paths (one per line), no generic chrome.exe.
+BitBrowser.exe

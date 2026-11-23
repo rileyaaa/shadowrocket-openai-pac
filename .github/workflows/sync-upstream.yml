@@ -1,4 +1,4 @@
-name: Sync Johnshall and OpenAI rules
+name: Sync Johnshall, OpenAI and v2rayN rules
 
 on:
   workflow_dispatch:
@@ -16,11 +16,7 @@ on:
         required: false
         type: string
   schedule:
-    # Johnshall publishes around 07:04 Asia/Taipei daily.
-    # MetaCubeX is the latest regular daily source; recent builds completed around 09:09-10:27.
-    # Latest observed finish by 2026-10-12: 10:26:49 Asia/Taipei on 2026-10-06.
-    # Schedule roughly 30 minutes later; this is fixed cron, not event-driven.
-    # Scheduled at 11:00 Asia/Taipei = 03:00 UTC.
+    # 11:00 Taiwan = 03:00 UTC; keep one unchanged scheduled workflow.
     - cron: '0 3 * * *'
   push:
     branches: [main]
@@ -28,6 +24,7 @@ on:
       - 'scripts/**'
       - 'config/**'
       - 'tests/**'
+      - 'data/bitbrowser_domains.txt'
       - '.github/workflows/sync-upstream.yml'
 
 permissions:
@@ -40,14 +37,18 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+      - name: Run original Shadowrocket unit tests (unchanged)
+        run: |
+          python -m unittest discover -s tests -p 'test_build.py' -v
+          python -m unittest discover -s tests -p 'test_hardening.py' -v
+          python -m unittest discover -s tests -p 'test_review_queue.py' -v
+          python -m unittest discover -s tests -p 'test_sync_reporting.py' -v
       - name: Record explicit manual rejection or renew its review date
         if: github.event_name == 'workflow_dispatch' && inputs.reject_rule != ''
         env:
@@ -60,36 +61,37 @@ jobs:
             args+=(--months "$REVIEW_MONTHS")
           fi
           python scripts/review_queue.py "${args[@]}"
-      - name: Generate verified Shadowrocket config
-        run: python scripts/build.py --report-file "$RUNNER_TEMP/sync-report.json"
-      - name: Commit only when upstream changes
+      - name: Independently build verified Shadowrocket and v2rayN outputs
+        run: python scripts/run_dual.py --work-dir "$RUNNER_TEMP"
+      - name: Publish only validated outputs in one Git push
+        if: always()
         run: |
-          git add -A -- Shadowrocket_Johnshall_OpenAI.conf rules data/sources.json data/review-queue.md data/review-notifications.json config/review-decisions.json
-          if git diff --cached --quiet; then
-            echo "No changes; already in sync."
-            exit 0
+          if [ -f "$RUNNER_TEMP/dual-status.json" ]; then
+            python scripts/publish_dual.py --status-file "$RUNNER_TEMP/dual-status.json"
+          else
+            echo '::error::Build status missing; refusing publication.'
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: sync Johnshall and OpenAI rules"
-          git push origin HEAD:main
-      - name: Telegram report after successful Actions run
+      - name: Telegram one combined report and review receipt
         id: telegram
-        if: success()
-        continue-on-error: true
+        if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python scripts/notify_telegram.py --report-file "$RUNNER_TEMP/sync-report.json" --review-state-file data/review-notifications.json
+        run: |
+          python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
+            --review-state-file data/review-notifications.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success'
         run: |
           git add -- data/review-notifications.json
           if git diff --cached --quiet; then
-            echo "No review receipt changes."
+            echo 'No review receipt changes.'
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: record delivered review reminders"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: record delivered review reminders'
           git push origin HEAD:main
+      - name: Propagate independent build and publish failures
+        if: always()
+        run: python scripts/publish_dual.py --status-file "$RUNNER_TEMP/dual-status.json" --check

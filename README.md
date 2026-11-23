@@ -211,3 +211,51 @@ https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-
 包含 WorkOS 身份验证组件、Cloudflare 验证、Intercom 支持资源、SendGrid、Stripe 脚本、Sentry 与 Datadog 监控、Apple 检测。自动上游仍只采纳 OpenAI 专属域名，官方共享依赖由独立手工兜底承接；Voice 官方目的 IP、原 Johnshall 规则和两节点变量都未改变。
 
 安全边界：不引入 DOMAIN-SUFFIX,workos.com、DOMAIN-SUFFIX,stripe.com、DOMAIN-SUFFIX,cloudflare.com 等未获官方明确要求的整个供应商域名，也不使用 DOMAIN-KEYWORD,openai。静态域名和官方 Voice 目的 IP 不可能预知所有未来服务或隐藏直连目标，因此无法数学保证 100% 的 OpenAI 流量；新增目标应结合已建立的待审核规则报告及 Shadowrocket 连接日志查证。
+
+---
+
+## v2rayN · Johnshall + OpenAI + BitBrowser
+
+本节为**独立新增**的 Windows v2rayN 路由订阅；不改动原 Shadowrocket 双节点、构建脚本和订阅。
+
+### v2rayN 路由订阅
+
+```text
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_OpenAI.json
+```
+
+导入：Windows v2rayN → 设置 → 路由设置 → 新建规则集 → 别名 `Johnshall + OpenAI + BitBrowser` → 可选地址（Url）填入上述 Raw URL → 从订阅 Url 中导入规则 → 确认 → 保存并选为活动路由；选择您自己的代理节点。此文件是 **v2rayN 原生路由规则数组**，不是 PAC、Clash YAML、节点订阅或完整 Xray/sing-box 配置。`proxy`、`direct`、`block` 是路由动作，不携带任何服务器账号密码或节点名字；所有命中 `proxy` 的连接使用 v2rayN 当前选定的节点，最终未匹配流量 `direct`。**GitHub 每日更新并不保证客户端自动重新获取**；需依客户端版本与设置手动或自动重新导入。
+
+### 独立构建和每日维护
+
+- 原 `scripts/build.py` **保持不变**，独立生成 `Shadowrocket_Johnshall_OpenAI.conf`，保留原双节点和人工审核机制；原 `scripts/notify_telegram.py` 也保持不变。
+- 新 `scripts/build_v2rayn.py` 独立下载 Johnshall、四份 OpenAI 社区域名源、官方 ChatGPT Voice IP 与 Apple News 内嵌规则集，**不读取已生成 `.conf` 来转换**；读取原项目审核通过的 `config/manual-openai.rules` 与仅用于 v2rayN 的用户显式例外；转换可识别的完整 Johnshall 分流，不以少量 `geosite:cn` 取代源规则。
+- 每天台北时间 **11:00（UTC 03:00）** 使用**同一个** `.github/workflows/sync-upstream.yml` 调度两次独立构建，分别验证，成功的产物合并为**一次 Git 推送**；未改变时不提交。单个构建失败不发布其失败产物，也不阻止另一套成功产物发布。各构建的状态由独立状态文件记录，失败不会伪装成功。
+- `scripts/notify_combined.py` 统一复用**未修改**的旧 Telegram API 发送函数和人工审核送达确认逻辑，向原 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` 发送**一条综合报告**；只有成功发送后才更新审核提醒送达记录，并由工作流单独持久化。Git 推送失败与 Telegram 失败在报告/Actions 状态中独立体现，后者不会撤销已发布文件。
+- 新的状态/统计仅写到 `data/v2rayn-sources.json`，不写入原 `data/sources.json`、`rules/openai-auto.list` 等 Shadowrocket 专属状态。下载、规模、来源结构、Voice CIDR、广告数量、转换成功率与独立基线全部校验后才以原子方式更新 JSON。
+
+手动独立运行：
+
+```bash
+python scripts/build_v2rayn.py --report-file /tmp/v2rayn-report.json
+python -m unittest discover -s tests -p 'test_v2rayn.py' -v
+```
+
+### 规则优先级与语义差异
+
+1. 回环 / 私网地址直连；2. Johnshall 原广告、追踪、恶意域名拦截；3. 专用 BitBrowser 进程；4. 用户指定的 BitBrowser 服务与 IP 检测域名；5. 官方 Voice 目的 IP、已审核 OpenAI 和 v2rayN 显式用户例外；6. Johnshall 原始可转换规则，按原顺序首次匹配；7. 最终 direct。
+
+原 `REJECT` / `REJECT-DROP` / `REJECT-NO-DROP` 在 v2rayN 中只能统一表示 `block`，不能复制 Shadowrocket 各种拒绝时的网络行为；原 `no-resolve` 不是通用 Xray 规则字段，DNS 解析策略还需要客户端设置配合。Johnshall **URL Rewrite、MITM 不是路由规则，不会在 v2rayN 自动实现**；这些功能仍以原 Shadowrocket 为准。广告拦截被显式提至进程强制代理之前，故该处相对于 Johnshall 原始跨动作优先级属于有意调整。`DOMAIN-WILDCARD` 使用锚定正则映射，必须对实际目标版本测试。任何未知 / 不支持的 Johnshall 类型及未审核外部 RULE-SET 都会**阻止 v2rayN 发布**，并保留旧版；不悄悄丢弃。
+
+本项目的 OpenAI 社区来源继续执行原审核逻辑，未知第三方不会从社区列表自动放行。`config/v2rayn/openai-extra.rules` 是本次用户**明确指定**的 v2rayN-only 扩展，其中包含共享的 Statsig、featuregates 等广泛后缀，可能会代理其他应用流量；这些条目**不会改变原 Shadowrocket 审核记录或原规则**。
+
+### BitBrowser：域名、进程、TUN 与检测方法
+
+`data/bitbrowser_domains.txt` 每条保存域名、官方确认/社区验证/用户指定/待核实分类、用途与出处。其中 `bitbrowser.cn`、`bitbrowser.net`、`bitbrowser.ru` 有 BitBrowser 官方公告支持。`bitbrowser.com` 目前呈现另一家浏览器隐私检测服务，**不能据此认定为指纹浏览器官方域名**，仅按用户明确要求列入并标记为用户指定。`todetect.*`、`ip-api.com` 等部分域名为共享 IP 检测服务，也可能影响非 BitBrowser 流量。
+
+- 一般**系统代理模式**：只捕获应用主动使用系统代理的流量，不能保证所有浏览器窗口、UDP/WebRTC 都走 v2rayN。
+- Windows **TUN 模式**：可按 v2rayN 的进程字段分流。`config/v2rayn/verified-processes.txt` 初始按第三方实务指南加入有证据的专用子进程 `BitBrowser.exe`，**不使用通用 `chrome.exe`、`msedge.exe`、`firefox.exe`**。不同 BitBrowser 版本可能有不同主程序名、子进程或安装路径。实际使用时打开任务管理器“详细信息”及进程命令行/可执行路径，确认属于 BitBrowser 后才将新的**完整专用路径**加入该文本文件、重新构建并重新导入。单凭 `BitBrowser.exe` 不保证覆盖整个应用。进程规则是否生效还取决于 v2rayN 版本、Xray/sing-box 内核、TUN 开关及进程识别支持。
+- BitBrowser **内置独立代理**：如果已配置 SOCKS/HTTP 代理，浏览器可能绕过系统代理或形成双层代理；不要在 TUN 下将核心自身的出口再导回本机代理。保留 `localhost`、`127.0.0.1`、`::1` 及必要私网 Local API 访问，确保本地 `/health`、`/browser/open` 等 API 可用。
+- 在实际 Windows 主机上打开 v2rayN TUN 日志，检查 BitBrowser 主程序、专用子进程及普通 Chrome 的匹配路径：BitBrowser 访问 `bitbrowser.cn` 和国内网页应显示 `proxy`，普通 Chrome 访问国内网页仍按 Johnshall；已知广告应 `block`、localhost 应 `direct`。用浏览器查看出口 IPv4/IPv6、DNS 解析（DNS 泄漏测试）、WebRTC 公网候选地址，以及 UDP/QUIC 行为；同时核对 BitBrowser 内置代理出口，避免与 TUN 重复。无 Windows + TUN 实测前，不能声称全流量百分之百覆盖。
+
+官方 v2rayN 格式资料：[自定义路由规则说明](https://github.com/2dust/v2rayN/wiki/Description-of-custom-routing-rules)；BitBrowser 官方域名公告：[官方通知](https://www.bitbrowser.cn/blog/_gftz_btllqyhqzy__)；专用 `BitBrowser.exe` 子进程的社区资料：[指纹浏览器执行文件](https://doc.tkrmw.com/matrix/bitbrowser.html)。

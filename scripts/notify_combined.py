@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""One Telegram update for both builders, preserving original review receipts.
+
+Use the unchanged notify_telegram.send retry implementation and the unchanged
+review_queue.acknowledge only after Telegram confirmed acceptance.
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime
+import json
+import os
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import notify_telegram as original
+import review_queue
+
+
+def read_json(path: str | None) -> dict | None:
+    if not path or not Path(path).is_file():
+        return None
+    try:
+        doc = json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        print(f'::warning::Unreadable report: {type(exc).__name__}')
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def emit_message(status: dict, shadow: dict | None, v2: dict | None,
+                 *, when: str, event: str, run_url: str) -> str:
+    builds = {key: status.get(key, {}).get('exit_code') == 0
+              for key in ('shadowrocket', 'v2rayn')}
+    published = status.get('publish', {}).get('success', False)
+    complete = all(builds.values()) and published
+    partial = any(builds.values())
+    overall = '成功' if complete else '部分成功' if partial else '失败'
+    lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
+             f'🔄 触发：{original.EVENTS.get(event, event)}',
+             f'📦 总体状态：{overall}',
+             f'📤 GitHub 发布：{status.get("publish", {}).get("state", "未执行")}', '']
+    for key, title, report in [('shadowrocket', '🚀 Shadowrocket 小火箭', shadow),
+                               ('v2rayn', '💻 v2rayN', v2)]:
+        build = status.get(key, {})
+        success = build.get('exit_code') == 0 and report is not None
+        lines += ['━━━━━━━━━━━━━━', title,
+                  f'构建：{"✅ 成功" if success else "❌ 失败 / 报告缺失"}']
+        if not success:
+            lines += [f'原因：{build.get("error", "构建报告不存在，无法确认")[-350:]}',
+                      '配置：保留上一次已发布版本']
+            continue
+        if not published:
+            lines += ['发布：❌ 未成功推送 GitHub（仅本地构建成功）']
+        else:
+            changed_files = status.get('publish', {}).get('changed_files', [])
+            output = ('Shadowrocket_Johnshall_OpenAI.conf' if key == 'shadowrocket'
+                      else 'v2rayN_Johnshall_OpenAI.json')
+            lines += [f'发布：{"✅ 已更新" if output in changed_files else "✅ 已检查，内容无变化"}']
+        lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
+        stats = report.get('statistics', {})
+        if key == 'shadowrocket':
+            for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
+                                ('automatic_openai_domains', 'OpenAI 自动域名'),
+                                ('voice_prefixes', 'Voice IP'),
+                                ('retained_ad_rules', '拦截规则')]:
+                if type(stats.get(prop)) is int:
+                    lines.append(f'{label}：{stats[prop]}')
+            lines += [f'自动规则新增/删除：{len(report.get("auto_added", []))}/'
+                      f'{len(report.get("auto_removed", []))}']
+        else:
+            for prop, label in [('routing_objects', '路由对象'), ('domain_rules', '域名规则'),
+                                ('ip_rules', 'IP 规则'), ('process_rules', '进程规则'),
+                                ('proxy_rules', '代理规则'), ('direct_rules', '直连规则'),
+                                ('block_rules', '拦截规则'), ('json_bytes', 'JSON 字节数'),
+                                ('bitbrowser_domains', 'BitBrowser 域名')]:
+                if type(stats.get(prop)) is int:
+                    lines.append(f'{label}：{stats[prop]}')
+            if stats.get('process_rules', 0) == 0:
+                lines.append('⚠️ 未配置经确认的进程路径')
+    lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
+    if shadow and status.get('shadowrocket', {}).get('exit_code') == 0:
+        lines += [f'新增待审核：{len(shadow.get("new_excluded_candidates", []))}；'
+                  f'到期复审：{len(shadow.get("review_due_candidates", []))}']
+        counts = shadow.get('manual_review_counts', {})
+        if isinstance(counts, dict):
+            lines.append(f'审核状态：待审 {counts.get("pending", "?")}, 到期 {counts.get("due", "?")}')
+        for line in shadow.get('review_warnings', [])[:2]:
+            lines.append('⚠️ ' + str(line)[:140])
+    else:
+        lines.append('⚠️ Shadowrocket 审核报告缺失；没有确认或清除提醒送达状态')
+    if not published:
+        lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
+    if v2 and v2.get('warnings'):
+        lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
+    if run_url:
+        lines += ['', '🔗 GitHub Actions：' + run_url]
+    message = '\n'.join(lines)
+    if len(message) > 3900:
+        message = message[:3550] + '\n…详见 GitHub Actions 执行摘要。'
+        if run_url:
+            message += '\n' + run_url
+    return message
+
+
+def main() -> int:
+    p = argparse.ArgumentParser()
+    p.add_argument('--status-file', required=True, type=Path)
+    p.add_argument('--review-state-file', type=Path)
+    args = p.parse_args()
+    status = read_json(str(args.status_file)) or {
+        'shadowrocket': {'exit_code': -1, 'error': 'Build status file missing'},
+        'v2rayn': {'exit_code': -1, 'error': 'Build status file missing'},
+        'publish': {'success': False, 'state': 'not-run'}}
+    shadow = read_json(status.get('reports', {}).get('shadowrocket'))
+    v2 = read_json(status.get('reports', {}).get('v2rayn'))
+    repo = os.environ.get('GITHUB_REPOSITORY', '')
+    run_id = os.environ.get('GITHUB_RUN_ID', '')
+    run_url = (f'{os.environ.get("GITHUB_SERVER_URL", "https://github.com")}/'
+               f'{repo}/actions/runs/{run_id}') if repo and run_id else ''
+    now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
+    message = emit_message(status, shadow, v2, when=now,
+                           event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url)
+    print(message)
+    summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if summary_path:
+        with open(summary_path, 'a', encoding='utf-8') as f:
+            f.write('## Shadowrocket + v2rayN 真实构建及发布报告\n\n~~~text\n'
+                    + message + '\n~~~\n')
+            if shadow:
+                for key in ('new_excluded_candidates', 'review_due_candidates'):
+                    if shadow.get(key):
+                        f.write(f'\n### {key}\n\n')
+                        for item in shadow[key]:
+                            f.write('- ' + str(item.get('rule', '?')) + '\n')
+            if v2:
+                for warning in v2.get('warnings', []):
+                    f.write('\n- ⚠️ ' + str(warning) + '\n')
+    token, chat_id = (os.environ.get('TELEGRAM_BOT_TOKEN', '').strip(),
+                      os.environ.get('TELEGRAM_CHAT_ID', '').strip())
+    if not token or not chat_id:
+        print('::error::Missing Telegram secrets; report not sent and receipt not acknowledged')
+        return 1
+    try:
+        original.send(token, chat_id, message)
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f'::error::Telegram delivery failed: {type(exc).__name__}; receipts unchanged')
+        return 1
+    print('Unified Telegram report sent.')
+    if args.review_state_file and shadow and status.get('shadowrocket', {}).get('exit_code') == 0:
+        try:
+            review_queue.acknowledge(shadow, args.review_state_file)
+        except (OSError, ValueError, TypeError) as exc:
+            print(f'::error::Telegram delivered, but review acknowledgement failed: {type(exc).__name__}')
+            return 1
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

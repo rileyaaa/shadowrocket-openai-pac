@@ -1,0 +1,50 @@
+# v2rayN-only extra matches explicitly requested on 2026-11-23.
+# User-approved exceptions ONLY for this independent routing file; no changes to
+# config/manual-openai.rules or config/review-decisions.json.
+# Some shared third-party domains are broad and affect unrelated applications.
+# The legacy auto-review rejections remain untouched, and are NOT auto-approved.
+# Additional first-party/dedicated matches (most already covered by original)
+domain:openai.com
+domain:oaistatic.com
+domain:oaiusercontent.com
+domain:oaistatsig.com
+domain:sora.com
+domain:chat.com
+domain:crixet.com
+domain:chatgpt.com
+domain:chatgpt.site
+full:openai.com.cdn.cloudflare.net
+full:openaiapi-site.azureedge.net
+full:openaiassets.blob.core.windows.net
+full:openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net
+full:openaicom.imgix.net
+full:openaicomproductionae4b.blob.core.windows.net
+full:production-openaicom-storage.azureedge.net
+full:cdn.openaimerge.com
+regexp:^chatgpt-async-webps-prod-[^.]+[.]webpubsub[.]azure[.]com$
+domain:chatgpt.livekit.cloud
+domain:host.livekit.cloud
+domain:turn.livekit.cloud
+full:cdn.workos.com
+full:forwarder.workos.com
+full:setup.workos.com
+full:images.workoscdn.com
+full:workos.imgix.net
+full:challenges.cloudflare.com
+full:humb.apple.com
+domain:intercom.io
+domain:intercomcdn.com
+domain:ct.sendgrid.net
+full:js.stripe.com
+full:o207216.ingest.sentry.io
+full:o33249.ingest.sentry.io
+full:o33249.ingest.us.sentry.io
+full:browser-intake-datadoghq.com
+full:rum.browser-intake-datadoghq.com
+full:openai.qualtrics.com
+# Broad user-requested shared infrastructure (not approved by legacy auto-review)
+domain:statsig.com
+domain:statsigapi.net
+domain:featuregates.org
+domain:featureassets.org
+domain:prodregistryv2.org
