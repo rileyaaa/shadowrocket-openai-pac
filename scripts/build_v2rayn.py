@@ -151,8 +151,10 @@ def load_published_baseline() -> tuple[bytes | None, dict | None]:
 
 def selected_bitbrowser_domains(entries: list[tuple[str, str, str]]) -> list[str]:
     """Only previously approved entries are emitted; input count is advisory."""
-    return sorted({host for host, confidence, _ in entries
-                   if confidence in ('official', 'user')})
+    # Preserve approved input order so a healthy regeneration is byte-identical.
+    # load_bitbrowser_domains has already rejected duplicate hosts.
+    return [host for host, confidence, _ in entries
+            if confidence in ('official', 'user')]
 
 
 def safety_check(stats: dict, old: dict | None) -> None:
