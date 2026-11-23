@@ -263,7 +263,21 @@ def validate_safety(current: dict, previous: dict | None) -> None:
         before, after = old.get(key), current.get(key)
         if type(before) is not int or type(after) is not int or before < 1:
             raise ValueError(f'Invalid AI safety baseline for {key}')
-        if not .75 * before <= after <= 1.50 * before:
+        # One-time 2026-11-23 reviewed reduction from 72 to 51 Gemini rules.
+        # Shared Google login/CDN/Fonts/Play and generic Code Assist hosts were
+        # removed, but two narrow Gemini App helpers remain.  The exact
+        # baseline/feed counts and vetted manual set all need to match.
+        # Subsequent runs again use the ordinary 75%-150% baseline guards.
+        reviewed_gemini_narrowing = (
+            key == 'gemini_domains' and before == 72 and after == 51
+            and current.get('gemini_v2fly') == 49
+            and current.get('gemini_metacubex') == 49
+            and set(load_manual(MANUAL.read_text(encoding='utf-8'))['gemini']) == {
+                'DOMAIN,jnn-pa.googleapis.com',
+                'DOMAIN,waa-pa.clients6.google.com',
+            }
+        )
+        if not reviewed_gemini_narrowing and not .75 * before <= after <= 1.50 * before:
             raise ValueError(f'AI SOURCE ANOMALY: {key}: {before} -> {after}; last good file retained')
 
 

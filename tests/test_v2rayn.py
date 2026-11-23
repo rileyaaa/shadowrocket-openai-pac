@@ -95,8 +95,13 @@ class ConversionTests(unittest.TestCase):
 
     def test_bitbrowser_list_status_provenance(self):
         entries = core.load_bitbrowser_domains(builder.BITBROWSER.read_text(encoding='utf-8'))
-        self.assertEqual(len(entries), 12)
-        self.assertIn(('bitbrowser.com', 'user', 'User requested; current ownership is NOT confirmed as the BitBrowser anti-detect client'), entries)
+        self.assertEqual(len(entries), 11)
+        self.assertFalse(any(domain == 'bitbrowser.com' for domain, _, _ in entries))
+        self.assertEqual(sum(status == 'official' for _, status, _ in entries), 3)
+        self.assertEqual(sum(status == 'user' for _, status, _ in entries), 8)
+        self.assertEqual(sum(status != 'official' for _, status, _ in entries), 8)
+        self.assertEqual(core.load_processes(builder.PROCESSES.read_text(encoding='utf-8')),
+                         ['BitBrowser.exe'])
         with self.assertRaises(ValueError):
             core.load_bitbrowser_domains('bitbrowser.cn|official|x|https://example.com')
 

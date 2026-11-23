@@ -1,10 +1,10 @@
 # domain | confidence | purpose | evidence URL
 # official = claimed in BitBrowser official 2025 notice; user = user-specified routing
-# bitbrowser.com currently shows a separate browser privacy scan site; NOT confirmed as BitBrowser client infrastructure.
+# bitbrowser.com deliberately omitted: it is a separate browser privacy-check site,
+# not one of the three officially named BitBrowser anti-detect service domains.
 bitbrowser.cn | official | Chinese official website and service | https://www.bitbrowser.cn/blog/_gftz_btllqyhqzy__
 bitbrowser.net | official | English official website and service | https://www.bitbrowser.cn/blog/_gftz_btllqyhqzy__
 bitbrowser.ru | official | Russian official website and service | https://www.bitbrowser.cn/blog/_gftz_btllqyhqzy__
-bitbrowser.com | user | User requested; current ownership is NOT confirmed as the BitBrowser anti-detect client | https://bitbrowser.com/about/
 todetect.cn | user | Fingerprint/IP testing, user-requested | https://www.bitbrowser.net/
 todetect.net | user | Fingerprint/IP testing, user-requested | https://www.bitbrowser.net/
 ip-api.com | user | IP inspection, user-requested | https://www.bitbrowser.net/

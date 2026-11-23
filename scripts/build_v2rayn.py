@@ -215,7 +215,9 @@ def run(argv: list[str] | None = None) -> dict:
     original_stats = {**johnshall_stats, **voice_counts, 'voice_prefixes': len(voice),
                       'auto_domains': len(auto), 'manual_domains': len(manual),
                       'openai_user_extras': len(extra), 'bitbrowser_domains': len(bitbrowser),
-                      'unverified_bitbrowser_domains': sum(c == 'unverified' for _, c, _ in bitbrowser),
+                      'official_bitbrowser_domains': sum(c == 'official' for _, c, _ in bitbrowser),
+                      'user_requested_bitbrowser_domains': sum(c == 'user' for _, c, _ in bitbrowser),
+                      'unverified_bitbrowser_domains': sum(c != 'official' for _, c, _ in bitbrowser),
                       'unparsed_community_rules_review_only': sum(len(x) for x in unparsed_sources.values()),
                       **ai['counts'], 'ai_review_candidates': len(ai['review_candidates'])}
     stats = core.validate_rules(rules, original_stats)

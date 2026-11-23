@@ -1,32 +1,15 @@
-# Manually reviewed additions for BOTH Shadowrocket AI and v2rayN output.
+# Reviewed AI-only additions shared by BOTH Shadowrocket AI and v2rayN.
 # Format SERVICE,DOMAIN,EXACT-HOST. Never add whole Google APIs/CDN/analytics suffixes.
-# Google Gemini App firewall documentation (exact hosts can serve other Google apps):
-# https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings
-GEMINI,DOMAIN,accounts.google.com
+# Gemini: an official firewall ALLOWLIST is not an AI-only proxy list.
+# Shared Google login/CDN/Fonts/Play/People/OAuth hosts are intentionally excluded;
+# those requests fall through to the original Johnshall rules.
+# Only two narrowly scoped Gemini App helper hosts remain (still not exclusive).
+# Official reference: https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings
 GEMINI,DOMAIN,jnn-pa.googleapis.com
 GEMINI,DOMAIN,waa-pa.clients6.google.com
-GEMINI,DOMAIN,optimizationguide-pa.googleapis.com
-GEMINI,DOMAIN,www.googleapis.com
-GEMINI,DOMAIN,apis.google.com
-GEMINI,DOMAIN,ssl.gstatic.com
-GEMINI,DOMAIN,www.gstatic.com
-GEMINI,DOMAIN,fonts.googleapis.com
-GEMINI,DOMAIN,fonts.gstatic.com
-GEMINI,DOMAIN,lh3.googleusercontent.com
-GEMINI,DOMAIN,lh5.googleusercontent.com
-GEMINI,DOMAIN,ogs.google.com
-GEMINI,DOMAIN,play.google.com
-GEMINI,DOMAIN,csp.withgoogle.com
-GEMINI,DOMAIN,encrypted-tbn0.gstatic.com
-GEMINI,DOMAIN,encrypted-tbn1.gstatic.com
-GEMINI,DOMAIN,encrypted-tbn2.gstatic.com
-GEMINI,DOMAIN,encrypted-tbn3.gstatic.com
-# Gemini Code Assist documented network requirements, exact shared hosts:
-# https://cloud.google.com/gemini/docs/codeassist/set-up-gemini
-GEMINI,DOMAIN,oauth2.googleapis.com
-GEMINI,DOMAIN,serviceusage.googleapis.com
-GEMINI,DOMAIN,people.googleapis.com
-GEMINI,DOMAIN,feedback-pa.googleapis.com
+# Gemini Code Assist primary AI endpoints come from the reviewed community feeds.
+# Its shared login/Cloud APIs do not override the baseline geographic routes.
+# Reference: https://cloud.google.com/gemini/docs/codeassist/set-up-gemini
 # Claude Code network requirements; core anthropic.com/claude.ai covered by suffix:
 # https://code.claude.com/docs/en/network-config
 CLAUDE,DOMAIN,api.anthropic.com

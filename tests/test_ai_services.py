@@ -39,7 +39,13 @@ class AIInputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ai.load_manual('GEMINI,DOMAIN,googleads.g.doubleclick.net\nCLAUDE,DOMAIN,api.anthropic.com')
         parsed=ai.load_manual(ai.MANUAL.read_text(encoding='utf-8'))
-        self.assertIn('DOMAIN,accounts.google.com',parsed['gemini'])
+        self.assertEqual(set(parsed['gemini']), {
+            'DOMAIN,jnn-pa.googleapis.com',
+            'DOMAIN,waa-pa.clients6.google.com',
+        })
+        self.assertNotIn('DOMAIN,accounts.google.com',parsed['gemini'])
+        self.assertNotIn('DOMAIN,fonts.gstatic.com',parsed['gemini'])
+        self.assertNotIn('DOMAIN,play.google.com',parsed['gemini'])
         self.assertIn('DOMAIN,api.anthropic.com',parsed['claude'])
 
     def test_two_source_formats_preserve_exact_vs_suffix(self):
@@ -98,6 +104,17 @@ class AIInputTests(unittest.TestCase):
         p['default_review_months'] = 0
         with self.assertRaises(ValueError):
             ai.evaluate_review_policy([],p)
+
+    def test_one_time_reviewed_gemini_scope_reduction(self):
+        before = {'gemini_domains': 72, 'claude_domains': 19,
+                  'gemini_v2fly': 49, 'gemini_metacubex': 49,
+                  'claude_v2fly': 21, 'claude_metacubex': 21}
+        after = dict(before, gemini_domains=51)
+        ai.validate_safety(after, {'ai_counts': before})
+        with self.assertRaisesRegex(ValueError, 'AI SOURCE ANOMALY'):
+            ai.validate_safety(dict(after, gemini_domains=50), {'ai_counts': before})
+        with self.assertRaisesRegex(ValueError, 'AI SOURCE ANOMALY'):
+            ai.validate_safety(dict(after, gemini_domains=37), {'ai_counts': after})
 
     def test_anomaly_fails_publication(self):
         now={'gemini_domains':50,'claude_domains':15}

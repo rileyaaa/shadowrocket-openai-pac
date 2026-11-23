@@ -273,7 +273,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 
 ### BitBrowser：域名、进程、TUN 与检测方法
 
-`data/bitbrowser_domains.txt` 每条保存域名、官方确认/社区验证/用户指定/待核实分类、用途与出处。其中 `bitbrowser.cn`、`bitbrowser.net`、`bitbrowser.ru` 有 BitBrowser 官方公告支持。`bitbrowser.com` 目前呈现另一家浏览器隐私检测服务，**不能据此认定为指纹浏览器官方域名**，仅按用户明确要求列入并标记为用户指定。`todetect.*`、`ip-api.com` 等部分域名为共享 IP 检测服务，也可能影响非 BitBrowser 流量。
+`data/bitbrowser_domains.txt` 保留官方确认的 `bitbrowser.cn`、`bitbrowser.net`、`bitbrowser.ru`，以及原先明确指定的 IP/指纹检测服务域名。`bitbrowser.com` 目前是独立浏览器隐私检测网站，不在比特指纹浏览器官方域名清单，已从专用域名规则移除；这不影响 `BitBrowser.exe` 的进程代理。其余检测域名仍是用户指定而非官方域名，可能也影响其他软件访问这些检测网站。
 
 - 一般**系统代理模式**：只捕获应用主动使用系统代理的流量，不能保证所有浏览器窗口、UDP/WebRTC 都走 v2rayN。
 - Windows **TUN 模式**：可按 v2rayN 的进程字段分流。`config/v2rayn/verified-processes.txt` 初始按第三方实务指南加入有证据的专用子进程 `BitBrowser.exe`，**不使用通用 `chrome.exe`、`msedge.exe`、`firefox.exe`**。不同 BitBrowser 版本可能有不同主程序名、子进程或安装路径。实际使用时打开任务管理器“详细信息”及进程命令行/可执行路径，确认属于 BitBrowser 后才将新的**完整专用路径**加入该文本文件、重新构建并重新导入。单凭 `BitBrowser.exe` 不保证覆盖整个应用。进程规则是否生效还取决于 v2rayN 版本、Xray/sing-box 内核、TUN 开关及进程识别支持。
@@ -313,7 +313,7 @@ v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`
 
 Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/google-gemini.list`；Claude：v2fly `data/anthropic` 与 MetaCubeX `geo/geosite/anthropic.list`。**MetaCubeX 主要是衍生格式，不能当作完全独立的域名归属证据。** 每次记录各来源 SHA-256、数量和变化，在新来源异常缩减、缺失、语法变化时保留上一版有效输出。生成文件由 Action 提交，不直接手改。
 
-`config/ai-services.rules` 记录官方文档支持的精确共享主机补充（例如 Gemini 的特定登录/API 和 Claude Code）；`scripts/ai_services.py` 中明示哪些专用后缀和共享精确域名获准自动同步。来源首次出现的新共享供应商主机或不明域名进入 `data/ai-review-queue.md`，**不自动代理**。未经核实不要将整个 `googleapis.com`、`gstatic.com`、`sentry.io`、Google IP / ASN 纳入。广告追踪主机不会因为出现在 Gemini 官方防火墙文档里就自动跳过原广告拦截；v2rayN 保留广告规则高优先级。当前包含少量官方确认的共享精确主机，可能也让其他 Google 功能走西雅图，此行为刻意接受以优先满足 Gemini 使用。
+`config/ai-services.rules` 只补充经过审查的独立 AI 主机。2026-11-23 起，Gemini 删除会被 Gmail / Google Play / 其他 Google 服务 / 普通网站共用的登录、字体、图片、通用 API/CDN 精确主机；保留 `jnn-pa.googleapis.com` 与 `waa-pa.clients6.google.com` 两个较窄的 Gemini App 辅助主机。官方「防火墙允许清单」不是「Gemini 专属流量清单」，Google 共享连接继续按 Johnshall 原始规则处理，即使 Gemini 页面本身走西雅图，登录或静态资源也可能走不同出口。主要 Gemini、AI Studio、Code Assist API 仍由经过筛选的上游规则覆盖，实际覆盖情况要用客户端连接日志复核。Claude Code 的精确主机规则保持不变。新增不明域名仍只进入 `data/ai-review-queue.md` 待审，不自动代理。
 
 GitHub Actions 分别记录两套真实构建状态、独立安全发布、失败保留上一版有效配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 
