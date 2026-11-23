@@ -74,6 +74,12 @@ class ConversionTests(unittest.TestCase):
         with self.assertRaises(core.UnsupportedRule):
             core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
 
+    def test_early_final_is_rejected(self):
+        source = '\n'.join(['FINAL,direct'] + ['DOMAIN,a.com,Proxy'] * 10001
+                           + ['DOMAIN,ads.example,REJECT'] * 20001)
+        with self.assertRaisesRegex(ValueError, 'FINAL must be the last'):
+            core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
+
     def test_full_source_sample_and_ads_hoisted(self):
         source = '\n'.join(['DOMAIN,a.com,Proxy'] * 10001
                            + ['DOMAIN,ads.example,REJECT'] * 20001
@@ -96,6 +102,8 @@ class ConversionTests(unittest.TestCase):
             core.load_processes('C:\\Program Files\\Google\\Chrome\\chrome.exe')
         with self.assertRaises(ValueError):
             core.load_processes('nonexistent')
+        with self.assertRaisesRegex(ValueError, 'BitBrowser.exe'):
+            core.load_processes('# only a comment')
 
     def test_bitbrowser_list_status_provenance(self):
         entries = core.load_bitbrowser_domains(builder.BITBROWSER.read_text(encoding='utf-8'))
@@ -212,12 +220,33 @@ class SafetyTests(unittest.TestCase):
             def fake_git(*args):
                 if args[0] == 'push':
                     raise RuntimeError('remote rejected push')
-                return type('R', (), {'stdout': 'README.md\n' if args[0] == 'diff' else '1234\n'})()
+                return type('R', (), {'stdout': 'Shadowrocket_Johnshall_AI.conf\n' if args[0] == 'diff' else '1234\n'})()
             with patch.object(publish, 'git', side_effect=fake_git):
                 publish.publish(path)
             status = json.loads(path.read_text())
             self.assertFalse(status['publish']['success'])
             self.assertIn('remote rejected', status['publish']['error'])
+
+    def test_publisher_rejects_unexpected_staged_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'status.json'
+            path.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
+                                        'v2rayn': {'exit_code': 0}}))
+            def fake_git(*args):
+                return type('R', (), {'stdout': 'README.md\n' if args[0] == 'diff' else ''})()
+            with patch.object(publish, 'git', side_effect=fake_git):
+                publish.publish(path)
+            result = json.loads(path.read_text())['publish']
+            self.assertFalse(result['success'])
+            self.assertIn('Unexpected staged publish paths', result['error'])
+
+    def test_telegram_missing_report_is_not_success(self):
+        state = {'shadowrocket_ai': {'exit_code': 0},
+                 'v2rayn': {'exit_code': 0},
+                 'publish': {'success': True, 'state': 'published'}}
+        msg = notify.emit_message(state, None, {}, when='2026-11-23 11:00',
+                                  event='schedule', run_url='')
+        self.assertIn('总体状态：失败', msg)
 
     def test_telegram_missing_secret_does_not_ack(self):
         with tempfile.TemporaryDirectory() as tmp:
