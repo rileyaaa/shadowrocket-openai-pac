@@ -2,5 +2,18 @@
   "version": 1,
   "default_review_months": 6,
   "reminder_interval_days": 7,
-  "rejected_rules": []
+  "rejected_rules": [
+    {
+      "service": "gemini",
+      "rule": "DOMAIN-SUFFIX,geller-pa.googleapis.com",
+      "reason": "共享 Google Search 等非专属 AI 后端；按 2026-11-23 分流审查决定保留 Johnshall 原有路由，六个月后复审。",
+      "reviewed_at": "2026-11-23"
+    },
+    {
+      "service": "gemini",
+      "rule": "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com",
+      "reason": "普通 Google 产品与 AI 共享的辅助后端；不纳入 AI 专用节点，按原有 Johnshall 路由并定期复审。",
+      "reviewed_at": "2026-11-23"
+    }
+  ]
 }
