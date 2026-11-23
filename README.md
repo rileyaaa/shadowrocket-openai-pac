@@ -24,7 +24,7 @@
 
 | 客户端 | 唯一正式订阅 | 路由方式 |
 |---|---|---|
-| Shadowrocket | [`Shadowrocket_Johnshall_AI.conf`](Shadowrocket_Johnshall_AI.conf) | OpenAI / Gemini / Claude → `RackNerd🇺🇸西雅图`；Johnshall Proxy → `Altare🇸🇬新加坡` |
+| Shadowrocket | [`Shadowrocket_Johnshall_AI.conf`](Shadowrocket_Johnshall_AI.conf) | OpenAI / Gemini / Claude → `Hinet🇹🇼台湾`；Johnshall Proxy → `Altare🇸🇬新加坡` |
 | v2rayN | [`v2rayN_Johnshall_AI.json`](v2rayN_Johnshall_AI.json) | 三家 AI 与 BitBrowser → `proxy`，**不绑定具体节点** |
 
 Shadowrocket Raw 订阅：
@@ -50,10 +50,10 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_J
 请先在小火箭导入两个实际代理节点，路由模式选「配置」。本仓库不存储任何代理凭据。两个节点的完整备注名称只在 [`config/user-settings.json`](config/user-settings.json) 中维护：
 
 ```json
-{"openai_node_name":"RackNerd🇺🇸西雅图","johnshall_proxy_node_name":"Altare🇸🇬新加坡"}
+{"openai_node_name":"Hinet🇹🇼台湾","johnshall_proxy_node_name":"Altare🇸🇬新加坡"}
 ```
 
-两个字段表示**分流用途**，不是国家：`openai_node_name` 是 OpenAI 专用出口，`johnshall_proxy_node_name` 是 Johnshall 原 `Proxy` 出口。目前的西雅图和新加坡是已设置的两个节点；未来换节点，只需更新这两个值。修改 JSON 后会自动重建配置，**无需额外策略组**。
+两个字段表示**分流用途**，不是国家：`openai_node_name` 是 OpenAI 专用出口，`johnshall_proxy_node_name` 是 Johnshall 原 `Proxy` 出口。目前的台湾 AI 节点和新加坡是已设置的两个节点；未来换节点，只需更新这两个值。修改 JSON 后会自动重建配置，**无需额外策略组**。
 
 ## 只有两份 OpenAI 路由规则源
 
@@ -286,7 +286,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 
 ## Gemini + Claude 每日自动维护（新增）
 
-现只保留一份 Shadowrocket AI 订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅图`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。旧 `scripts/build.py` 的共用函数不变，但不再执行其旧订阅发布入口。
+现只保留一份 Shadowrocket AI 订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `Hinet🇹🇼台湾`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。旧 `scripts/build.py` 的共用函数不变，但不再执行其旧订阅发布入口。
 
 **Shadowrocket 全 AI 配置：**
 
@@ -294,7 +294,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowrocket_Johnshall_AI.conf
 ```
 
-旧 OpenAI 专用订阅已停止维护并删除；要让 Gemini / Claude 也走西雅图，Shadowrocket 请使用上方唯一的全 AI 配置地址。
+旧 OpenAI 专用订阅已停止维护并删除；要让 Gemini / Claude 也走台湾 AI 节点，Shadowrocket 请使用上方唯一的全 AI 配置地址。
 
 **v2rayN 完整路由订阅（文件已更名，必须更新地址）：**
 
@@ -313,7 +313,7 @@ v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`
 
 Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/google-gemini.list`；Claude：v2fly `data/anthropic` 与 MetaCubeX `geo/geosite/anthropic.list`。**MetaCubeX 主要是衍生格式，不能当作完全独立的域名归属证据。** 每次记录各来源 SHA-256、数量和变化，在新来源异常缩减、缺失、语法变化时保留上一版有效输出。生成文件由 Action 提交，不直接手改。
 
-`config/ai-services.rules` 只补充经过审查的独立 AI 主机。2026-11-23 起，Gemini 删除会被 Gmail / Google Play / 其他 Google 服务 / 普通网站共用的登录、字体、图片、通用 API/CDN 精确主机；保留 `jnn-pa.googleapis.com` 与 `waa-pa.clients6.google.com` 两个较窄的 Gemini App 辅助主机。官方「防火墙允许清单」不是「Gemini 专属流量清单」，Google 共享连接继续按 Johnshall 原始规则处理，即使 Gemini 页面本身走西雅图，登录或静态资源也可能走不同出口。主要 Gemini、AI Studio、Code Assist API 仍由经过筛选的上游规则覆盖，实际覆盖情况要用客户端连接日志复核。Claude Code 的精确主机规则保持不变。新增不明域名仍只进入 `data/ai-review-queue.md` 待审，不自动代理。
+`config/ai-services.rules` 只补充经过审查的独立 AI 主机。2026-11-23 起，Gemini 删除会被 Gmail / Google Play / 其他 Google 服务 / 普通网站共用的登录、字体、图片、通用 API/CDN 精确主机；保留 `jnn-pa.googleapis.com` 与 `waa-pa.clients6.google.com` 两个较窄的 Gemini App 辅助主机。官方「防火墙允许清单」不是「Gemini 专属流量清单」，Google 共享连接继续按 Johnshall 原始规则处理，即使 Gemini 页面本身走台湾 AI 节点，登录或静态资源也可能走不同出口。主要 Gemini、AI Studio、Code Assist API 仍由经过筛选的上游规则覆盖，实际覆盖情况要用客户端连接日志复核。Claude Code 的精确主机规则保持不变。新增不明域名仍只进入 `data/ai-review-queue.md` 待审，不自动代理。
 
 GitHub Actions 分别记录两套真实构建状态、独立安全发布、失败保留上一版有效配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 

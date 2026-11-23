@@ -60,7 +60,7 @@ def insert_ai_rules(original: str, additions: dict, node: str) -> str:
     if not node or '\n' in node or ',' in node:
         raise ValueError('Invalid exact OpenAI node name')
     parts = ['# [2b] Independently reviewed Gemini and Claude enhancements',
-             '# Both services use the EXACT OpenAI Seattle node; changes require review.']
+             '# Both services use the configured AI node; its name must match the Shadowrocket node.']
     for service in ('gemini', 'claude'):
         rules = additions['rules'][service]
         parts.append('# ' + service.upper() + ' first-party and exact shared dependencies')

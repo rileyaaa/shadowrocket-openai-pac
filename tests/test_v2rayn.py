@@ -127,7 +127,9 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(json.loads(data), rules)
         self.assertIsInstance(json.loads(data), list)
         self.assertNotIn(b'outbounds', data)
-        self.assertNotIn(b'RackNerd', data)
+        # The v2rayN routing subscription must never bind either configured node.
+        self.assertNotIn('Hinet🇹🇼台湾'.encode('utf-8'), data)
+        self.assertNotIn('Altare🇸🇬新加坡'.encode('utf-8'), data)
         with self.assertRaises(ValueError):
             core.validate_rules([], {})
         with self.assertRaises(ValueError):

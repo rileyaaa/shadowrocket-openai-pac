@@ -11,24 +11,24 @@
 ## 静态核对（仓库内的自动化测试）
 
 - Claude Code 新增的官方可选错误上报主机为 **精确** `browser-intake-us5-datadoghq.com`，不得放宽为 `datadoghq.com` 整站。
-- Shadowrocket 构建后应有 `DOMAIN,browser-intake-us5-datadoghq.com,RackNerd🇺🇸西雅图,force-remote-dns`。
-- v2rayN 应有 `full:browser-intake-us5-datadoghq.com`、`outboundTag=proxy`，但不写死西雅图节点。
+- Shadowrocket 构建后应有 `DOMAIN,browser-intake-us5-datadoghq.com,Hinet🇹🇼台湾,force-remote-dns`。
+- v2rayN 应有 `full:browser-intake-us5-datadoghq.com`、`outboundTag=proxy`，但不写死台湾 AI 节点节点。
 - 原有 OpenAI Voice 官方目的 IP、ChatGPT / Codex 域名和 Google AI 边界不因本次变更而移除。
 - `BitBrowser.exe` 进程规则与现有 11 条比特浏览器域名保持不变。
 
 ## iPhone / Shadowrocket 实际验收
 
 1. 确认实际订阅为 `Shadowrocket_Johnshall_AI.conf`，路由模式采用该配置；代理节点名称必须与 `config/user-settings.json` 的备注完全相符。
-2. 在连接日志中逐一核对 `chatgpt.com`、`api.openai.com`、`files.oaiusercontent.com`、`claude.ai`、`api.anthropic.com`、`platform.claude.com`、`gemini.google.com` 是否命中 **西雅图**。可选遥测域名没有实际请求时不必人为触发。
+2. 在连接日志中逐一核对 `chatgpt.com`、`api.openai.com`、`files.oaiusercontent.com`、`claude.ai`、`api.anthropic.com`、`platform.claude.com`、`gemini.google.com` 是否命中 **台湾 AI 节点**。可选遥测域名没有实际请求时不必人为触发。
 3. 核对普通 `mail.google.com`、`drive.google.com` 等未进入 *AI 专用层*；它们是否走新加坡或直连由 Johnshall 自身决定。
 4. 检查实际连接记录中的 DNS、IPv4/IPv6、UDP、WebSocket 路径及真实节点出口。对 Voice 的 UDP 3478 使用官方目的 IP 规则核查，不使用全网 UDP 3478 通配规则。
-5. **故障验收**：在可控条件下使西雅图节点不可达，但保持客户端运行。测试关键 AI 请求是否失败，并从连接日志或网络抓包确定没有通过手机本机出口成功连接。随后恢复节点。仅看到 VPN 图标或「自动重连」不足以证明 Kill Switch；如果 iOS 上无法确认断线阻断，不能把当前分流配置视为零泄漏方案。
+5. **故障验收**：在可控条件下使台湾 AI 节点节点不可达，但保持客户端运行。测试关键 AI 请求是否失败，并从连接日志或网络抓包确定没有通过手机本机出口成功连接。随后恢复节点。仅看到 VPN 图标或「自动重连」不足以证明 Kill Switch；如果 iOS 上无法确认断线阻断，不能把当前分流配置视为零泄漏方案。
 
 ## Windows / v2rayN 实际验收
 
-1. 导入 `v2rayN_Johnshall_AI.json` 为**自定义路由规则数组**，选择实际期望的活动节点；本 JSON 不携带服务器信息，也不指定西雅图。
+1. 导入 `v2rayN_Johnshall_AI.json` 为**自定义路由规则数组**，选择实际期望的活动节点；本 JSON 不携带服务器信息，也不指定台湾 AI 节点。
 2. 检查 TUN 与系统代理捕获方式、DNS 与 IPv6，确认应用 / CLI / 子进程确实被路由。Windows 上的 `BitBrowser.exe` 进程匹配依赖实际内核及进程识别能力；不要添加通用 `chrome.exe`、`node.exe` 或 `firefox.exe`。
-3. 核对 `api.anthropic.com`、`claude.ai`、`chatgpt.com`、`api.openai.com` 的有效规则为 `proxy`；确认实际选中的代理出口，不要把 JSON 的 `proxy` 标签当成已经选择西雅图的证明。
+3. 核对 `api.anthropic.com`、`claude.ai`、`chatgpt.com`、`api.openai.com` 的有效规则为 `proxy`；确认实际选中的代理出口，不要把 JSON 的 `proxy` 标签当成已经选择台湾 AI 节点的证明。
 4. Claude Code 支持 `HTTP_PROXY` / `HTTPS_PROXY`，但**不直接支持 SOCKS 代理**。检查启动时的环境变量和 `NO_PROXY`；后台 agent 的代理环境应通过用户级或托管设置继承，而不能只依赖某次 shell 的临时变量。不要把密码写入仓库。参考 [Claude Code 官方网络配置](https://code.claude.com/docs/en/network-config)。
 5. **故障验收**：停用实际代理节点（保留 TUN / 进程捕获），核对关键 AI 请求不能回落到 Windows 本地直连；必要时在 Windows 防火墙设置按程序阻断直连，但先确认不会造成 v2rayN 内核路由环路或阻断代理本身。检查主进程、后台 agent、DNS 和 IPv6，避免只看浏览器出口检测网站。
 
