@@ -29,6 +29,18 @@ class ConversionTests(unittest.TestCase):
         self.assertNotEqual(core.as_match('DOMAIN', 'browser-intake-us5-datadoghq.com'),
                             ('domain', 'domain:datadoghq.com'))
 
+    def test_chatgpt_webpubsub_pattern_does_not_cross_dns_label(self):
+        import re
+        field, value = core.as_match(
+            'DOMAIN-WILDCARD', 'chatgpt-async-webps-prod-*.webpubsub.azure.com')
+        self.assertEqual(field, 'domain')
+        regex = re.compile(value.removeprefix('regexp:'))
+        self.assertTrue(regex.fullmatch('chatgpt-async-webps-prod-xyz-12.webpubsub.azure.com'))
+        for wrong in ('chatgpt-async-webps-prod-x.y.webpubsub.azure.com',
+                      'chatgpt-async-webps-prod-.webpubsub.azure.com',
+                      'chatgpt-async-webps-prod-x.webpubsub.azure.com.bad.test'):
+            self.assertIsNone(regex.fullmatch(wrong))
+
     def test_ipv4_ipv6_geo_and_no_resolve(self):
         self.assertEqual(core.parse_rule('IP-CIDR,8.8.8.0/24,Proxy,no-resolve'),
                          ('ip', '8.8.8.0/24', 'proxy'))
