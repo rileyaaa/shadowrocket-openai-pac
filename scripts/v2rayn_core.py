@@ -204,8 +204,6 @@ def load_processes(text: str) -> list[str]:
             raise ValueError('Generic browsers must never be routed as BitBrowser')
         if value not in results:
             results.append(value)
-    if 'BitBrowser.exe' not in results:
-        raise ValueError('Required BitBrowser.exe process route missing')
     return results
 
 
