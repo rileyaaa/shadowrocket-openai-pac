@@ -18,6 +18,7 @@ import time
 import urllib.request
 from urllib.parse import quote
 import review_queue
+import v2rayn_core as johnshall_semantics
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_URL = "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
@@ -380,6 +381,59 @@ def voice_address_counts(rules: list[str]) -> dict[str, int]:
     }
 
 
+
+
+def _voice_intervals(rules: set[str]) -> dict[int, list[tuple[int, int]]]:
+    """Canonical, non-overlapping inclusive address intervals per IP family."""
+    networks: dict[int, list] = {4: [], 6: []}
+    for rule in rules:
+        pieces = rule.split(',')
+        if len(pieces) < 2 or pieces[0] not in ('IP-CIDR', 'IP-CIDR6'):
+            raise ValueError(f'Invalid Voice baseline rule: {rule}')
+        network = ipaddress.ip_network(pieces[1], strict=True)
+        if (pieces[0] == 'IP-CIDR6') != (network.version == 6):
+            raise ValueError(f'Invalid Voice baseline IP family: {rule}')
+        networks[network.version].append(network)
+    return {
+        family: [(int(net.network_address), int(net.broadcast_address))
+                 for net in ipaddress.collapse_addresses(networks[family])]
+        for family in (4, 6)
+    }
+
+
+def validate_voice_interval_overlap(previous: set[str], current: set[str]) -> None:
+    """Reject near-total replacement, but accept equivalent CIDR re-partitioning."""
+    if not previous:
+        return
+    old_intervals = _voice_intervals(previous)
+    new_intervals = _voice_intervals(current)
+    for family in (4, 6):
+        old_rows = old_intervals[family]
+        new_rows = new_intervals[family]
+        old_total = sum(right - left + 1 for left, right in old_rows)
+        new_total = sum(right - left + 1 for left, right in new_rows)
+        if old_total and not new_total:
+            raise ValueError(f'VOICE COVERAGE ANOMALY: IPv{family} destination family removed')
+        if not old_total or not new_total:
+            continue
+        intersection = 0
+        i = j = 0
+        while i < len(old_rows) and j < len(new_rows):
+            left = max(old_rows[i][0], new_rows[j][0])
+            right = min(old_rows[i][1], new_rows[j][1])
+            if left <= right:
+                intersection += right - left + 1
+            if old_rows[i][1] < new_rows[j][1]:
+                i += 1
+            else:
+                j += 1
+        if intersection * 2 < min(old_total, new_total):
+            raise ValueError(
+                f'VOICE COVERAGE ANOMALY: IPv{family} address overlap '
+                f'{intersection}/{min(old_total, new_total)}; review needed')
+
+
+
 def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool) -> dict[str, int]:
     current = voice_address_counts(ips)
     if not has_baseline:
@@ -405,19 +459,10 @@ def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool
                 f"added({len(added)}): {', '.join(added[:80])}; "
                 f"removed({len(removed)}): {', '.join(removed[:80])}"
             )
-    # Raw address counts alone are not a coverage guarantee. A same-size
-    # replacement of all official Voice destinations must require review.
+    # Compare actual IP destination coverage, not textual CIDR partitions.
     previous_voice = {','.join(rule.split(',')[:2]) for rule in active_auto_rules(old_auto)
                       if rule.startswith(('IP-CIDR,', 'IP-CIDR6,'))}
-    new_voice = set(ips)
-    if previous_voice and new_voice:
-        overlap = len(previous_voice & new_voice)
-        if overlap < min(len(previous_voice), len(new_voice)) * .50:
-            raise ValueError(
-                f'VOICE COVERAGE ANOMALY: address overlap {overlap}/'
-                f'{min(len(previous_voice), len(new_voice))}; '
-                'official destination set changed substantially; manual review required'
-            )
+    validate_voice_interval_overlap(previous_voice, set(ips))
     return current
 
 
@@ -634,6 +679,12 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         raise ValueError("Johnshall MITM hostname setting is missing")
     general_lines = [line for line in general.splitlines()
                      if not ("=" in line and line.partition("=")[0].strip() in DNS_KEYS)]
+    # Audit the *effective* parsed rules before changing output policy names.
+    # This also rejects unrecognized active types/actions, a collapsed set of
+    # ordinary proxy destinations, malformed modifiers and early FINAL.
+    # It does not reorder or remove any Shadowrocket source rule.
+    johnshall_semantics.johnshall_entries(
+        original_rules, rulesets or {}, inline_ruleset)
     changed = []
     converted = 0
     before_ads = 0
