@@ -218,6 +218,13 @@ class VoiceAndBitBrowserTests(unittest.TestCase):
 
 
 class PublishAndReportTests(unittest.TestCase):
+    def setUp(self):
+        # CI executes pull_request merges; publication behavior is tested as
+        # a simulated authenticated main workflow without touching Git.
+        ctx = patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'})
+        ctx.start()
+        self.addCleanup(ctx.stop)
+
     def status_file(self, root):
         p = Path(root) / 'status.json'
         p.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
