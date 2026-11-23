@@ -78,6 +78,14 @@ jobs:
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
+          # Telegram success is NOT proof of a successful GitHub publication.
+          python - "$RUNNER_TEMP/dual-status.json" <<'PY'
+          import json, sys
+          state = json.load(open(sys.argv[1], encoding='utf-8'))
+          if not state.get('publish', {}).get('success'):
+              print('::error::Refusing receipt write after failed publication.')
+              sys.exit(1)
+          PY
           # A failed publisher may leave unrelated staged files behind.
           # Never let receipt persistence accidentally publish those files.
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
