@@ -12,77 +12,107 @@
   "review_candidates": [
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,ant.dev",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,anthropic.team",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,antspace.dev",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,chatbotclaude.com",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,claudeacademy.com",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,claudemcpclient.com",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,claudepages.dev",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     },
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
+      "review_due_on": null,
+      "reviewed_at": null,
       "rule": "DOMAIN-SUFFIX,claudestudio.com",
       "service": "claude",
       "sources": [
         "claude_metacubex",
         "claude_v2fly"
-      ]
+      ],
+      "status": "pending"
     }
   ],
+  "review_counts": {
+    "cooling": 0,
+    "due": 0,
+    "pending": 8
+  },
+  "review_decisions_sha256": "a4ec6d6ebda62a9f32201c8b3ca16d120ee128367a701db22951f0435d15ff85",
   "schema_version": 1,
   "sources": {
     "acl4ssr": {

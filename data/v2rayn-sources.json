@@ -8,6 +8,7 @@
     "gemini_v2fly": 49
   },
   "inputs_sha256": {
+    "ai_review_decisions": "a4ec6d6ebda62a9f32201c8b3ca16d120ee128367a701db22951f0435d15ff85",
     "bitbrowser": "04ee0027298c0e51c8e7ec8f88523ad25446fa78673c062def1fced8e06b2302",
     "extra_openai": "0be1baabe869faf0d3e928852b3913bf4ab68c5637a27d7875952c5f2858ecfd",
     "manual_ai": "e5ea680f46b50bb4a8959ae9c38de8158e382db2b138298b3a75559128cabc4d",
