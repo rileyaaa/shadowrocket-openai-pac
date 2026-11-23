@@ -75,8 +75,9 @@ class ConversionTests(unittest.TestCase):
             core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
 
     def test_early_final_is_rejected(self):
-        source = '\n'.join(['FINAL,direct'] + ['DOMAIN,a.com,Proxy'] * 10001
-                           + ['DOMAIN,ads.example,REJECT'] * 20001)
+        source = '\n'.join(['FINAL,direct']
+                           + [f'DOMAIN,proxy{i}.example,Proxy' for i in range(10001)]
+                           + [f'DOMAIN,ad{i}.example,REJECT' for i in range(20001)])
         with self.assertRaisesRegex(ValueError, 'FINAL must be the last'):
             core.johnshall_entries(source, {}, lambda x, _: [x], minimum_lines=1)
 
@@ -109,8 +110,7 @@ class ConversionTests(unittest.TestCase):
             core.load_processes('C:\\Program Files\\Google\\Chrome\\chrome.exe')
         with self.assertRaises(ValueError):
             core.load_processes('nonexistent')
-        with self.assertRaisesRegex(ValueError, 'BitBrowser.exe'):
-            core.load_processes('# only a comment')
+        self.assertEqual(core.load_processes('# only a comment'), [])
 
     def test_bitbrowser_list_status_provenance(self):
         entries = core.load_bitbrowser_domains(builder.BITBROWSER.read_text(encoding='utf-8'))
@@ -161,6 +161,25 @@ class ConversionTests(unittest.TestCase):
 
 
 class SafetyTests(unittest.TestCase):
+    def setUp(self):
+        # Unit tests simulate a legitimate main release rather than PR CI.
+        env = patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_publish_rejects_non_main(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'status.json'
+            path.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
+                                        'v2rayn': {'exit_code': 0}}))
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true',
+                                           'GITHUB_REF': 'refs/heads/test'}):
+                with patch.object(publish, 'git') as git:
+                    publish.publish(path)
+                    git.assert_not_called()
+            self.assertIn('Refusing publish outside refs/heads/main',
+                          json.loads(path.read_text())['publish']['error'])
+
     def test_independent_size_guards(self):
         present = {name: 1000 for name in
                    ('johnshall_lines', 'johnshall_proxy_rules', 'johnshall_block_rules',
@@ -253,7 +272,7 @@ class SafetyTests(unittest.TestCase):
                  'publish': {'success': True, 'state': 'published'}}
         msg = notify.emit_message(state, None, {}, when='2026-11-23 11:00',
                                   event='schedule', run_url='')
-        self.assertIn('总体状态：失败', msg)
+        self.assertIn('总体状态：部分成功', msg)
 
     def test_telegram_missing_secret_does_not_ack(self):
         with tempfile.TemporaryDirectory() as tmp:
