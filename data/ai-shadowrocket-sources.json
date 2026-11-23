@@ -1,14 +1,14 @@
 {
   "ai_counts": {
-    "claude_domains": 19,
+    "claude_domains": 20,
     "claude_metacubex": 21,
     "claude_v2fly": 21,
     "gemini_domains": 51,
     "gemini_metacubex": 49,
     "gemini_v2fly": 49
   },
-  "manual_ai_sha256": "f6e376dbde532d3043b91bbf10ae97a548eda70f513a7911ec47b46eab93b9ad",
-  "output_sha256": "405fafdbc451750bc15c8eb829236a1da01c41225b982900fb4342209a9a1b1f",
+  "manual_ai_sha256": "c6cd98930af28c0e58d7ba2ee3c125503f3a7f806cf192f7a231053373305a02",
+  "output_sha256": "41b69213a3a254e70cdf2fee8be54725ce179663c32a120e67ca2a63b0baf232",
   "review_candidates": [
     {
       "reason": "Unverified shared host or unapproved domain; not automatically routed",
