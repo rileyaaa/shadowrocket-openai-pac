@@ -192,6 +192,14 @@ class SafetyTests(unittest.TestCase):
             self.assertIn('Refusing publish outside refs/heads/main',
                           json.loads(path.read_text())['publish']['error'])
 
+    def test_voice_equal_count_replacement_needs_review(self):
+        old = {f'IP-CIDR,4.4.4.{i}/32' for i in range(1, 6)}
+        builder.validate_voice_overlap(old, old)
+        with self.assertRaisesRegex(ValueError, 'VOICE COVERAGE ANOMALY'):
+            builder.validate_voice_overlap(
+                old, {f'IP-CIDR,9.9.9.{i}/32' for i in range(1, 6)})
+        builder.validate_voice_overlap(set(), old)  # one-time baseline migration
+
     def test_independent_size_guards(self):
         present = {name: 1000 for name in
                    ('johnshall_lines', 'johnshall_proxy_rules', 'johnshall_block_rules',
