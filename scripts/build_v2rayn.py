@@ -43,8 +43,8 @@ def download(url: str, minimum: int = 50) -> bytes:
     for attempt in range(2):
         try:
             with urllib.request.urlopen(request, timeout=75) as response:
-                if response.status != 200:
-                    raise ValueError(f'Unexpected HTTP status {response.status} for {url}')
+                if response.status != 200 or response.headers.get('Content-Range'):
+                    raise ValueError(f'Unexpected HTTP status / partial response {response.status} for {url}')
                 length = response.headers.get('Content-Length')
                 if length is not None and not re.fullmatch(r'[0-9]+', length.strip()):
                     raise ValueError('Invalid Content-Length')
@@ -109,6 +109,52 @@ def atomically_write(path: Path, content: bytes) -> None:
             os.unlink(name)
 
 
+def load_published_baseline() -> tuple[bytes | None, dict | None]:
+    """Only an intact existing v1/v2 release may be used for the next baseline."""
+    has_output, has_state = CONFIG.is_file(), STATE.is_file()
+    if not has_output and not has_state:
+        return None, None  # genuine first initialization
+    if not has_output or not has_state:
+        raise ValueError('Incomplete published v2rayN baseline: output/state file missing')
+    before = CONFIG.read_bytes()
+    old = json.loads(STATE.read_text(encoding='utf-8'))
+    if not isinstance(old, dict) or old.get('schema_version') not in (1, 2):
+        raise ValueError('Unknown published v2rayN state version')
+    for key in ('statistics', 'sources', 'ai_counts', 'inputs_sha256'):
+        if not isinstance(old.get(key), dict) or not old[key]:
+            raise ValueError('Incomplete published v2rayN baseline: missing ' + key)
+    digest = old.get('output_sha256')
+    if not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest):
+        raise ValueError('Missing published v2rayN output_sha256')
+    if hashlib.sha256(before).hexdigest() != digest:
+        raise ValueError('Previous v2rayN output/state digest mismatch')
+    voice = old.get('voice_rules')
+    if not isinstance(voice, list) or len(voice) < 5 or not all(
+            isinstance(rule, str) and rule.startswith(('IP-CIDR,', 'IP-CIDR6,'))
+            for rule in voice):
+        raise ValueError('Missing published v2rayN voice_rules baseline')
+    if len(set(voice)) != len(voice):
+        raise ValueError('Duplicate entries in published v2rayN Voice baseline')
+    # The previous v1 counted input domains; migrate only known fully approved
+    # v1 snapshots, not an unverified/partially filtered input list.
+    if old['schema_version'] == 1:
+        old_stats = old['statistics']
+        expected = old_stats.get('bitbrowser_domains')
+        total_approved = (old_stats.get('official_bitbrowser_domains', -1) +
+                          old_stats.get('user_requested_bitbrowser_domains', -1))
+        if type(expected) is not int or expected != total_approved:
+            raise ValueError('Unrecognized v2rayN v1 BitBrowser baseline; manual review required')
+    elif type(old['statistics'].get('bitbrowser_effective_domains')) is not int:
+        raise ValueError('Missing published v2rayN effective BitBrowser baseline')
+    return before, old
+
+
+def selected_bitbrowser_domains(entries: list[tuple[str, str, str]]) -> list[str]:
+    """Only previously approved entries are emitted; input count is advisory."""
+    return sorted({host for host, confidence, _ in entries
+                   if confidence in ('official', 'user')})
+
+
 def safety_check(stats: dict, old: dict | None) -> None:
     if old is None:
         return
@@ -120,10 +166,12 @@ def safety_check(stats: dict, old: dict | None) -> None:
         ('johnshall_block_rules', .85, 1.50), ('voice_prefixes', .70, 2.00),
         ('voice_ipv4_addresses', .70, 2.00), ('voice_ipv6_addresses', .70, 2.00),
         ('auto_domains', .75, 2.00), ('manual_domains', .75, 2.00),
-        ('bitbrowser_domains', .75, 2.00), ('domain_rules', .80, 1.50),
+        ('bitbrowser_effective_domains', .75, 2.00), ('domain_rules', .80, 1.50),
         ('ip_rules', .70, 2.00), ('block_rules', .85, 1.50),
     ):
-        before, now = previous.get(key), stats.get(key)
+        before = (previous.get('bitbrowser_domains') if key == 'bitbrowser_effective_domains'
+                  and old.get('schema_version') == 1 else previous.get(key))
+        now = stats.get(key)
         if type(before) is not int or type(now) is not int or before < 0 or now < 0:
             raise ValueError(f'Invalid v2rayN baseline statistic: {key}')
         if before == 0:
@@ -150,6 +198,7 @@ def run(argv: list[str] | None = None) -> dict:
     p.add_argument('--ruleset-dir', type=Path)
     args = p.parse_args(argv)
 
+    before, old = load_published_baseline()
     original = args.upstream_file.read_bytes() if args.upstream_file else download(legacy.BASE_URL, 1_000_000)
     voice_raw = args.voice_file.read_bytes() if args.voice_file else download(legacy.VOICE_URL)
     fetched = {'johnshall': (legacy.BASE_URL, original),
@@ -179,8 +228,11 @@ def run(argv: list[str] | None = None) -> dict:
     openai_entries = [(*core.as_match(*rule.split(',', 1)), 'proxy') for rule in all_openai]
     extra = parse_user_extra(OPENAI_EXTRA.read_text(encoding='utf-8'))
     bitbrowser = core.load_bitbrowser_domains(BITBROWSER.read_text(encoding='utf-8'))
+    effective_bitbrowser = selected_bitbrowser_domains(bitbrowser)
+    if not effective_bitbrowser:
+        raise ValueError('All approved BitBrowser domains removed; explicit review required')
     bit_entries = [(*core.as_match('DOMAIN-SUFFIX', name), 'proxy')
-                   for name, confidence, _ in bitbrowser if confidence in ('official', 'user')]
+                   for name in effective_bitbrowser]
     processes = core.load_processes(PROCESSES.read_text(encoding='utf-8'))
     proc_entries = [('process', path, 'proxy') for path in processes]
     if 'BitBrowser.exe' not in processes:
@@ -225,10 +277,14 @@ def run(argv: list[str] | None = None) -> dict:
     voice_counts = legacy.voice_address_counts(voice)
     original_stats = {**johnshall_stats, **voice_counts, 'voice_prefixes': len(voice),
                       'auto_domains': len(auto), 'manual_domains': len(manual),
-                      'openai_user_extras': len(extra), 'bitbrowser_domains': len(bitbrowser),
+                      'openai_user_extras': len(extra),
+                      'bitbrowser_domains': len(effective_bitbrowser),
+                      'bitbrowser_effective_domains': len(effective_bitbrowser),
+                      'bitbrowser_input_domains': len(bitbrowser),
+                      'bitbrowser_candidate_domains': sum(c in ('community', 'unverified') for _, c, _ in bitbrowser),
                       'official_bitbrowser_domains': sum(c == 'official' for _, c, _ in bitbrowser),
                       'user_requested_bitbrowser_domains': sum(c == 'user' for _, c, _ in bitbrowser),
-                      'unverified_bitbrowser_domains': sum(c != 'official' for _, c, _ in bitbrowser),
+                      'unverified_bitbrowser_domains': sum(c in ('community', 'unverified') for _, c, _ in bitbrowser),
                       'unparsed_community_rules_review_only': sum(len(x) for x in unparsed_sources.values()),
                       **ai['counts'], 'ai_review_candidates': len(ai['review_candidates'])}
     stats = core.validate_rules(rules, original_stats)
@@ -239,12 +295,6 @@ def run(argv: list[str] | None = None) -> dict:
     if json.loads(output) != rules:
         raise AssertionError('JSON serialization round-trip failed')
     stats['json_bytes'] = len(output)
-    before = CONFIG.read_bytes() if CONFIG.exists() else None
-    old = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
-    if before is not None and old is None:
-        raise ValueError('Existing v2rayN output has no baseline state; refusing reset')
-    if old and old.get('output_sha256') and hashlib.sha256(before or b'').hexdigest() != old['output_sha256']:
-        raise ValueError('Previous v2rayN output/state digest mismatch')
     safety_check(stats, old)
     # Independent v2rayN voice baseline (not read from Shadowrocket output).
     # Existing state without this field gets one migration baseline.
@@ -255,7 +305,7 @@ def run(argv: list[str] | None = None) -> dict:
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
     next_sources.update(ai['records'])
-    state = {'schema_version': 1, 'output_sha256': hashlib.sha256(output).hexdigest(),
+    state = {'schema_version': 2, 'output_sha256': hashlib.sha256(output).hexdigest(),
              'voice_rules': sorted(current_voice),
              'sources': next_sources, 'statistics': stats,
              'ai_counts': ai['counts'],
@@ -267,8 +317,6 @@ def run(argv: list[str] | None = None) -> dict:
                  'manual_ai': ai['manual_sha256'],
                  'ai_review_decisions': ai['review_decisions_sha256'],
              }}
-    if old and old.get('schema_version') != 1:
-        raise ValueError('Unknown previous v2rayN state format')
     changed = before != output
     source_changes = [name for name, value in next_sources.items()
                       if value != (old or {}).get('sources', {}).get(name)]
