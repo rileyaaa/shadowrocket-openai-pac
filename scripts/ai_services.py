@@ -72,7 +72,7 @@ def check_hostname(value: str) -> str:
 
 
 def parse_feed(text: str, fmt: str, service: str) -> list[tuple[str, str]]:
-    if fmt not in ('v2fly', 'meta') or service not in SOURCES['gemini_v2fly'][0:1] + ('claude',):
+    if fmt not in ('v2fly', 'meta') or service not in ('gemini', 'claude'):
         raise ValueError('Unknown Gemini/Claude feed format or service')
     rows = []
     for line in text.lstrip('\ufeff').splitlines():

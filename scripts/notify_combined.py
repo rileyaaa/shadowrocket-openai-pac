@@ -42,7 +42,7 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
              f'📤 GitHub 发布：{status.get("publish", {}).get("state", "未执行")}', '']
-    sections = [('shadowrocket', '🚀 Shadowrocket 原有 OpenAI', shadow)]
+    sections = [('shadowrocket', '🚀 Shadowrocket 小火箭（原有 OpenAI）', shadow)]
     if 'shadowrocket_ai' in status:
         sections.append(('shadowrocket_ai', '🚀 Shadowrocket OpenAI + Gemini + Claude', shadow_ai))
     sections.append(('v2rayn', '💻 v2rayN', v2))
