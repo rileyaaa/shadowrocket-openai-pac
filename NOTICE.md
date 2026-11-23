@@ -1,6 +1,6 @@
 # 上游规则授权和署名
 
-本项目生成的 `Shadowrocket_Johnshall_OpenAI.conf` 包含对 Johnshall 原有 Shadowrocket 规则文件的修改与再发布。
+本项目正式维护的 `Shadowrocket_Johnshall_AI.conf` 与 `v2rayN_Johnshall_AI.json` 均包含对 Johnshall 原始分流规则的转换、修改与再发布。旧版 `Shadowrocket_Johnshall_OpenAI.conf` 不再作为正式订阅交付。
 
 - 上游项目：https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever
 - 上游文件：https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/blob/release/sr_top500_banlist_ad.conf
