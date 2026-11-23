@@ -205,9 +205,10 @@ class SafetyTests(unittest.TestCase):
                    ('johnshall_lines', 'johnshall_proxy_rules', 'johnshall_block_rules',
                     'voice_prefixes', 'voice_ipv4_addresses', 'voice_ipv6_addresses',
                     'auto_domains', 'manual_domains', 'bitbrowser_domains',
+                    'bitbrowser_effective_domains',
                     'domain_rules', 'ip_rules', 'block_rules')}
         builder.safety_check(present, None)
-        baseline = {'statistics': deepcopy(present)}
+        baseline = {'schema_version': 2, 'statistics': deepcopy(present)}
         builder.safety_check(present, baseline)
         altered = deepcopy(present)
         altered['johnshall_block_rules'] = 300
@@ -292,7 +293,7 @@ class SafetyTests(unittest.TestCase):
                  'publish': {'success': True, 'state': 'published'}}
         msg = notify.emit_message(state, None, {}, when='2026-11-23 11:00',
                                   event='schedule', run_url='')
-        self.assertIn('总体状态：部分成功', msg)
+        self.assertIn('总体状态：失败', msg)
 
     def test_telegram_missing_secret_does_not_ack(self):
         with tempfile.TemporaryDirectory() as tmp:
