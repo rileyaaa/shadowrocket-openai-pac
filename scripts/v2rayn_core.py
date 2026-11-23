@@ -109,6 +109,8 @@ def johnshall_entries(source: str, rulesets: dict[str, list[str]], inline_rulese
         raise ValueError(f'Johnshall upstream unexpectedly small: {len(lines)}')
     blocked, ordinary, unsupported = [], [], []
     proxy, ads, finals, embedded = 0, 0, 0, 0
+    final_line = None
+    last_active_line = None
     for line_number, raw in enumerate(lines, 1):
         try:
             expanded = inline_ruleset(raw, rulesets)
@@ -121,8 +123,10 @@ def johnshall_entries(source: str, rulesets: dict[str, list[str]], inline_rulese
                 entry = parse_rule(item)
                 if entry is None:
                     continue
+                last_active_line = line_number
                 if entry[0] == 'FINAL':
                     finals += 1
+                    final_line = line_number
                     continue
                 field, value, action = entry
                 if action == 'block':
@@ -139,6 +143,8 @@ def johnshall_entries(source: str, rulesets: dict[str, list[str]], inline_rulese
             break
     if unsupported:
         raise UnsupportedRule('Unsupported Johnshall rules (publication aborted): ' + '; '.join(unsupported))
+    if finals == 1 and final_line != last_active_line:
+        raise ValueError('Johnshall FINAL must be the last effective routing rule')
     if finals != 1 or proxy < 10000 or ads < 20000:
         raise ValueError(f'Johnshall guard failed: FINAL={finals} proxy={proxy} block={ads}')
     return blocked, ordinary, {'johnshall_lines': len(lines), 'johnshall_proxy_rules': proxy,
@@ -192,6 +198,8 @@ def load_processes(text: str) -> list[str]:
             raise ValueError('Generic browsers must never be routed as BitBrowser')
         if value not in results:
             results.append(value)
+    if 'BitBrowser.exe' not in results:
+        raise ValueError('Required BitBrowser.exe process route missing')
     return results
 
 
