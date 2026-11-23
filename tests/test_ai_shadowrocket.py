@@ -22,9 +22,9 @@ class DedicatedShadowrocketTests(unittest.TestCase):
         self.assertIn('DOMAIN-SUFFIX,gemini.google.com,Hinet🇹🇼台湾,force-remote-dns',result)
         self.assertIn('DOMAIN-SUFFIX,claude.ai,Hinet🇹🇼台湾,force-remote-dns',result)
         self.assertIn('DOMAIN,browser-intake-us5-datadoghq.com,Hinet🇹🇼台湾,force-remote-dns',result)
-        self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com,ExampleOpenAI', result)
+        self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com,Hinet🇹🇼台湾', result)
         self.assertTrue(result.index('DOMAIN,chatgpt.com,ExampleOpenAI') <
-                        result.index('DOMAIN-SUFFIX,gemini.google.com,ExampleOpenAI') <
+                        result.index('DOMAIN-SUFFIX,gemini.google.com,Hinet🇹🇼台湾') <
                         result.index('DOMAIN,google.com,DIRECT'))
         self.assertEqual(result.count('FINAL,direct'),1)
         self.assertEqual(base.count('DOMAIN-SUFFIX,gemini.google.com'),0)
