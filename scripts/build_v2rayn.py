@@ -238,11 +238,19 @@ def run(argv: list[str] | None = None) -> dict:
     if old and old.get('output_sha256') and hashlib.sha256(before or b'').hexdigest() != old['output_sha256']:
         raise ValueError('Previous v2rayN output/state digest mismatch')
     safety_check(stats, old)
+    # Independent v2rayN voice baseline (not read from Shadowrocket output).
+    # Existing state without this field gets one migration baseline.
+    previous_voice = set(old.get('voice_rules', [])) if old else set()
+    current_voice = set(voice)
+    if previous_voice and current_voice and (
+            len(previous_voice & current_voice) < min(len(previous_voice), len(current_voice)) * .50):
+        raise ValueError('V2RAYN VOICE COVERAGE ANOMALY: official destination set replaced')
     ai_services.validate_safety(ai['counts'], old)
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
     next_sources.update(ai['records'])
     state = {'schema_version': 1, 'output_sha256': hashlib.sha256(output).hexdigest(),
+             'voice_rules': sorted(current_voice),
              'sources': next_sources, 'statistics': stats,
              'ai_counts': ai['counts'],
              'inputs_sha256': {
