@@ -35,8 +35,33 @@ jobs:
         run: python -B -m unittest discover -s tests -v
       - name: Verify live upstreams and regenerate both outputs without publication
         run: |
+          python - <<'PY' > "$RUNNER_TEMP/before-build.json"
+          import hashlib, json
+          from pathlib import Path
+          def snapshot(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          print(json.dumps({
+              'shadow': snapshot('Shadowrocket_Johnshall_AI.conf'),
+              'v2rayn': snapshot('v2rayN_Johnshall_AI.json'),
+              'shadow_sources': json.loads(Path('data/ai-shadowrocket-sources.json').read_text())['sources'],
+              'v2rayn_sources': json.loads(Path('data/v2rayn-sources.json').read_text())['sources'],
+          }, sort_keys=True))
+          PY
           python scripts/build_ai_shadowrocket.py --report-file "$RUNNER_TEMP/shadowrocket-smoke.json"
           python scripts/build_v2rayn.py --report-file "$RUNNER_TEMP/v2rayn-smoke.json"
+          python - "$RUNNER_TEMP/before-build.json" <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          before = json.loads(Path(sys.argv[1]).read_text())
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+          sr = json.loads(Path('data/ai-shadowrocket-sources.json').read_text())
+          v2 = json.loads(Path('data/v2rayn-sources.json').read_text())
+          if sr['sources'] == before['shadow_sources']:
+              assert digest('Shadowrocket_Johnshall_AI.conf') == before['shadow'], 'Healthy Shadowrocket output unexpectedly changed'
+          if v2['sources'] == before['v2rayn_sources']:
+              assert digest('v2rayN_Johnshall_AI.json') == before['v2rayn'], 'Healthy v2rayN output unexpectedly changed'
+          PY
           python - <<'PY'
           import json
           from pathlib import Path
