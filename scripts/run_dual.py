@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independently run the two builders; never conceal either exit status."""
+"""Independently run original Shadowrocket, AI Shadowrocket and v2rayN builds."""
 from __future__ import annotations
 import argparse
 import json
@@ -29,6 +29,7 @@ def main() -> int:
     args.work_dir.mkdir(parents=True, exist_ok=True)
     legacy_report = args.work_dir / 'shadowrocket-report.json'
     v2_report = args.work_dir / 'v2rayn-report.json'
+    ai_report = args.work_dir / 'shadowrocket-ai-report.json'
     original_cases = ('test_build.py', 'test_hardening.py',
                       'test_review_queue.py', 'test_sync_reporting.py')
     original_results = [execute(f'Original test suite {pattern}',
@@ -44,19 +45,31 @@ def main() -> int:
     else:
         status['shadowrocket'] = execute('Shadowrocket build',
             [sys.executable, 'scripts/build.py', '--report-file', str(legacy_report)])
+    ai_tests = execute('Gemini and Claude source / Shadowrocket AI unit tests',
+        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
+         '-p', 'test_ai_*.py', '-v'])
+    if ai_tests['exit_code']:
+        status['shadowrocket_ai'] = {'exit_code': ai_tests['exit_code'],
+            'error': 'AI rules validation tests failed: ' + ai_tests['error']}
+    else:
+        status['shadowrocket_ai'] = execute('Independent AI-enhanced Shadowrocket build',
+            [sys.executable, 'scripts/build_ai_shadowrocket.py', '--report-file', str(ai_report)])
     tests = execute('v2rayN independent unit tests',
                     [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_v2rayn.py', '-v'])
-    if tests['exit_code'] != 0:
-        status['v2rayn'] = {'exit_code': tests['exit_code'],
-                            'error': 'v2rayN tests failed: ' + tests['error']}
+    if tests['exit_code'] != 0 or ai_tests['exit_code'] != 0:
+        status['v2rayn'] = {'exit_code': tests['exit_code'] or ai_tests['exit_code'],
+                            'error': 'v2rayN / shared AI rules tests failed: ' +
+                            (tests['error'] or ai_tests['error'])}
     else:
         status['v2rayn'] = execute('v2rayN independent build',
                [sys.executable, 'scripts/build_v2rayn.py', '--report-file', str(v2_report)])
-    status['reports'] = {'shadowrocket': str(legacy_report), 'v2rayn': str(v2_report)}
+    status['reports'] = {'shadowrocket': str(legacy_report),
+                         'shadowrocket_ai': str(ai_report), 'v2rayn': str(v2_report)}
     status['publish'] = {'success': False, 'state': 'pending'}
     status_path = args.work_dir / 'dual-status.json'
     status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Build status: Shadowrocket={status["shadowrocket"]["exit_code"]}, '
+          f'Shadowrocket AI={status["shadowrocket_ai"]["exit_code"]}, '
           f'v2rayN={status["v2rayn"]["exit_code"]}; saved {status_path}')
     return 0  # Publish & notification still run; final checker propagates failures.
 

@@ -1,4 +1,4 @@
-name: Sync Johnshall, OpenAI and v2rayN rules
+name: Sync Johnshall, OpenAI, Gemini, Claude and v2rayN rules
 
 on:
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
             args+=(--months "$REVIEW_MONTHS")
           fi
           python scripts/review_queue.py "${args[@]}"
-      - name: Independently build verified Shadowrocket and v2rayN outputs
+      - name: Independently build original Shadowrocket, AI Shadowrocket and v2rayN
         run: python scripts/run_dual.py --work-dir "$RUNNER_TEMP"
       - name: Publish only validated outputs in one Git push
         if: always()

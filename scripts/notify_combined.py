@@ -29,9 +29,11 @@ def read_json(path: str | None) -> dict | None:
 
 
 def emit_message(status: dict, shadow: dict | None, v2: dict | None,
-                 *, when: str, event: str, run_url: str) -> str:
+                 *, when: str, event: str, run_url: str,
+                 shadow_ai: dict | None = None) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
-              for key in ('shadowrocket', 'v2rayn')}
+              for key in ('shadowrocket', 'v2rayn', 'shadowrocket_ai')
+              if key in status or key != 'shadowrocket_ai'}
     published = status.get('publish', {}).get('success', False)
     complete = all(builds.values()) and published
     partial = any(builds.values())
@@ -40,8 +42,11 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
              f'📤 GitHub 发布：{status.get("publish", {}).get("state", "未执行")}', '']
-    for key, title, report in [('shadowrocket', '🚀 Shadowrocket 小火箭', shadow),
-                               ('v2rayn', '💻 v2rayN', v2)]:
+    sections = [('shadowrocket', '🚀 Shadowrocket 原有 OpenAI', shadow)]
+    if 'shadowrocket_ai' in status:
+        sections.append(('shadowrocket_ai', '🚀 Shadowrocket OpenAI + Gemini + Claude', shadow_ai))
+    sections.append(('v2rayn', '💻 v2rayN', v2))
+    for key, title, report in sections:
         build = status.get(key, {})
         success = build.get('exit_code') == 0 and report is not None
         lines += ['━━━━━━━━━━━━━━', title,
@@ -54,8 +59,9 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
             lines += ['发布：❌ 未成功推送 GitHub（仅本地构建成功）']
         else:
             changed_files = status.get('publish', {}).get('changed_files', [])
-            output = ('Shadowrocket_Johnshall_OpenAI.conf' if key == 'shadowrocket'
-                      else 'v2rayN_Johnshall_OpenAI.json')
+            output = {'shadowrocket': 'Shadowrocket_Johnshall_OpenAI.conf',
+                      'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
+                      'v2rayn': 'v2rayN_Johnshall_OpenAI.json'}[key]
             lines += [f'发布：{"✅ 已更新" if output in changed_files else "✅ 已检查，内容无变化"}']
         lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
         stats = report.get('statistics', {})
@@ -68,12 +74,24 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
                     lines.append(f'{label}：{stats[prop]}')
             lines += [f'自动规则新增/删除：{len(report.get("auto_added", []))}/'
                       f'{len(report.get("auto_removed", []))}']
+        elif key == 'shadowrocket_ai':
+            for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
+                                ('voice_prefixes', 'OpenAI Voice IP'),
+                                ('gemini_domains', 'Gemini 审核域名'),
+                                ('claude_domains', 'Claude 审核域名'),
+                                ('retained_ad_rules', '广告拦截'),
+                                ('conf_bytes', '订阅字节数')]:
+                if type(stats.get(prop)) is int:
+                    lines.append(f'{label}：{stats[prop]}')
+            lines.append(f'AI 待审核：{len(report.get("ai_review_candidates", []))}')
         else:
             for prop, label in [('routing_objects', '路由对象'), ('domain_rules', '域名规则'),
                                 ('ip_rules', 'IP 规则'), ('process_rules', '进程规则'),
                                 ('proxy_rules', '代理规则'), ('direct_rules', '直连规则'),
                                 ('block_rules', '拦截规则'), ('json_bytes', 'JSON 字节数'),
-                                ('bitbrowser_domains', 'BitBrowser 域名')]:
+                                ('bitbrowser_domains', 'BitBrowser 域名'),
+                                ('gemini_domains', 'Gemini 审核域名'),
+                                ('claude_domains', 'Claude 审核域名')]:
                 if type(stats.get(prop)) is int:
                     lines.append(f'{label}：{stats[prop]}')
             if stats.get('process_rules', 0) == 0:
@@ -91,6 +109,8 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
         lines.append('⚠️ Shadowrocket 审核报告缺失；没有确认或清除提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
+    if shadow_ai and shadow_ai.get('ai_review_candidates'):
+        lines.append(f'⚠️ Gemini/Claude 新候选待审：{len(shadow_ai["ai_review_candidates"])}，未自动批准')
     if v2 and v2.get('warnings'):
         lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
     if run_url:
@@ -114,13 +134,15 @@ def main() -> int:
         'publish': {'success': False, 'state': 'not-run'}}
     shadow = read_json(status.get('reports', {}).get('shadowrocket'))
     v2 = read_json(status.get('reports', {}).get('v2rayn'))
+    shadow_ai = read_json(status.get('reports', {}).get('shadowrocket_ai'))
     repo = os.environ.get('GITHUB_REPOSITORY', '')
     run_id = os.environ.get('GITHUB_RUN_ID', '')
     run_url = (f'{os.environ.get("GITHUB_SERVER_URL", "https://github.com")}/'
                f'{repo}/actions/runs/{run_id}') if repo and run_id else ''
     now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
     message = emit_message(status, shadow, v2, when=now,
-                           event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url)
+                           event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url,
+                           shadow_ai=shadow_ai)
     print(message)
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary_path:
@@ -133,6 +155,10 @@ def main() -> int:
                         f.write(f'\n### {key}\n\n')
                         for item in shadow[key]:
                             f.write('- ' + str(item.get('rule', '?')) + '\n')
+            if shadow_ai:
+                f.write('\n### Gemini / Claude 未批准新候选\n\n')
+                for item in shadow_ai.get('ai_review_candidates', []):
+                    f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])})\n')
             if v2:
                 for warning in v2.get('warnings', []):
                     f.write('\n- ⚠️ ' + str(warning) + '\n')

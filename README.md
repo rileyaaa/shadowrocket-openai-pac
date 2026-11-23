@@ -259,3 +259,41 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 - 在实际 Windows 主机上打开 v2rayN TUN 日志，检查 BitBrowser 主程序、专用子进程及普通 Chrome 的匹配路径：BitBrowser 访问 `bitbrowser.cn` 和国内网页应显示 `proxy`，普通 Chrome 访问国内网页仍按 Johnshall；已知广告应 `block`、localhost 应 `direct`。用浏览器查看出口 IPv4/IPv6、DNS 解析（DNS 泄漏测试）、WebRTC 公网候选地址，以及 UDP/QUIC 行为；同时核对 BitBrowser 内置代理出口，避免与 TUN 重复。无 Windows + TUN 实测前，不能声称全流量百分之百覆盖。
 
 官方 v2rayN 格式资料：[自定义路由规则说明](https://github.com/2dust/v2rayN/wiki/Description-of-custom-routing-rules)；BitBrowser 官方域名公告：[官方通知](https://www.bitbrowser.cn/blog/_gftz_btllqyhqzy__)；专用 `BitBrowser.exe` 子进程的社区资料：[指纹浏览器执行文件](https://doc.tkrmw.com/matrix/bitbrowser.html)。
+
+---
+
+## Gemini + Claude 每日自动维护（新增）
+
+保留原有 Shadowrocket OpenAI 双节点订阅与 `scripts/build.py` **完全不变**。另外生成独立 AI 增强订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅图`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。
+
+**Shadowrocket 全 AI 配置：**
+
+```text
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowrocket_Johnshall_AI.conf
+```
+
+旧 OpenAI 专用订阅 `Shadowrocket_Johnshall_OpenAI.conf` 继续独立正常更新；**要让 Gemini / Claude 也走西雅图，Shadowrocket 需改订阅为上方的新地址**。这不会强制改变当前设备已订阅的旧配置。
+
+**v2rayN 完整路由订阅（地址不变）：**
+
+```text
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_OpenAI.json
+```
+
+v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`，由 v2rayN 当前活动节点决定出口；`direct` 和 `block` 按原分流语义处理。需要重新从 URL 导入或按客户端能力刷新已有订阅，GitHub 每日更新不代表客户端自动刷新。
+
+### 来源和审核边界
+
+每天台北时间 **11:00（03:00 UTC）**，现有单一 GitHub Actions 排程独立运行：
+
+- 原始 Shadowrocket：`scripts/build.py`，原有七来源及人工审核保持不变。
+- 新 Shadowrocket 全 AI：`scripts/build_ai_shadowrocket.py`，重新独立抓取原七来源，并叠加 Gemini / Claude 独立审核层。
+- v2rayN：`scripts/build_v2rayn.py`，独立重抓七来源与四个新增 AI 来源；不读取其他生成订阅。
+
+Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/google-gemini.list`；Claude：v2fly `data/anthropic` 与 MetaCubeX `geo/geosite/anthropic.list`。**MetaCubeX 主要是衍生格式，不能当作完全独立的域名归属证据。** 每次记录各来源 SHA-256、数量和变化，在新来源异常缩减、缺失、语法变化时保留上一版有效输出。生成文件由 Action 提交，不直接手改。
+
+`config/ai-services.rules` 记录官方文档支持的精确共享主机补充（例如 Gemini 的特定登录/API 和 Claude Code）；`scripts/ai_services.py` 中明示哪些专用后缀和共享精确域名获准自动同步。来源首次出现的新共享供应商主机或不明域名进入 `data/ai-review-queue.md`，**不自动代理**。未经核实不要将整个 `googleapis.com`、`gstatic.com`、`sentry.io`、Google IP / ASN 纳入。广告追踪主机不会因为出现在 Gemini 官方防火墙文档里就自动跳过原广告拦截；v2rayN 保留广告规则高优先级。当前包含少量官方确认的共享精确主机，可能也让其他 Google 功能走西雅图，此行为刻意接受以优先满足 Gemini 使用。
+
+GitHub Actions 分别记录三套真实构建状态、独立安全发布、失败保留旧配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
+
+此订阅覆盖经审核的域名和已知共享依赖，不保证 Chrome / 桌面客户端的所有 DNS、WebSocket、WebRTC、IPv6、UDP 一定经过代理。请使用客户端连接日志和实际出口 IP 验证 Gemini 网页、AI Studio、Claude 网页、Claude Code、登录和文件上传。Shadowrocket 的 URL Rewrite / MITM 与 v2rayN 路由规则功能不同，不承诺完全等价。

@@ -22,6 +22,7 @@ import urllib.request
 
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
+import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / 'v2rayN_Johnshall_OpenAI.json'
@@ -173,6 +174,12 @@ def run(argv: list[str] | None = None) -> dict:
     bit_entries = [(*core.as_match('DOMAIN-SUFFIX', name), 'proxy') for name, _, _ in bitbrowser]
     processes = core.load_processes(PROCESSES.read_text(encoding='utf-8'))
     proc_entries = [('process', path, 'proxy') for path in processes]
+    ai = ai_services.collect(download)
+    ai_entries = {
+        service: [(*core.as_match(*rule.split(',', 1)), 'proxy')
+                  for rule in ai['rules'][service]]
+        for service in ('gemini', 'claude')
+    }
 
     base = original.decode('utf-8-sig')
     if len(original) < 1_000_000 or len(base.splitlines()) < 50_000:
@@ -199,6 +206,8 @@ def run(argv: list[str] | None = None) -> dict:
              + core.compact(bit_entries, 'BitBrowser selected domains')
              + core.compact(voice_entries, 'OpenAI official Voice IPs')
              + core.compact(openai_entries + extra, 'OpenAI reviewed and user extras')
+             + core.compact(ai_entries['gemini'], 'Gemini approved rules')
+             + core.compact(ai_entries['claude'], 'Claude approved rules')
              + core.compact(ordinary, 'Johnshall original order')
              + [{'remarks': 'Johnshall FINAL direct', 'outboundTag': 'direct',
                  'port': '0-65535', 'enabled': True}])
@@ -207,7 +216,8 @@ def run(argv: list[str] | None = None) -> dict:
                       'auto_domains': len(auto), 'manual_domains': len(manual),
                       'openai_user_extras': len(extra), 'bitbrowser_domains': len(bitbrowser),
                       'unverified_bitbrowser_domains': sum(c == 'unverified' for _, c, _ in bitbrowser),
-                      'unparsed_community_rules_review_only': sum(len(x) for x in unparsed_sources.values())}
+                      'unparsed_community_rules_review_only': sum(len(x) for x in unparsed_sources.values()),
+                      **ai['counts'], 'ai_review_candidates': len(ai['review_candidates'])}
     stats = core.validate_rules(rules, original_stats)
     output = core.json_bytes(rules)
     if len(output) < 500_000 or len(output) > 13_000_000:
@@ -219,14 +229,18 @@ def run(argv: list[str] | None = None) -> dict:
     before = CONFIG.read_bytes() if CONFIG.exists() else None
     old = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
     safety_check(stats, old)
+    ai_services.validate_safety(ai['counts'], old)
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
+    next_sources.update(ai['records'])
     state = {'schema_version': 1, 'sources': next_sources, 'statistics': stats,
+             'ai_counts': ai['counts'],
              'inputs_sha256': {
                  'manual_openai': hashlib.sha256((ROOT / 'config/manual-openai.rules').read_bytes()).hexdigest(),
                  'bitbrowser': hashlib.sha256(BITBROWSER.read_bytes()).hexdigest(),
                  'extra_openai': hashlib.sha256(OPENAI_EXTRA.read_bytes()).hexdigest(),
                  'verified_processes': hashlib.sha256(PROCESSES.read_bytes()).hexdigest(),
+                 'manual_ai': ai['manual_sha256'],
              }}
     if old and old.get('schema_version') != 1:
         raise ValueError('Unknown previous v2rayN state format')
@@ -235,12 +249,14 @@ def run(argv: list[str] | None = None) -> dict:
                       if value != (old or {}).get('sources', {}).get(name)]
     report = {'build_success': True, 'config_changed': changed,
               'statistics': stats, 'changed_sources': source_changes,
+              'ai_review_candidates': ai['review_candidates'],
               'warnings': [
                   'URL Rewrite and MITM are not v2rayN routing rules and cannot be carried over.',
                   'REJECT variants map to block; no-resolve is not a portable Xray routing modifier.',
                   'Ad-block rules are intentionally prioritized ahead of Johnshall routing and BitBrowser.',
                   'BitBrowser process interception requires user-verified executable path and Windows TUN.',
                   'Browser-internal proxies, DNS, WebRTC and IPv6 need client-side testing.',
+                  'Gemini/Claude shared providers use exact host rules; new community-only candidates remain review-only.',
                   f'{sum(len(x) for x in unparsed_sources.values())} non-domain community source entries remain review-only, never auto-approved.',
               ]}
     # Mutate only v2rayN-owned artifacts, after all validations.

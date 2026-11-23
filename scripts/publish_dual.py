@@ -8,6 +8,8 @@ import subprocess
 
 SHADOW_FILES = ('Shadowrocket_Johnshall_OpenAI.conf', 'rules', 'data/sources.json',
                 'data/review-queue.md', 'data/review-notifications.json')
+SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf', 'data/ai-shadowrocket-sources.json',
+                   'data/ai-review-queue.md')
 V2_FILES = ('v2rayN_Johnshall_OpenAI.json', 'data/v2rayn-sources.json')
 REVIEW_FILES = ('config/review-decisions.json',)
 
@@ -28,9 +30,11 @@ def publish(path: Path) -> None:
     try:
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
-              for key in ('shadowrocket', 'v2rayn')}
+              for key in ('shadowrocket', 'shadowrocket_ai', 'v2rayn')}
         if ok['shadowrocket']:
             files += SHADOW_FILES
+        if ok['shadowrocket_ai']:
+            files += SHADOW_AI_FILES
         if ok['v2rayn']:
             files += V2_FILES
         git('add', '-A', '--', *files)
@@ -43,7 +47,7 @@ def publish(path: Path) -> None:
             return
         git('config', 'user.name', 'github-actions[bot]')
         git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
-        git('commit', '-m', 'chore: sync validated Shadowrocket and v2rayN rules')
+        git('commit', '-m', 'chore: sync validated Shadowrocket and AI-enhanced v2rayN routes')
         commit = git('rev-parse', 'HEAD').stdout.strip()
         git('push', 'origin', 'HEAD:main')
         remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
@@ -65,14 +69,15 @@ def check(path: Path) -> int:
         print('::error::No build status was produced.')
         return 1
     status = json.loads(path.read_text(encoding='utf-8'))
-    failed = [key for key in ('shadowrocket', 'v2rayn')
-              if status.get(key, {}).get('exit_code') != 0]
+    failed = [key for key in ('shadowrocket', 'v2rayn', 'shadowrocket_ai')
+              if (key in status or key != 'shadowrocket_ai') and
+              status.get(key, {}).get('exit_code') != 0]
     if not status.get('publish', {}).get('success'):
         failed.append('publish')
     if failed:
         print(f'::error::Failed tasks: {", ".join(failed)}')
         return 1
-    print('Both builds validated; publication successful or unchanged.')
+    print('All present builds validated; publication successful or unchanged.')
     return 0
 
 
