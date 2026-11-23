@@ -39,10 +39,14 @@ class AIInputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ai.load_manual('GEMINI,DOMAIN,googleads.g.doubleclick.net\nCLAUDE,DOMAIN,api.anthropic.com')
         parsed=ai.load_manual(ai.MANUAL.read_text(encoding='utf-8'))
-        self.assertEqual(set(parsed['gemini']), {
-            'DOMAIN,jnn-pa.googleapis.com',
-            'DOMAIN,waa-pa.clients6.google.com',
-        })
+        self.assertIn('DOMAIN,jules.googleapis.com', parsed['gemini'])
+        self.assertIn('DOMAIN,antigravity.google.com', parsed['gemini'])
+        self.assertIn('DOMAIN,businessaicode.googleapis.com', parsed['gemini'])
+        self.assertIn('DOMAIN,notebooklm.cloud.google.com', parsed['gemini'])
+        for shared in ('jnn-pa.googleapis.com', 'waa-pa.clients6.google.com',
+                       'geller-pa.googleapis.com', 'proactivebackend-pa.googleapis.com'):
+            self.assertNotIn('DOMAIN,' + shared, parsed['gemini'])
+            self.assertNotIn(shared, ai.APPROVED_HOSTS['gemini'])
         self.assertNotIn('DOMAIN,accounts.google.com',parsed['gemini'])
         self.assertNotIn('DOMAIN,fonts.gstatic.com',parsed['gemini'])
         self.assertNotIn('DOMAIN,play.google.com',parsed['gemini'])
@@ -54,6 +58,20 @@ class AIInputTests(unittest.TestCase):
         self.assertIn('DOMAIN,browser-intake-us5-datadoghq.com', parsed['claude'])
         self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com', parsed['claude'])
         self.assertNotIn('DOMAIN-SUFFIX,sentry.io', parsed['claude'])
+
+    def test_claude_core_is_pinned_against_feed_removal(self):
+        pinned = set(ai.load_manual(ai.MANUAL.read_text(encoding='utf-8'))['claude'])
+        self.assertTrue(ai.MANDATORY['claude'].issubset(pinned))
+        self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com', pinned)
+
+    def test_rejected_under_approved_suffix_is_a_blocking_conflict(self):
+        approved = {'gemini': {'DOMAIN,antigravity.google.com'},
+                    'claude': {'DOMAIN-SUFFIX,claude.ai'}}
+        policy = {'rejected_rules': [{'service': 'claude', 'rule': 'DOMAIN,sub.claude.ai'}]}
+        with self.assertRaisesRegex(ValueError, 'approved/rejected rule conflict'):
+            ai.check_rejection_conflicts(approved, policy)
+        policy['rejected_rules'] = [{'service': 'claude', 'rule': 'DOMAIN,unrelated.example'}]
+        ai.check_rejection_conflicts(approved, policy)
 
     def test_two_source_formats_preserve_exact_vs_suffix(self):
         v='full:api.anthropic.com\nclaude.ai\n' + '\n'.join(f'ex{i}.claude.ai' for i in range(11))
@@ -117,7 +135,10 @@ class AIInputTests(unittest.TestCase):
                   'gemini_v2fly': 49, 'gemini_metacubex': 49,
                   'claude_v2fly': 21, 'claude_metacubex': 21}
         after = dict(before, gemini_domains=51)
-        ai.validate_safety(after, {'ai_counts': before})
+        # Old one-time migration exception does not match the new reviewed
+        # manual scope. Newly shrinking rules must have a fresh specific review.
+        with self.assertRaisesRegex(ValueError, 'AI SOURCE ANOMALY'):
+            ai.validate_safety(after, {'ai_counts': before})
         with self.assertRaisesRegex(ValueError, 'AI SOURCE ANOMALY'):
             ai.validate_safety(dict(after, gemini_domains=50), {'ai_counts': before})
         with self.assertRaisesRegex(ValueError, 'AI SOURCE ANOMALY'):
