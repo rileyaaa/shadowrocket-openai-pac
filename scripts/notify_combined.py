@@ -28,17 +28,31 @@ def read_json(path: str | None) -> dict | None:
     return doc if isinstance(doc, dict) else None
 
 
+def valid_build_report(report: dict | None) -> bool:
+    return (isinstance(report, dict)
+            and report.get('build_success') is True
+            and type(report.get('config_changed')) is bool
+            and isinstance(report.get('statistics'), dict)
+            and bool(report['statistics']))
+
+
 def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                  *, when: str, event: str, run_url: str,
                  official_docs: dict | None = None) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
               for key in ('shadowrocket_ai', 'v2rayn')}
-    published = status.get('publish', {}).get('success', False)
-    reports_complete = all((shadow_ai is not None, v2 is not None))
-    complete = all(builds.values()) and reports_complete and published
-    partial = published and any((builds['shadowrocket_ai'] and shadow_ai is not None,
-                                 builds['v2rayn'] and v2 is not None))
-    overall = '成功' if complete else '部分成功' if partial else '失败'
+    publication = status.get('publish', {})
+    published = publication.get('success') is True
+    changed_files = publication.get('changed_files', [])
+    if not isinstance(changed_files, list):
+        changed_files = []
+    valid = {'shadowrocket_ai': builds['shadowrocket_ai'] and valid_build_report(shadow_ai),
+             'v2rayn': builds['v2rayn'] and valid_build_report(v2)}
+    complete = all(valid.values()) and published
+    partial = published and any(valid.values())
+    overall = ('成功' if complete else '部分成功' if partial else
+               '待核对' if publication.get('state') == 'pushed_unverified'
+               or (published and changed_files) else '失败')
     lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
@@ -47,20 +61,30 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                 ('v2rayn', '💻 v2rayN（OpenAI + Gemini + Claude）', v2)]
     for key, title, report in sections:
         build = status.get(key, {})
-        success = build.get('exit_code') == 0 and report is not None
+        success = valid[key]
+        output = {'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
+                  'v2rayn': 'v2rayN_Johnshall_AI.json'}[key]
+        released = output in changed_files
         lines += ['━━━━━━━━━━━━━━', title,
-                  f'构建：{"✅ 成功" if success else "❌ 失败 / 报告缺失"}']
+                  f'构建：{"✅ 成功" if success else "❌ 失败 / 报告不可用"}']
         if not success:
-            lines += [f'原因：{build.get("error", "构建报告不存在，无法确认")[-350:]}',
-                      '配置：保留上一次已发布版本']
+            error = str(build.get('error') or '构建报告缺失或不可信')
+            lines.append('原因：' + error[-350:])
+            if released and published:
+                lines.append('发布：⚠️ GitHub 已确认推送此配置，但构建报告缺失；必须核对内容')
+            elif released or publication.get('state') == 'pushed_unverified':
+                lines.append('发布：⚠️ 推送已返回成功，远端结果待确认')
+            elif build.get('exit_code') != 0:
+                lines.append('配置：本次构建失败，保留上一次已发布版本')
+            else:
+                lines.append('配置：本次没有确认的订阅变更，需检查构建报告')
             continue
-        if not published:
-            lines += ['发布：❌ 未成功推送 GitHub（仅本地构建成功）']
+        if publication.get('state') == 'pushed_unverified':
+            lines.append('发布：⚠️ 推送已返回成功，远端版本尚待确认')
+        elif not published:
+            lines.append('发布：❌ 未确认 GitHub 发布（本地构建成功）')
         else:
-            changed_files = status.get('publish', {}).get('changed_files', [])
-            output = {'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
-                      'v2rayn': 'v2rayN_Johnshall_AI.json'}[key]
-            lines += [f'发布：{"✅ 已更新" if output in changed_files else "✅ 已检查，内容无变化"}']
+            lines += [f'发布：{"✅ 已更新" if released else "✅ 已检查，内容无变化"}']
         lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
         stats = report.get('statistics', {})
         if key == 'shadowrocket_ai':
@@ -89,7 +113,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
-    if shadow_ai and status.get('shadowrocket_ai', {}).get('exit_code') == 0:
+    if valid['shadowrocket_ai']:
         lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
                   f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
         counts = shadow_ai.get('manual_review_counts', {})
@@ -101,7 +125,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     else:
         lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
-        lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
+        lines.append('⚠️ ' + str(publication.get('error', 'GitHub 未确认发布'))[:250])
     if shadow_ai and shadow_ai.get('ai_review_candidates'):
         counts = shadow_ai.get('ai_review_counts', {})
         lines.append('⚠️ Gemini/Claude 未批准候选：{}，其中到期复审 {}（不会自动放行）'.format(

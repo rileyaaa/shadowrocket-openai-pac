@@ -60,7 +60,12 @@ APPROVED_HOSTS = {
       http-intake.logs.us5.datadoghq.com o1158394.ingest.us.sentry.io'''.split()),
 }
 MANDATORY = {
-    'gemini': {'DOMAIN-SUFFIX,gemini.google.com', 'DOMAIN,generativelanguage.googleapis.com'},
+    'gemini': {
+        'DOMAIN-SUFFIX,gemini.google.com',
+        'DOMAIN,generativelanguage.googleapis.com',
+        'DOMAIN,antigravity-cli-auto-updater-974169037036.us-central1.run.app',
+        'DOMAIN,antigravity-hub-auto-updater-974169037036.us-central1.run.app',
+    },
     'claude': {
         'DOMAIN-SUFFIX,claude.ai', 'DOMAIN-SUFFIX,anthropic.com',
         'DOMAIN-SUFFIX,claude.com', 'DOMAIN-SUFFIX,claudeusercontent.com',
@@ -171,9 +176,15 @@ def evaluate_review_policy(candidates: list[dict], policy: dict,
             raise ValueError('Malformed AI rejection decision')
         service, rule, reason, stamp = (item[x] for x in
                                         ('service', 'rule', 'reason', 'reviewed_at'))
-        if (service not in ('gemini', 'claude') or not isinstance(rule, str) or
-                not rule.startswith(('DOMAIN,', 'DOMAIN-SUFFIX,'))):
+        if service not in ('gemini', 'claude') or not isinstance(rule, str):
             raise ValueError('Invalid AI rejection rule type')
+        kind, separator, host = rule.partition(',')
+        if separator != ',' or kind not in ('DOMAIN', 'DOMAIN-SUFFIX'):
+            raise ValueError('Invalid AI rejection rule type')
+        # Human decisions are security controls: never silently miss a match
+        # because an operator used uppercase, extra spaces or a trailing dot.
+        if check_hostname(host) != host:
+            raise ValueError('Noncanonical AI rejection rule; use lower-case DNS host without trailing dot')
         if not isinstance(reason, str) or not 3 <= len(reason.strip()) <= 2000:
             raise ValueError('AI rejection needs meaningful reason')
         try:

@@ -7,6 +7,7 @@ Unsupported source semantics raise rather than silently losing matches.
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import PureWindowsPath
 import ipaddress
 import json
 import re
@@ -203,8 +204,10 @@ def load_processes(text: str) -> list[str]:
             raise ValueError('BitBrowser process must be BitBrowser.exe or a verified absolute .exe path')
         if not re.match(r'^[A-Za-z]:\\', value):
             raise ValueError('BitBrowser process path must be absolute Windows path')
-        if value.lower().endswith(('\\chrome.exe', '\\firefox.exe', '\\msedge.exe')):
-            raise ValueError('Generic browsers must never be routed as BitBrowser')
+        parts = PureWindowsPath(value).parts
+        if parts[-1].lower() != 'bitbrowser.exe' or not any(
+                'bitbrowser' in part.lower() for part in parts[1:-1]):
+            raise ValueError('Only a dedicated BitBrowser installation executable may be routed')
         if value not in results:
             results.append(value)
     return results

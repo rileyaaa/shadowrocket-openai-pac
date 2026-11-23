@@ -26,7 +26,7 @@ SOURCES = {
     'gemini_app_firewall': ('https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings', 'gemini'),
     'claude_code_network': ('https://code.claude.com/docs/en/network-config', 'claude'),
 }
-HOST = re.compile(r'(?i)\b[a-z0-9-]+(?:\.[a-z0-9-]+){1,7}\.[a-z]{2,}\b')
+HOST = re.compile(r'(?i)(?<![a-z0-9-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,63}(?![a-z0-9-])')
 ALLOWED_TAILS = {
     'gemini': ('google.com', 'googleapis.com', 'googleusercontent.com', 'gstatic.com',
                'google.dev', 'google', 'deepmind.com', 'withgoogle.com', 'google.ai',
@@ -51,16 +51,25 @@ class ExtractText(HTMLParser):
             self.parts.append(data)
 
 
+ADVISORY_EXACT_HOSTS = {
+    'claude': frozenset({'browser-intake-us5-datadoghq.com'}),
+    'gemini': frozenset(),
+}
+
+
 def extract_hosts(content: str, service: str) -> list[str]:
     parser = ExtractText()
     parser.feed(content)
     text = ' '.join(parser.parts)
     hosts = {h.lower() for h in HOST.findall(text) if
+             h.lower() in ADVISORY_EXACT_HOSTS[service] or
              any(h.lower() == end or h.lower().endswith('.' + end)
                  for end in ALLOWED_TAILS[service])}
     limit = 10 if service == 'gemini' else 3
     if not limit <= len(hosts) <= 300:
         raise ValueError(f'Official {service} doc parse incomplete or unexpectedly large: {len(hosts)}')
+    if service == 'claude' and not {'claude.ai', 'claude.com'}.issubset(hosts):
+        raise ValueError('Official Claude network document missing key first-party hostnames')
     return sorted(hosts)
 
 
@@ -105,20 +114,24 @@ def run(argv: list[str] | None = None):
             removed=sorted(set(previous)-set(hosts))
             if added or removed:
                 comparisons.append({'service':service,'source':key,'added':added,'removed':removed})
-    # All official pages validated before touching the previous advisory snapshot.
+    # Never overwrite unresolved advisory findings from earlier weeks.
     data={'schema_version':1,'sources':current}
     from build_v2rayn import atomically_write
     state_bytes=(json.dumps(data,ensure_ascii=False,indent=2,sort_keys=True)+'\n').encode()
-    if not STATE.exists() or STATE.read_bytes()!=state_bytes:
-        atomically_write(STATE,state_bytes)
     if comparisons:
-        lines=['# Gemini / Claude 官方網路文件變更待審','',
-               '注意：這只是每週比對，不會直接加入代理。先確認用途、權屬、最小匹配範圍。','']
+        previous_review = REVIEW.read_text(encoding='utf-8') if REVIEW.exists() else (
+            '# Gemini / Claude 官方網路文件變更待審\n\n'
+            '此處保留歷次尚未清理的觀察紀錄；任何候選都不會自動加入代理。\n')
+        date_stamp = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d')
+        lines = [f'## {date_stamp} — 官方文件變更', '']
         for item in comparisons:
-            lines += [f"## {item['service']} — {item['source']}"]
+            lines += [f"### {item['service']} — {item['source']}"]
             lines += [f'- 新增：`{x}`' for x in item['added']]
             lines += [f'- 移除：`{x}`' for x in item['removed']]
-        atomically_write(REVIEW, ('\n'.join(lines)+'\n').encode())
+        review_text = previous_review.rstrip() + '\n\n' + '\n'.join(lines) + '\n'
+        atomically_write(REVIEW, review_text.encode('utf-8'))
+    if not STATE.exists() or STATE.read_bytes()!=state_bytes:
+        atomically_write(STATE,state_bytes)
     report={'checked':True,'changed':bool(comparisons),'changes':comparisons,
             'sources':list(SOURCES),'initial_baseline':old is None}
     if args.report_file:

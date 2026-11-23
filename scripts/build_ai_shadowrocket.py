@@ -118,6 +118,67 @@ def prepare_openai_review(voice, auto, emitted_auto, emitted_manual,
             'review': review, 'delivery': delivery, 'report': old_report}
 
 
+
+def load_published_baseline() -> tuple[dict | None, dict | None, str]:
+    """Require a complete, self-consistent published baseline before any rebuild.
+
+    Existing v1 snapshots are a recognized migration to v2 only if every
+    mandatory file and digest is intact. Missing fields are never interpreted
+    as a fresh install. An actual fresh install has none of these four files.
+    """
+    files = (OUTPUT, STATE, ORIGINAL_STATE, ORIGINAL_AUTO)
+    existing = [path for path in files if path.is_file()]
+    if not existing:
+        return None, None, ''
+    if len(existing) != len(files):
+        missing = [str(path.relative_to(ROOT)) for path in files if not path.is_file()]
+        raise ValueError('Incomplete published Shadowrocket baseline: missing ' + ', '.join(missing))
+    state = json.loads(STATE.read_text(encoding='utf-8'))
+    old_legacy = json.loads(ORIGINAL_STATE.read_text(encoding='utf-8'))
+    if not isinstance(state, dict) or state.get('schema_version') not in (1, 2):
+        raise ValueError('Unknown published Shadowrocket baseline version')
+    required = ('output_sha256', 'ai_counts', 'statistics', 'sources')
+    if any(not isinstance(state.get(key), dict) or not state[key] for key in required[1:]):
+        raise ValueError('Incomplete published Shadowrocket state: counts/sources/statistics')
+    digest = state.get('output_sha256')
+    if not isinstance(digest, str) or not re.fullmatch(r'[0-9a-f]{64}', digest):
+        raise ValueError('Missing Shadowrocket output_sha256; refusing baseline reset')
+    old_output = OUTPUT.read_bytes()
+    if hashlib.sha256(old_output).hexdigest() != digest:
+        raise ValueError('Previous Shadowrocket output/state digest mismatch')
+    if not isinstance(old_legacy, dict) or not isinstance(old_legacy.get('sources'), dict) or not isinstance(old_legacy.get('statistics'), dict):
+        raise ValueError('Incomplete Shadowrocket legacy source baseline')
+    if not isinstance(old_legacy['sources'].get('voice'), dict) or not old_legacy['sources']['voice'].get('sha256'):
+        raise ValueError('Missing Shadowrocket Voice source baseline')
+    old_auto_bytes = ORIGINAL_AUTO.read_bytes()
+    old_auto = old_auto_bytes.decode('utf-8')
+    voice_rules = {','.join(row.split(',')[:2]) for row in legacy.active_auto_rules(old_auto)
+                   if row.startswith(('IP-CIDR,', 'IP-CIDR6,'))}
+    if not voice_rules:
+        raise ValueError('Published Voice baseline is missing')
+    # Check the auxiliary baseline against the *published* output, not only
+    # its own file. This protects recognized v1 snapshots without a digest
+    # of the auxiliary file.
+    header = '# [1a] OpenAI automatic rules - official Voice destination IPs\n'
+    stop = '# [1b] OpenAI automatic rules - public domain rules\n'
+    text = old_output.decode('utf-8')
+    if text.count(header) != 1 or text.count(stop) != 1:
+        raise ValueError('Published Shadowrocket Voice section is missing')
+    segment = text.split(header, 1)[1].split(stop, 1)[0]
+    effective = {','.join(row.strip().split(',')[:2]) for row in segment.splitlines()
+                 if row.strip().startswith(('IP-CIDR,', 'IP-CIDR6,'))}
+    if effective != voice_rules:
+        raise ValueError('Published Shadowrocket Voice section does not match auxiliary baseline')
+    if state['schema_version'] == 2:
+        for key, raw in (('voice_auto_sha256', old_auto_bytes),
+                         ('legacy_state_sha256', ORIGINAL_STATE.read_bytes())):
+            expected = state.get(key)
+            if not isinstance(expected, str) or hashlib.sha256(raw).hexdigest() != expected:
+                raise ValueError('Shadowrocket published auxiliary digest mismatch: ' + key)
+    return state, old_legacy, old_auto
+
+
+
 def run(argv: list[str] | None = None) -> dict:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--upstream-file', type=Path)
@@ -128,6 +189,7 @@ def run(argv: list[str] | None = None) -> dict:
     p.add_argument('--report-file', type=Path)
     args = p.parse_args(argv)
 
+    old, old_legacy, old_auto = load_published_baseline()
     settings = legacy.load_settings()
     base, voice_raw, fetched, source_lists, unparsed, rulesets = load_sources(args)
     voice = legacy.parse_voice(voice_raw)
@@ -137,8 +199,6 @@ def run(argv: list[str] | None = None) -> dict:
     emitted_auto, emitted_manual = legacy.compact_openai_rules(auto, manual)
     original, stats = legacy.generate(base.decode('utf-8-sig'), voice, emitted_auto,
                                       emitted_manual, settings=settings, rulesets=rulesets)
-    old_legacy = json.loads(ORIGINAL_STATE.read_text(encoding='utf-8')) if ORIGINAL_STATE.exists() else None
-    old_auto = ORIGINAL_AUTO.read_text(encoding='utf-8') if ORIGINAL_AUTO.exists() else ''
     stats.update({
         'excluded_shared_auto_domains': len(all_auto) - len(auto),
         'auto_input_rules': len(auto),
@@ -179,15 +239,6 @@ def run(argv: list[str] | None = None) -> dict:
     else:
         overrides = None
     ai = ai_services.collect(legacy.fetch, source_overrides=overrides)
-    old = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
-    if old and old.get('schema_version') != 1:
-        raise ValueError('Unsupported prior Shadowrocket AI state version')
-    if OUTPUT.exists() and old is None:
-        raise ValueError('Existing Shadowrocket output has no baseline state; refusing reset')
-    if old and old.get('output_sha256') and (
-            not OUTPUT.exists() or
-            hashlib.sha256(OUTPUT.read_bytes()).hexdigest() != old['output_sha256']):
-        raise ValueError('Previous Shadowrocket output/state digest mismatch')
     ai_services.validate_safety(ai['counts'], old)
     enhanced = insert_ai_rules(original, ai, settings['openai_node_name'])
     if (len(enhanced.encode('utf-8')) < 1_000_000 or enhanced.count('[Rule]') != 1
@@ -200,7 +251,7 @@ def run(argv: list[str] | None = None) -> dict:
     outputs = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                for name, (url, raw) in fetched.items()}
     outputs.update(ai['records'])
-    state = {'schema_version': 1, 'sources': outputs, 'ai_counts': ai['counts'],
+    state = {'schema_version': 2, 'sources': outputs, 'ai_counts': ai['counts'],
              'statistics': stats, 'manual_ai_sha256': ai['manual_sha256'],
              'review_candidates': ai['review_candidates'],
              'review_counts': ai['review_counts'],
@@ -212,6 +263,11 @@ def run(argv: list[str] | None = None) -> dict:
         voice, auto, emitted_auto, emitted_manual, source_lists, unparsed,
         fetched, rulesets, settings, stats, old_legacy, old_auto, changed,
     )
+    # Bind the freshly generated auxiliary files to the new schema-v2 state.
+    legacy_bytes = (json.dumps(review_meta['source_state'], ensure_ascii=False,
+                               sort_keys=True, indent=2) + '\n').encode('utf-8')
+    state['voice_auto_sha256'] = hashlib.sha256(review_meta['auto_text'].encode('utf-8')).hexdigest()
+    state['legacy_state_sha256'] = hashlib.sha256(legacy_bytes).hexdigest()
     review = review_meta['review']
     original_delta = review_meta['report']
     report = {'build_success': True, 'config_changed': changed,
@@ -239,8 +295,7 @@ def run(argv: list[str] | None = None) -> dict:
     v2helpers.atomically_write(ORIGINAL_AUTO, review_meta['auto_text'].encode('utf-8'))
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
         v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
-    v2helpers.atomically_write(ORIGINAL_STATE,
-        (json.dumps(review_meta['source_state'], ensure_ascii=False, sort_keys=True, indent=2) + '\n').encode('utf-8'))
+    v2helpers.atomically_write(ORIGINAL_STATE, legacy_bytes)
     v2helpers.atomically_write(ROOT / 'data/review-queue.md',
         review_queue.render_queue(review).encode('utf-8'))
     review_queue.write_json(ROOT / 'data/review-notifications.json', review_meta['delivery'])

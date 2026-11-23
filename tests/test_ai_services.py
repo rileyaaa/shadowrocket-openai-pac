@@ -73,6 +73,25 @@ class AIInputTests(unittest.TestCase):
         policy['rejected_rules'] = [{'service': 'claude', 'rule': 'DOMAIN,unrelated.example'}]
         ai.check_rejection_conflicts(approved, policy)
 
+    def test_rejection_hostname_must_be_canonical(self):
+        for host in ('API.ANTHROPIC.COM', 'api.anthropic.com.', 'api.anthropic.com '):
+            with self.subTest(host=host):
+                policy = {'version': 1, 'default_review_months': 6,
+                          'reminder_interval_days': 7,
+                          'rejected_rules': [{
+                              'service': 'claude', 'rule': 'DOMAIN,' + host,
+                              'reason': 'Manual security decision',
+                              'reviewed_at': '2026-11-23'}]}
+                with self.assertRaises(ValueError):
+                    ai.evaluate_review_policy([], policy, on=date(2026, 11, 23))
+
+    def test_antigravity_updaters_are_required_but_unrelated_runapp_is_not(self):
+        for host in ('antigravity-cli-auto-updater-974169037036.us-central1.run.app',
+                     'antigravity-hub-auto-updater-974169037036.us-central1.run.app'):
+            self.assertIn('DOMAIN,' + host, ai.MANDATORY['gemini'])
+        self.assertFalse(ai.is_approved('gemini', 'DOMAIN',
+                                        'another-tenant.us-central1.run.app'))
+
     def test_two_source_formats_preserve_exact_vs_suffix(self):
         v='full:api.anthropic.com\nclaude.ai\n' + '\n'.join(f'ex{i}.claude.ai' for i in range(11))
         m='api.anthropic.com\n+.claude.ai\n' + '\n'.join(f'+.ex{i}.claude.ai' for i in range(11))

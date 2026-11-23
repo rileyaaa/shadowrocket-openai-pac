@@ -6,6 +6,7 @@ import hashlib
 import http.client
 import io
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -458,6 +459,22 @@ class PipelineHardeningTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_build()
             self.assertEqual(self.published_files(), before)
+
+    def test_duplicate_ordinary_proxy_and_unknown_rule_do_not_publish(self):
+        self.run_build()
+        previous = self.published_files()
+        duplicate = re.sub(rb'DOMAIN,proxy\d+\.example,Proxy',
+                           b'DOMAIN,one-proxy.example,Proxy', self.base)
+        self.sources[build.BASE_URL] = duplicate
+        with self.assertRaisesRegex(ValueError, 'unique coverage collapsed'):
+            self.run_build()
+        self.assertEqual(previous, self.published_files())
+        self.sources[build.BASE_URL] = self.base.replace(
+            b'DOMAIN,before.example,Proxy\n',
+            b'UNKNOWN-TYPE,custom.example,Proxy\nDOMAIN,before.example,Proxy\n')
+        with self.assertRaisesRegex(ValueError, 'Unsupported|Unsupported rule type'):
+            self.run_build()
+        self.assertEqual(previous, self.published_files())
 
     def test_external_ruleset_is_inlined_at_same_position_and_hashed(self):
         self.run_build()
