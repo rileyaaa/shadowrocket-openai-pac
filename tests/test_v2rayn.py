@@ -24,6 +24,10 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(field, 'domain')
         self.assertEqual(wildcard, r'regexp:^x\-.*\.webpubsub\.azure\.com$')
         self.assertNotIn('domain:stripe.com', [core.as_match('DOMAIN', 'js.stripe.com')[1]])
+        self.assertEqual(core.as_match('DOMAIN', 'browser-intake-us5-datadoghq.com'),
+                         ('domain', 'full:browser-intake-us5-datadoghq.com'))
+        self.assertNotEqual(core.as_match('DOMAIN', 'browser-intake-us5-datadoghq.com'),
+                            ('domain', 'domain:datadoghq.com'))
 
     def test_ipv4_ipv6_geo_and_no_resolve(self):
         self.assertEqual(core.parse_rule('IP-CIDR,8.8.8.0/24,Proxy,no-resolve'),

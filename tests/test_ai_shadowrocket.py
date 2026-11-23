@@ -16,10 +16,13 @@ class DedicatedShadowrocketTests(unittest.TestCase):
         ai = {'rules': {'gemini': ['DOMAIN-SUFFIX,gemini.google.com',
                                   'DOMAIN,generativelanguage.googleapis.com'],
                         'claude': ['DOMAIN-SUFFIX,claude.ai',
-                                   'DOMAIN-SUFFIX,anthropic.com']}}
+                                   'DOMAIN-SUFFIX,anthropic.com',
+                                   'DOMAIN,browser-intake-us5-datadoghq.com']}}
         result = ai_builder.insert_ai_rules(base, ai, 'RackNerd🇺🇸西雅图')
         self.assertIn('DOMAIN-SUFFIX,gemini.google.com,RackNerd🇺🇸西雅图,force-remote-dns',result)
         self.assertIn('DOMAIN-SUFFIX,claude.ai,RackNerd🇺🇸西雅图,force-remote-dns',result)
+        self.assertIn('DOMAIN,browser-intake-us5-datadoghq.com,RackNerd🇺🇸西雅图,force-remote-dns',result)
+        self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com,RackNerd', result)
         self.assertTrue(result.index('DOMAIN,chatgpt.com,RackNerd') <
                         result.index('DOMAIN-SUFFIX,gemini.google.com,RackNerd') <
                         result.index('DOMAIN,google.com,DIRECT'))

@@ -46,7 +46,14 @@ class AIInputTests(unittest.TestCase):
         self.assertNotIn('DOMAIN,accounts.google.com',parsed['gemini'])
         self.assertNotIn('DOMAIN,fonts.gstatic.com',parsed['gemini'])
         self.assertNotIn('DOMAIN,play.google.com',parsed['gemini'])
+        for shared_google in ('accounts.google.com', 'www.googleapis.com',
+                              'fonts.googleapis.com', 'fonts.gstatic.com',
+                              'ssl.gstatic.com', 'play.google.com', 'ogs.google.com'):
+            self.assertNotIn('DOMAIN,' + shared_google, parsed['gemini'])
         self.assertIn('DOMAIN,api.anthropic.com',parsed['claude'])
+        self.assertIn('DOMAIN,browser-intake-us5-datadoghq.com', parsed['claude'])
+        self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com', parsed['claude'])
+        self.assertNotIn('DOMAIN-SUFFIX,sentry.io', parsed['claude'])
 
     def test_two_source_formats_preserve_exact_vs_suffix(self):
         v='full:api.anthropic.com\nclaude.ai\n' + '\n'.join(f'ex{i}.claude.ai' for i in range(11))

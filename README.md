@@ -317,6 +317,12 @@ Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/go
 
 GitHub Actions 分别记录两套真实构建状态、独立安全发布、失败保留上一版有效配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 
+### AI 专用域名与防直连审查（2026-11-23）
+
+Claude Code 官方网络清单中的可选错误报告精确主机 `browser-intake-us5-datadoghq.com` 已加入两份生成订阅；只匹配这个完整主机，不纳入整个 `datadoghq.com`，也不删除已有 Claude 监控及登录规则。Gemini 继续限定 Google AI 产品及其明确后端，不重新放宽 Google 登录、字体、Play 或普通 API 全域。OpenAI 保留已核实的核心和 Voice 依赖；v2rayN 先前单独批准的 Statsig / 共享供应商例外暂时维持，待实际客户端出口验收后再逐项评估收窄，避免无意放回直连。
+
+**重要：路由订阅不是 Kill Switch。** Shadowrocket、v2rayN 的最后规则仍遵循 Johnshall 的 `FINAL,direct`；当客户端未捕获连接、DNS / IPv6 绕过隧道、应用自行连接或 VPN 断开时，单靠已知域名清单不能保证不会使用本机出口。请按 [AI 出口与防直连验收清单](docs/ai-egress-validation.md) 在实际设备测试，特别验证代理断线时关键 AI 连接会失败而不是退回直连。仓库不能代替手机/Windows 防火墙设置，也没有替你开启系统级拦截。
+
 此订阅覆盖经审核的域名和已知共享依赖，不保证 Chrome / 桌面客户端的所有 DNS、WebSocket、WebRTC、IPv6、UDP 一定经过代理。请使用客户端连接日志和实际出口 IP 验证 Gemini 网页、AI Studio、Claude 网页、Claude Code、登录和文件上传。Shadowrocket 的 URL Rewrite / MITM 与 v2rayN 路由规则功能不同，不承诺完全等价。
 
 ### 官方文件每周复审（不阻塞每日生成）

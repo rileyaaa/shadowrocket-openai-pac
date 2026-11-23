@@ -10,7 +10,8 @@ GEMINI,DOMAIN,waa-pa.clients6.google.com
 # Gemini Code Assist primary AI endpoints come from the reviewed community feeds.
 # Its shared login/Cloud APIs do not override the baseline geographic routes.
 # Reference: https://cloud.google.com/gemini/docs/codeassist/set-up-gemini
-# Claude Code network requirements; core anthropic.com/claude.ai covered by suffix:
+# Claude Code network requirements; core anthropic.com/claude.ai covered by suffix.
+# Exact optional error reporting: never route the generic datadoghq.com suffix.
 # https://code.claude.com/docs/en/network-config
 CLAUDE,DOMAIN,api.anthropic.com
 CLAUDE,DOMAIN,platform.claude.com
@@ -18,3 +19,5 @@ CLAUDE,DOMAIN,mcp-proxy.anthropic.com
 CLAUDE,DOMAIN,downloads.claude.ai
 CLAUDE,DOMAIN,assets-proxy.anthropic.com
 CLAUDE,DOMAIN,bridge.claudeusercontent.com
+# Claude Code optional error reports, Anthropic-documented exact host only.
+CLAUDE,DOMAIN,browser-intake-us5-datadoghq.com
