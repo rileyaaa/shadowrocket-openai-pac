@@ -66,11 +66,38 @@ def publish(path: Path) -> None:
         git('push', 'origin', 'HEAD:main')
         remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
         if remote != commit:
-            # A new commit can legitimately advance main after our push. The
-            # published commit must remain an ancestor of remote main.
-            ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', commit, remote])
-            if ancestor.returncode != 0:
-                raise RuntimeError('Git push verification mismatch: published commit not on remote main')
+            # A concurrent fast-forward can move remote main immediately after
+            # our successful push. The new SHA is usually NOT locally present
+            # in actions/checkout's shallow clone, so fetch before merge-base.
+            try:
+                verified = False
+                for depth in (128, 512):
+                    git('fetch', '--no-tags', f'--depth={depth}',
+                        'origin', 'refs/heads/main')
+                    fetched = git('rev-parse', 'FETCH_HEAD').stdout.strip()
+                    if fetched != remote:
+                        remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
+                        continue
+                    ancestor = subprocess.run(
+                        ['git', 'merge-base', '--is-ancestor', commit, 'FETCH_HEAD'],
+                        capture_output=True, text=True)
+                    if ancestor.returncode == 0:
+                        verified = True
+                        break
+                    if ancestor.returncode not in (1,):
+                        raise RuntimeError('Cannot check fetched Git ancestry: ' +
+                                           ancestor.stderr.strip()[-200:])
+                if not verified:
+                    raise RuntimeError('Published commit not verified as ancestor of remote main')
+            except (RuntimeError, OSError, IndexError) as exc:
+                # Push returned success. Do not misreport it as a failed push.
+                status['publish'] = {'success': False,
+                                     'state': 'pushed_unverified',
+                                     'commit': commit,
+                                     'changed_files': changed_files,
+                                     'error': 'Push succeeded but remote ancestry could not be confirmed: ' + str(exc)}
+                print('::warning::' + status['publish']['error'])
+                return
         status['publish'] = {'success': True, 'state': 'published',
                              'commit': commit, 'changed_files': changed_files}
         print(f'Published commit {commit}: {changed_files}')
