@@ -286,7 +286,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 
 ## Gemini + Claude 每日自动维护（新增）
 
-现只保留一份 Shadowrocket AI 订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅圖`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。旧 `scripts/build.py` 的共用函数不变，但不再执行其旧订阅发布入口。
+现只保留一份 Shadowrocket AI 订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅图`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。旧 `scripts/build.py` 的共用函数不变，但不再执行其旧订阅发布入口。
 
 **Shadowrocket 全 AI 配置：**
 

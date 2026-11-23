@@ -55,7 +55,7 @@ jobs:
             args+=(--months "$REVIEW_MONTHS")
           fi
           python scripts/review_queue.py "${args[@]}"
-      - name: Independently build original Shadowrocket, AI Shadowrocket and v2rayN
+      - name: Independently build two AI subscriptions (Shadowrocket and v2rayN)
         run: python scripts/run_dual.py --work-dir "$RUNNER_TEMP"
       - name: Publish only validated outputs in one Git push
         if: always()
