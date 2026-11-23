@@ -1,4 +1,4 @@
-# Shadowrocket · OpenAI 专用出口 + Johnshall 原样分流
+# Shadowrocket + v2rayN · OpenAI / Gemini / Claude 双订阅自动维护
 
 > **2026-10-15 稳定性回退**：撤回依赖官方帮助中心网页的新增自动审批功能，恢复到 `216c431` 的同步与待审核流程。构建不再请求该网页，也不再因其 Cloudflare 验证冻结自动域名更新。官方 Voice、四份社区规则、Johnshall 和 Apple News 继续按原有七来源流程同步；白名单外的新候选仍报告后审核，不直接加入规则。Voice 范围保护、下载完整性、未知格式待审和 Apple News 内嵌校验这四项修复全部保留，节点、手工兜底及每日 11:00 排程保持原样。官方网页仅作为人工查证资料。
 
@@ -18,21 +18,42 @@
 
 基于 [Johnshall 上游](https://github.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever) 的完整 Shadowrocket 配置，每天同步：**尽最大可能将 OpenAI 本身及官方确认的共享网络依赖送至 OpenAI 专用节点**；其他 Johnshall 原本 `Proxy` 的流量走另一个指定节点。DIRECT / REJECT / 最后直连保留原规则。节点所在国家可随时更换，不与配置文件名和变量名绑定。
 
-## 小火箭完整配置订阅
+## 当前仅维护两份客户端订阅（2026-11-23 起）
+
+每天台北时间 **11:00**，一个 GitHub Actions 工作流独立生成、验证并按需一次推送以下两份文件：
+
+| 客户端 | 唯一正式订阅 | 路由方式 |
+|---|---|---|
+| Shadowrocket | [`Shadowrocket_Johnshall_AI.conf`](Shadowrocket_Johnshall_AI.conf) | OpenAI / Gemini / Claude → `RackNerd🇺🇸西雅图`；Johnshall Proxy → `Altare🇸🇬新加坡` |
+| v2rayN | [`v2rayN_Johnshall_AI.json`](v2rayN_Johnshall_AI.json) | 三家 AI 与 BitBrowser → `proxy`，**不绑定具体节点** |
+
+Shadowrocket Raw 订阅：
 
 ```text
-https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowrocket_Johnshall_OpenAI.conf
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowrocket_Johnshall_AI.conf
 ```
 
-**注意：订阅地址已经更名，旧的 `Shadowrocket_Johnshall_JP_KR.conf` 地址不再提供更新。请在 Shadowrocket 中改用上面的新 Raw 地址。**
+v2rayN Raw 订阅：
+
+```text
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_AI.json
+```
+
+**旧版已停用并删除**：原先单独 OpenAI 的小火箭配置和旧文件名的 v2rayN JSON 均不再更新。客户端必须换到以上地址；单纯刷新旧地址不能自动跳转。
+
+`scripts/build.py` 与 `scripts/notify_telegram.py` 保留为验证过的解析/发送基础库，但每日工作流不再运行旧订阅生成入口。OpenAI Voice 覆盖保护、来源 SHA-256、社区候选审核、半年复审、Telegram 提醒回执统一由全 AI Shadowrocket 建置器继续维护；`rules/openai-auto.list`、`data/sources.json`、`data/review-queue.md` 为基线和审计资料，**不是第三份客户端订阅**。
+
+## 原 OpenAI 分流设计与历史决策
+
+以下保留最初 OpenAI 审查边界、保护策略和故障处理的历史依据；客户端文件、每日执行入口及安装操作均以上方最新「两份订阅」为准。
 
 请先在小火箭导入两个实际代理节点，路由模式选「配置」。本仓库不存储任何代理凭据。两个节点的完整备注名称只在 [`config/user-settings.json`](config/user-settings.json) 中维护：
 
 ```json
-{"openai_node_name":"日本JP","johnshall_proxy_node_name":"韩国KR"}
+{"openai_node_name":"RackNerd🇺🇸西雅图","johnshall_proxy_node_name":"Altare🇸🇬新加坡"}
 ```
 
-两个字段表示**分流用途**，不是国家：`openai_node_name` 是 OpenAI 专用出口，`johnshall_proxy_node_name` 是 Johnshall 原 `Proxy` 出口。目前的日本和韩国只是示例值；未来换节点，只需更新这两个值。修改 JSON 后会自动重建配置，**无需额外策略组**。
+两个字段表示**分流用途**，不是国家：`openai_node_name` 是 OpenAI 专用出口，`johnshall_proxy_node_name` 是 Johnshall 原 `Proxy` 出口。目前的西雅图和新加坡是已设置的两个节点；未来换节点，只需更新这两个值。修改 JSON 后会自动重建配置，**无需额外策略组**。
 
 ## 只有两份 OpenAI 路由规则源
 
@@ -78,7 +99,8 @@ Johnshall 上游约在每天 **07:04 台北时间**发布；截至 2026-10-12 �
 
 ```bash
 python -m unittest discover -s tests -v
-python scripts/build.py
+python scripts/build_ai_shadowrocket.py
+python scripts/build_v2rayn.py
 ```
 
 构建失败时不会提交不完整结果；成功时提交更新的完整 `.conf`、自动列表、数据源校验信息和审核清单。原 Johnshall 的 URL Rewrite、MITM 和广告规则保留。**不要直接编辑生成的 `.conf` 和自动 `.list`**，否则下次同步会覆盖。
@@ -146,7 +168,7 @@ python scripts/build.py
 
 ### 记录不通过结果或续期
 
-在 GitHub **Actions → Sync Johnshall and OpenAI rules → Run workflow**：
+在 GitHub **Actions → Sync Johnshall, OpenAI, Gemini, Claude and v2rayN rules → Run workflow**：
 
 1. `reject_rule` 填审核清单中的完整规则；留空时只执行原同步。
 2. `reject_reason` 填本次不通过原因。
@@ -221,18 +243,18 @@ https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-
 ### v2rayN 路由订阅
 
 ```text
-https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_OpenAI.json
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_AI.json
 ```
 
 导入：Windows v2rayN → 设置 → 路由设置 → 新建规则集 → 别名 `Johnshall + OpenAI + BitBrowser` → 可选地址（Url）填入上述 Raw URL → 从订阅 Url 中导入规则 → 确认 → 保存并选为活动路由；选择您自己的代理节点。此文件是 **v2rayN 原生路由规则数组**，不是 PAC、Clash YAML、节点订阅或完整 Xray/sing-box 配置。`proxy`、`direct`、`block` 是路由动作，不携带任何服务器账号密码或节点名字；所有命中 `proxy` 的连接使用 v2rayN 当前选定的节点，最终未匹配流量 `direct`。**GitHub 每日更新并不保证客户端自动重新获取**；需依客户端版本与设置手动或自动重新导入。
 
 ### 独立构建和每日维护
 
-- 原 `scripts/build.py` **保持不变**，独立生成 `Shadowrocket_Johnshall_OpenAI.conf`，保留原双节点和人工审核机制；原 `scripts/notify_telegram.py` 也保持不变。
+- 原 `scripts/build.py` 和 `scripts/notify_telegram.py` 保持不变，作为解析及发送基础函数库；**不再执行旧配置生成入口**。OpenAI 审核、Voice 基线和提醒回执继续由全 AI Shadowrocket 建置器维护。
 - 新 `scripts/build_v2rayn.py` 独立下载 Johnshall、四份 OpenAI 社区域名源、官方 ChatGPT Voice IP 与 Apple News 内嵌规则集，**不读取已生成 `.conf` 来转换**；读取原项目审核通过的 `config/manual-openai.rules` 与仅用于 v2rayN 的用户显式例外；转换可识别的完整 Johnshall 分流，不以少量 `geosite:cn` 取代源规则。
-- 每天台北时间 **11:00（UTC 03:00）** 使用**同一个** `.github/workflows/sync-upstream.yml` 调度两次独立构建，分别验证，成功的产物合并为**一次 Git 推送**；未改变时不提交。单个构建失败不发布其失败产物，也不阻止另一套成功产物发布。各构建的状态由独立状态文件记录，失败不会伪装成功。
+- 每天台北时间 **11:00（UTC 03:00）** 使用**同一个** `.github/workflows/sync-upstream.yml` 调度两份独立客户端订阅，分别验证，成功的产物合并为**一次 Git 推送**；未改变时不提交。单个构建失败不发布其失败产物，也不阻止另一套成功产物发布。各构建的状态由独立状态文件记录，失败不会伪装成功。
 - `scripts/notify_combined.py` 统一复用**未修改**的旧 Telegram API 发送函数和人工审核送达确认逻辑，向原 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` 发送**一条综合报告**；只有成功发送后才更新审核提醒送达记录，并由工作流单独持久化。Git 推送失败与 Telegram 失败在报告/Actions 状态中独立体现，后者不会撤销已发布文件。
-- 新的状态/统计仅写到 `data/v2rayn-sources.json`，不写入原 `data/sources.json`、`rules/openai-auto.list` 等 Shadowrocket 专属状态。下载、规模、来源结构、Voice CIDR、广告数量、转换成功率与独立基线全部校验后才以原子方式更新 JSON。
+- v2rayN 建置仅写自己的 `data/v2rayn-sources.json`；Shadowrocket AI 建置继续维护 `data/sources.json`、`rules/openai-auto.list` 等 OpenAI 审核和 Voice 基线。下载、规模、来源结构、Voice CIDR、广告数量、转换成功率与独立基线全部校验后才以原子方式更新 JSON。
 
 手动独立运行：
 
@@ -264,7 +286,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 
 ## Gemini + Claude 每日自动维护（新增）
 
-保留原有 Shadowrocket OpenAI 双节点订阅与 `scripts/build.py` **完全不变**。另外生成独立 AI 增强订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅图`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。
+现只保留一份 Shadowrocket AI 订阅，覆盖 OpenAI、Gemini、Claude，三者使用 `config/user-settings.json` 中的 `openai_node_name`（当前 `RackNerd🇺🇸西雅圖`）；Johnshall 普通 Proxy 仍使用 `johnshall_proxy_node_name`（当前 `Altare🇸🇬新加坡`）。旧 `scripts/build.py` 的共用函数不变，但不再执行其旧订阅发布入口。
 
 **Shadowrocket 全 AI 配置：**
 
@@ -272,12 +294,12 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/Shadowrocket_Johnshall_AI.conf
 ```
 
-旧 OpenAI 专用订阅 `Shadowrocket_Johnshall_OpenAI.conf` 继续独立正常更新；**要让 Gemini / Claude 也走西雅图，Shadowrocket 需改订阅为上方的新地址**。这不会强制改变当前设备已订阅的旧配置。
+旧 OpenAI 专用订阅已停止维护并删除；要让 Gemini / Claude 也走西雅图，Shadowrocket 请使用上方唯一的全 AI 配置地址。
 
-**v2rayN 完整路由订阅（地址不变）：**
+**v2rayN 完整路由订阅（文件已更名，必须更新地址）：**
 
 ```text
-https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_OpenAI.json
+https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_Johnshall_AI.json
 ```
 
 v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`，由 v2rayN 当前活动节点决定出口；`direct` 和 `block` 按原分流语义处理。需要重新从 URL 导入或按客户端能力刷新已有订阅，GitHub 每日更新不代表客户端自动刷新。
@@ -286,15 +308,14 @@ v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`
 
 每天台北时间 **11:00（03:00 UTC）**，现有单一 GitHub Actions 排程独立运行：
 
-- 原始 Shadowrocket：`scripts/build.py`，原有七来源及人工审核保持不变。
-- 新 Shadowrocket 全 AI：`scripts/build_ai_shadowrocket.py`，重新独立抓取原七来源，并叠加 Gemini / Claude 独立审核层。
+- Shadowrocket 全 AI：`scripts/build_ai_shadowrocket.py`，重新独立抓取原七来源、维护原 OpenAI 审核/Voice 基线与提醒，并叠加 Gemini / Claude 独立审核层。
 - v2rayN：`scripts/build_v2rayn.py`，独立重抓七来源与四个新增 AI 来源；不读取其他生成订阅。
 
 Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/google-gemini.list`；Claude：v2fly `data/anthropic` 与 MetaCubeX `geo/geosite/anthropic.list`。**MetaCubeX 主要是衍生格式，不能当作完全独立的域名归属证据。** 每次记录各来源 SHA-256、数量和变化，在新来源异常缩减、缺失、语法变化时保留上一版有效输出。生成文件由 Action 提交，不直接手改。
 
 `config/ai-services.rules` 记录官方文档支持的精确共享主机补充（例如 Gemini 的特定登录/API 和 Claude Code）；`scripts/ai_services.py` 中明示哪些专用后缀和共享精确域名获准自动同步。来源首次出现的新共享供应商主机或不明域名进入 `data/ai-review-queue.md`，**不自动代理**。未经核实不要将整个 `googleapis.com`、`gstatic.com`、`sentry.io`、Google IP / ASN 纳入。广告追踪主机不会因为出现在 Gemini 官方防火墙文档里就自动跳过原广告拦截；v2rayN 保留广告规则高优先级。当前包含少量官方确认的共享精确主机，可能也让其他 Google 功能走西雅图，此行为刻意接受以优先满足 Gemini 使用。
 
-GitHub Actions 分别记录三套真实构建状态、独立安全发布、失败保留旧配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
+GitHub Actions 分别记录两套真实构建状态、独立安全发布、失败保留上一版有效配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 
 此订阅覆盖经审核的域名和已知共享依赖，不保证 Chrome / 桌面客户端的所有 DNS、WebSocket、WebRTC、IPv6、UDP 一定经过代理。请使用客户端连接日志和实际出口 IP 验证 Gemini 网页、AI Studio、Claude 网页、Claude Code、登录和文件上传。Shadowrocket 的 URL Rewrite / MITM 与 v2rayN 路由规则功能不同，不承诺完全等价。
 

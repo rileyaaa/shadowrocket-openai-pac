@@ -167,15 +167,22 @@ class SafetyTests(unittest.TestCase):
             path = Path(tmp) / 'status.json'
             for shadow, v2, publish_good in ((0, 0, True), (1, 0, True), (0, 1, True),
                                              (1, 1, True), (0, 0, False)):
-                path.write_text(json.dumps({'shadowrocket': {'exit_code': shadow},
+                path.write_text(json.dumps({'shadowrocket_ai': {'exit_code': shadow},
                                             'v2rayn': {'exit_code': v2},
                                             'publish': {'success': publish_good}}))
                 self.assertEqual(publish.check(path), 0 if (shadow, v2, publish_good) == (0, 0, True) else 1)
 
+    def test_only_two_published_client_artifacts(self):
+        self.assertEqual(builder.CONFIG.name, 'v2rayN_Johnshall_AI.json')
+        self.assertIn('Shadowrocket_Johnshall_AI.conf', publish.SHADOW_AI_FILES)
+        self.assertIn('v2rayN_Johnshall_AI.json', publish.V2_FILES)
+        self.assertNotIn('Shadowrocket_Johnshall_OpenAI.conf', publish.SHADOW_AI_FILES)
+        self.assertNotIn('v2rayN_Johnshall_OpenAI.json', publish.V2_FILES)
+
     def test_no_change_no_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'status.json'
-            path.write_text(json.dumps({'shadowrocket': {'exit_code': 0},
+            path.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
                                         'v2rayn': {'exit_code': 0}}))
             calls = []
             def fake_git(*args):
@@ -189,7 +196,7 @@ class SafetyTests(unittest.TestCase):
     def test_git_push_failure_recorded(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'status.json'
-            path.write_text(json.dumps({'shadowrocket': {'exit_code': 0},
+            path.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
                                         'v2rayn': {'exit_code': 0}}))
             def fake_git(*args):
                 if args[0] == 'push':
@@ -204,7 +211,7 @@ class SafetyTests(unittest.TestCase):
     def test_telegram_missing_secret_does_not_ack(self):
         with tempfile.TemporaryDirectory() as tmp:
             status = Path(tmp) / 's.json'
-            status.write_text(json.dumps({'shadowrocket': {'exit_code': 0},
+            status.write_text(json.dumps({'shadowrocket_ai': {'exit_code': 0},
                                           'v2rayn': {'exit_code': 1, 'error': 'download failed'},
                                           'reports': {},
                                           'publish': {'success': True, 'state': 'published'}}))
@@ -216,10 +223,10 @@ class SafetyTests(unittest.TestCase):
                     ack.assert_not_called()
 
     def test_single_telegram_message_sent_even_if_v2_fails(self):
-        status = {'shadowrocket': {'exit_code': 0},
+        status = {'shadowrocket_ai': {'exit_code': 0},
                   'v2rayn': {'exit_code': 1, 'error': 'upstream incomplete'},
                   'publish': {'success': True, 'state': 'published',
-                              'changed_files': ['Shadowrocket_Johnshall_OpenAI.conf']}}
+                              'changed_files': ['Shadowrocket_Johnshall_AI.conf']}}
         shadow = {'config_changed': True, 'statistics': {'johnshall_lines': 120000},
                   'new_excluded_candidates': [], 'review_due_candidates': []}
         msg = notify.emit_message(status, shadow, None, when='2026-11-23 11:00:00',

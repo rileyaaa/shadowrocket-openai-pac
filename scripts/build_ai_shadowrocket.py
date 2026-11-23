@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Independent, complete Shadowrocket Johnshall + OpenAI + Gemini + Claude.
+"""Maintain the ONLY Shadowrocket subscription: Johnshall + OpenAI/Gemini/Claude.
 
-This is a NEW subscription. The existing build.py/notify_telegram.py and
-Shadowrocket_Johnshall_OpenAI.conf are neither modified nor read as build
-inputs. Downloads the original seven sources independently, invokes only the
-reviewed pure rendering helpers from build.py, then adds audited AI rules
-before Johnshall. Publication is atomic and guarded by both old and new data.
+Uses stable pure parsing/rendering from legacy build.py, without running that
+builder or creating its retired .conf. Regenerates OpenAI review metadata,
+Voice coverage baseline, and notification state alongside the AI subscription.
+Both client subscriptions retain independent safety validation and publication.
 """
 from __future__ import annotations
 
@@ -19,6 +18,7 @@ import sys
 import build as legacy  # read-only, never invoke build.run()
 import build_v2rayn as v2helpers  # only atomic writer, independent data fetch is below
 import ai_services
+import review_queue
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / 'Shadowrocket_Johnshall_AI.conf'
@@ -74,6 +74,50 @@ def insert_ai_rules(original: str, additions: dict, node: str) -> str:
                             '\n'.join(parts) + '\n\n' + JOHNSHALL_MARKER, 1)
 
 
+def prepare_openai_review(voice, auto, emitted_auto, emitted_manual,
+                          source_lists, unparsed, fetched, rulesets, settings,
+                          stats, old_state, old_auto, changed):
+    """Maintain OpenAI review metadata without generating the retired .conf.
+
+    This is the audit-only part of the former build.run(): Voice baseline,
+    upstream exclusions, review queue, reminder delivery, Apple News provenance.
+    """
+    excluded = legacy.excluded_auto_rule_sources(source_lists, auto, unparsed)
+    auto_text = (
+        "# OpenAI automatic rules: official Voice destination IPs + public domains\n"
+        "# No node name here: route is supplied while merging into .conf\n"
+        "# Voice IPs (destination-only); never use OpenAI egress source ranges\n"
+        + "\n".join(f"{rule},no-resolve" for rule in voice) + "\n"
+        + "# Dedicated first-party and explicitly verified hosted domains\n"
+        + "\n".join(emitted_auto) + "\n"
+    )
+    try:
+        decisions = (ROOT / 'config/review-decisions.json').read_bytes()
+    except OSError:
+        decisions = b''
+    source_state = {
+        'sources': {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
+                    for name, (url, raw) in fetched.items()},
+        'settings': settings, 'statistics': stats,
+        'review': {
+            'excluded_auto_rules': list(excluded),
+            'decisions_sha256': hashlib.sha256(decisions).hexdigest(),
+        },
+    }
+    for name, (url, _) in legacy.RULESET_SOURCES.items():
+        source_state['sources'][name]['rule_count'] = len(rulesets[url])
+    old_report = legacy.make_sync_report(
+        old_state, source_state, old_auto, auto_text, changed,
+        excluded_sources=excluded,
+    )
+    review, delivery = review_queue.evaluate(
+        excluded, (old_state or {}).get('review', {}).get('excluded_auto_rules'),
+        emitted_auto + emitted_manual, legacy.domain_rule_covers, ROOT,
+    )
+    return {'source_state': source_state, 'auto_text': auto_text,
+            'review': review, 'delivery': delivery, 'report': old_report}
+
+
 def run(argv: list[str] | None = None) -> dict:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--upstream-file', type=Path)
@@ -95,6 +139,26 @@ def run(argv: list[str] | None = None) -> dict:
                                       emitted_manual, settings=settings, rulesets=rulesets)
     old_legacy = json.loads(ORIGINAL_STATE.read_text(encoding='utf-8')) if ORIGINAL_STATE.exists() else None
     old_auto = ORIGINAL_AUTO.read_text(encoding='utf-8') if ORIGINAL_AUTO.exists() else ''
+    stats.update({
+        'excluded_shared_auto_domains': len(all_auto) - len(auto),
+        'auto_input_rules': len(auto),
+        'manual_backup_rules': len(manual),
+        'suppressed_redundant_auto_rules': len(auto) - len(emitted_auto),
+        'suppressed_redundant_manual_rules': len(manual) - len(emitted_manual),
+        'cross_layer_duplicate_rules_retained': len(set(emitted_auto) & set(emitted_manual)),
+        'auto_total_ip_and_domain_rules': len(voice) + len(emitted_auto),
+        'unparsed_upstream_rules': len({rule for rows in unparsed.values() for rule in rows}),
+        'embedded_ruleset_rules': sum(len(rows) for rows in rulesets.values()),
+    })
+    stats.update(legacy.voice_address_counts(voice))
+    # Retain the original Apple News embedded-list size guard.
+    for name, (url, _) in legacy.RULESET_SOURCES.items():
+        before = (old_legacy or {}).get('sources', {}).get(name)
+        if before is not None:
+            count = before.get('rule_count')
+            if (type(count) is not int or count <= 0 or
+                    not count * .85 <= len(rulesets[url]) <= count * 1.50):
+                raise ValueError(f'Embedded ruleset count changed unexpectedly: {name}')
     reviewed_voice = False
     try:
         legacy.validate_voice_coverage(voice, old_auto, has_baseline=old_legacy is not None)
@@ -138,20 +202,42 @@ def run(argv: list[str] | None = None) -> dict:
              'output_sha256': hashlib.sha256(enhanced.encode('utf-8')).hexdigest()}
     output_bytes = enhanced.encode('utf-8')
     changed = not OUTPUT.exists() or OUTPUT.read_bytes() != output_bytes
+    review_meta = prepare_openai_review(
+        voice, auto, emitted_auto, emitted_manual, source_lists, unparsed,
+        fetched, rulesets, settings, stats, old_legacy, old_auto, changed,
+    )
+    review = review_meta['review']
+    original_delta = review_meta['report']
     report = {'build_success': True, 'config_changed': changed,
               'statistics': {**stats, **ai['counts'], 'conf_bytes': len(output_bytes)},
               'changed_sources': [k for k, value in outputs.items()
                                   if value != (old or {}).get('sources', {}).get(k)],
               'ai_review_candidates': ai['review_candidates'],
               'ai_review_counts': ai['review_counts'],
+              'auto_added': original_delta['auto_added'],
+              'auto_removed': original_delta['auto_removed'],
+              'new_excluded_candidates': review['new_candidates'],
+              'review_due_candidates': review['due_candidates'],
+              'manual_review_counts': review['counts'],
+              'review_reminder_interval_days': review['reminder_interval_days'],
+              'review_warnings': review['warnings'],
+              'review_decisions_changed': original_delta['review_decisions_changed'],
               'warnings': ['Shared Google authentication/static hosts may also proxy unrelated Google traffic.',
                            'Gemini/Claude rules depend on host/SNI; genuine client routing still needs testing.']}
-    # All downloaded inputs, semantic checks, and both safety baselines were
-    # checked before replacing any published artifact.
+    # All downloads, semantic checks and safety guards pass before any writes.
+    # No retired Shadowrocket_Johnshall_OpenAI.conf file is ever created.
     v2helpers.atomically_write(OUTPUT, output_bytes)
     v2helpers.atomically_write(STATE, (json.dumps(state, ensure_ascii=False, indent=2,
                                                   sort_keys=True) + '\n').encode('utf-8'))
     v2helpers.atomically_write(REVIEW_QUEUE, ai_services.render_review_queue(ai).encode('utf-8'))
+    v2helpers.atomically_write(ORIGINAL_AUTO, review_meta['auto_text'].encode('utf-8'))
+    for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
+        v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
+    v2helpers.atomically_write(ORIGINAL_STATE,
+        (json.dumps(review_meta['source_state'], ensure_ascii=False, sort_keys=True, indent=2) + '\n').encode('utf-8'))
+    v2helpers.atomically_write(ROOT / 'data/review-queue.md',
+        review_queue.render_queue(review).encode('utf-8'))
+    review_queue.write_json(ROOT / 'data/review-notifications.json', review_meta['delivery'])
     if args.report_file:
         v2helpers.atomically_write(args.report_file,
             (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))

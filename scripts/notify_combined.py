@@ -28,13 +28,11 @@ def read_json(path: str | None) -> dict | None:
     return doc if isinstance(doc, dict) else None
 
 
-def emit_message(status: dict, shadow: dict | None, v2: dict | None,
+def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                  *, when: str, event: str, run_url: str,
-                 shadow_ai: dict | None = None,
                  official_docs: dict | None = None) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
-              for key in ('shadowrocket', 'v2rayn', 'shadowrocket_ai')
-              if key in status or key != 'shadowrocket_ai'}
+              for key in ('shadowrocket_ai', 'v2rayn')}
     published = status.get('publish', {}).get('success', False)
     complete = all(builds.values()) and published
     partial = any(builds.values())
@@ -43,10 +41,8 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
              f'📤 GitHub 发布：{status.get("publish", {}).get("state", "未执行")}', '']
-    sections = [('shadowrocket', '🚀 Shadowrocket 小火箭（原有 OpenAI）', shadow)]
-    if 'shadowrocket_ai' in status:
-        sections.append(('shadowrocket_ai', '🚀 Shadowrocket OpenAI + Gemini + Claude', shadow_ai))
-    sections.append(('v2rayn', '💻 v2rayN', v2))
+    sections = [('shadowrocket_ai', '🚀 Shadowrocket 小火箭（OpenAI + Gemini + Claude）', shadow_ai),
+                ('v2rayn', '💻 v2rayN（OpenAI + Gemini + Claude）', v2)]
     for key, title, report in sections:
         build = status.get(key, {})
         success = build.get('exit_code') == 0 and report is not None
@@ -60,22 +56,12 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
             lines += ['发布：❌ 未成功推送 GitHub（仅本地构建成功）']
         else:
             changed_files = status.get('publish', {}).get('changed_files', [])
-            output = {'shadowrocket': 'Shadowrocket_Johnshall_OpenAI.conf',
-                      'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
-                      'v2rayn': 'v2rayN_Johnshall_OpenAI.json'}[key]
+            output = {'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
+                      'v2rayn': 'v2rayN_Johnshall_AI.json'}[key]
             lines += [f'发布：{"✅ 已更新" if output in changed_files else "✅ 已检查，内容无变化"}']
         lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
         stats = report.get('statistics', {})
-        if key == 'shadowrocket':
-            for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
-                                ('automatic_openai_domains', 'OpenAI 自动域名'),
-                                ('voice_prefixes', 'Voice IP'),
-                                ('retained_ad_rules', '拦截规则')]:
-                if type(stats.get(prop)) is int:
-                    lines.append(f'{label}：{stats[prop]}')
-            lines += [f'自动规则新增/删除：{len(report.get("auto_added", []))}/'
-                      f'{len(report.get("auto_removed", []))}']
-        elif key == 'shadowrocket_ai':
+        if key == 'shadowrocket_ai':
             for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
                                 ('voice_prefixes', 'OpenAI Voice IP'),
                                 ('gemini_domains', 'Gemini 审核域名'),
@@ -101,16 +87,17 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
-    if shadow and status.get('shadowrocket', {}).get('exit_code') == 0:
-        lines += [f'新增待审核：{len(shadow.get("new_excluded_candidates", []))}；'
-                  f'到期复审：{len(shadow.get("review_due_candidates", []))}']
-        counts = shadow.get('manual_review_counts', {})
+    if shadow_ai and status.get('shadowrocket_ai', {}).get('exit_code') == 0:
+        lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
+                  f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
+        counts = shadow_ai.get('manual_review_counts', {})
         if isinstance(counts, dict):
-            lines.append(f'审核状态：待审 {counts.get("pending", "?")}, 到期 {counts.get("due", "?")}')
-        for line in shadow.get('review_warnings', [])[:2]:
-            lines.append('⚠️ ' + str(line)[:140])
+            lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
+                         f'到期 {counts.get("due", "?")}')
+        for warning in shadow_ai.get('review_warnings', [])[:2]:
+            lines.append('⚠️ ' + str(warning)[:140])
     else:
-        lines.append('⚠️ Shadowrocket 审核报告缺失；没有确认或清除提醒送达状态')
+        lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
     if shadow_ai and shadow_ai.get('ai_review_candidates'):
@@ -143,10 +130,9 @@ def main() -> int:
     p.add_argument('--review-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
-        'shadowrocket': {'exit_code': -1, 'error': 'Build status file missing'},
+        'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
         'v2rayn': {'exit_code': -1, 'error': 'Build status file missing'},
         'publish': {'success': False, 'state': 'not-run'}}
-    shadow = read_json(status.get('reports', {}).get('shadowrocket'))
     v2 = read_json(status.get('reports', {}).get('v2rayn'))
     shadow_ai = read_json(status.get('reports', {}).get('shadowrocket_ai'))
     official_docs = read_json(status.get('reports', {}).get('official_docs'))
@@ -155,20 +141,20 @@ def main() -> int:
     run_url = (f'{os.environ.get("GITHUB_SERVER_URL", "https://github.com")}/'
                f'{repo}/actions/runs/{run_id}') if repo and run_id else ''
     now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
-    message = emit_message(status, shadow, v2, when=now,
+    message = emit_message(status, shadow_ai, v2, when=now,
                            event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url,
-                           shadow_ai=shadow_ai, official_docs=official_docs)
+                           official_docs=official_docs)
     print(message)
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary_path:
         with open(summary_path, 'a', encoding='utf-8') as f:
             f.write('## Shadowrocket + v2rayN 真实构建及发布报告\n\n~~~text\n'
                     + message + '\n~~~\n')
-            if shadow:
+            if shadow_ai:
                 for key in ('new_excluded_candidates', 'review_due_candidates'):
-                    if shadow.get(key):
-                        f.write(f'\n### {key}\n\n')
-                        for item in shadow[key]:
+                    if shadow_ai.get(key):
+                        f.write(f'\n### OpenAI {key}\n\n')
+                        for item in shadow_ai[key]:
                             f.write('- ' + str(item.get('rule', '?')) + '\n')
             if official_docs and official_docs.get('changes'):
                 f.write('\n### 每周官方文件变化（未自动批准）\n\n')
@@ -192,9 +178,11 @@ def main() -> int:
         print(f'::error::Telegram delivery failed: {type(exc).__name__}; receipts unchanged')
         return 1
     print('Unified Telegram report sent.')
-    if args.review_state_file and shadow and status.get('shadowrocket', {}).get('exit_code') == 0:
+    if (args.review_state_file and shadow_ai
+            and status.get('shadowrocket_ai', {}).get('exit_code') == 0
+            and status.get('publish', {}).get('success')):
         try:
-            review_queue.acknowledge(shadow, args.review_state_file)
+            review_queue.acknowledge(shadow_ai, args.review_state_file)
         except (OSError, ValueError, TypeError) as exc:
             print(f'::error::Telegram delivered, but review acknowledgement failed: {type(exc).__name__}')
             return 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independently run original Shadowrocket, AI Shadowrocket and v2rayN builds."""
+"""Independently run only the AI Shadowrocket and v2rayN subscription builds."""
 from __future__ import annotations
 import argparse
 import json
@@ -27,7 +27,6 @@ def main() -> int:
     p.add_argument('--work-dir', required=True, type=Path)
     args = p.parse_args()
     args.work_dir.mkdir(parents=True, exist_ok=True)
-    legacy_report = args.work_dir / 'shadowrocket-report.json'
     v2_report = args.work_dir / 'v2rayn-report.json'
     ai_report = args.work_dir / 'shadowrocket-ai-report.json'
     original_cases = ('test_build.py', 'test_hardening.py',
@@ -35,22 +34,17 @@ def main() -> int:
     original_results = [execute(f'Original test suite {pattern}',
         [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
          '-p', pattern, '-v']) for pattern in original_cases]
-    # Independent tests: an original-suite failure cannot block v2rayN.
+    # Continue testing the legacy parser that AI builders use as a library.
+    # Its tests protect Shadowrocket AI but do not prevent v2rayN publishing.
     status = {}
     failed_original = [result for result in original_results if result['exit_code']]
-    if failed_original:
-        status['shadowrocket'] = {
-            'exit_code': failed_original[0]['exit_code'],
-            'error': 'Original Shadowrocket tests failed: ' + failed_original[0]['error']}
-    else:
-        status['shadowrocket'] = execute('Shadowrocket build',
-            [sys.executable, 'scripts/build.py', '--report-file', str(legacy_report)])
     ai_tests = execute('Gemini and Claude source / Shadowrocket AI unit tests',
         [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
          '-p', 'test_ai_*.py', '-v'])
-    if ai_tests['exit_code']:
-        status['shadowrocket_ai'] = {'exit_code': ai_tests['exit_code'],
-            'error': 'AI rules validation tests failed: ' + ai_tests['error']}
+    if ai_tests['exit_code'] or failed_original:
+        failure = ai_tests if ai_tests['exit_code'] else failed_original[0]
+        status['shadowrocket_ai'] = {'exit_code': failure['exit_code'],
+            'error': 'Shadowrocket legacy parser / AI rules tests failed: ' + failure['error']}
     else:
         status['shadowrocket_ai'] = execute('Independent AI-enhanced Shadowrocket build',
             [sys.executable, 'scripts/build_ai_shadowrocket.py', '--report-file', str(ai_report)])
@@ -68,14 +62,12 @@ def main() -> int:
     docs_report = args.work_dir / 'ai-docs-audit-report.json'
     status['official_docs'] = execute('Weekly official Gemini / Claude doc advisory',
         [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report)])
-    status['reports'] = {'shadowrocket': str(legacy_report),
-                         'shadowrocket_ai': str(ai_report), 'v2rayn': str(v2_report),
-                         'official_docs': str(docs_report)}
+    status['reports'] = {'shadowrocket_ai': str(ai_report),
+                         'v2rayn': str(v2_report), 'official_docs': str(docs_report)}
     status['publish'] = {'success': False, 'state': 'pending'}
     status_path = args.work_dir / 'dual-status.json'
     status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-    print(f'Build status: Shadowrocket={status["shadowrocket"]["exit_code"]}, '
-          f'Shadowrocket AI={status["shadowrocket_ai"]["exit_code"]}, '
+    print(f'Build status: Shadowrocket AI={status["shadowrocket_ai"]["exit_code"]}, '
           f'v2rayN={status["v2rayn"]["exit_code"]}; saved {status_path}')
     return 0  # Publish & notification still run; final checker propagates failures.
 

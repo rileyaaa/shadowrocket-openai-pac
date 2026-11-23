@@ -25,7 +25,7 @@ import v2rayn_core as core
 import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / 'v2rayN_Johnshall_OpenAI.json'
+CONFIG = ROOT / 'v2rayN_Johnshall_AI.json'
 STATE = ROOT / 'data/v2rayn-sources.json'
 BITBROWSER = ROOT / 'data/bitbrowser_domains.txt'
 OPENAI_EXTRA = ROOT / 'config/v2rayn/openai-extra.rules'

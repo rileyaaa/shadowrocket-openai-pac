@@ -1,4 +1,4 @@
-"""Verify the separate AI Shadowrocket subscription cannot disturb the old file."""
+"""Verify the sole active Shadowrocket AI subscription and rule order."""
 from __future__ import annotations
 from pathlib import Path
 import sys
