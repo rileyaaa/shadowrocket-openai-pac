@@ -34,8 +34,10 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     builds = {key: status.get(key, {}).get('exit_code') == 0
               for key in ('shadowrocket_ai', 'v2rayn')}
     published = status.get('publish', {}).get('success', False)
-    complete = all(builds.values()) and published
-    partial = any(builds.values())
+    reports_complete = all((shadow_ai is not None, v2 is not None))
+    complete = all(builds.values()) and reports_complete and published
+    partial = published and any((builds['shadowrocket_ai'] and shadow_ai is not None,
+                                 builds['v2rayn'] and v2 is not None))
     overall = '成功' if complete else '部分成功' if partial else '失败'
     lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
              f'🔄 触发：{original.EVENTS.get(event, event)}',
