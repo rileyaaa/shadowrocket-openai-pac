@@ -3,10 +3,24 @@
 # Gemini: an official firewall ALLOWLIST is not an AI-only proxy list.
 # Shared Google login/CDN/Fonts/Play/People/OAuth hosts are intentionally excluded;
 # those requests fall through to the original Johnshall rules.
-# Only two narrowly scoped Gemini App helper hosts remain (still not exclusive).
+# Shared Google Search/assistant helpers are intentionally NOT routed as AI-only.
 # Official reference: https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings
-GEMINI,DOMAIN,jnn-pa.googleapis.com
-GEMINI,DOMAIN,waa-pa.clients6.google.com
+# Verified product-specific API, Web, updates and enterprise Notebook entrances.
+# Do not widen to googleapis.com, run.app, cloud.google.com or all Google Cloud AI.
+GEMINI,DOMAIN,antigravity.google.com
+GEMINI,DOMAIN,antigravity-cli-auto-updater-974169037036.us-central1.run.app
+GEMINI,DOMAIN,antigravity-hub-auto-updater-974169037036.us-central1.run.app
+GEMINI,DOMAIN,jules.googleapis.com
+GEMINI,DOMAIN,businessaicode.googleapis.com
+GEMINI,DOMAIN,businessaicode.us.rep.googleapis.com
+GEMINI,DOMAIN,businessaicode.eu.rep.googleapis.com
+GEMINI,DOMAIN,businessaicode.mtls.googleapis.com
+GEMINI,DOMAIN,notebooklm.cloud.google.com
+GEMINI,DOMAIN,notebook.cloud.google.com
+GEMINI,DOMAIN,notebooklm.cloud.google
+GEMINI,DOMAIN,notebook.cloud.google
+GEMINI,DOMAIN,ai.google
+GEMINI,DOMAIN,ai.google.com
 # Gemini Code Assist primary AI endpoints come from the reviewed community feeds.
 # Its shared login/Cloud APIs do not override the baseline geographic routes.
 # Reference: https://cloud.google.com/gemini/docs/codeassist/set-up-gemini
@@ -21,3 +35,12 @@ CLAUDE,DOMAIN,assets-proxy.anthropic.com
 CLAUDE,DOMAIN,bridge.claudeusercontent.com
 # Claude Code optional error reports, Anthropic-documented exact host only.
 CLAUDE,DOMAIN,browser-intake-us5-datadoghq.com
+# Pinned Claude routing baseline independent of community-feed changes.
+# These do not authorize broad shared CDN, Datadog or Sentry suffixes.
+CLAUDE,DOMAIN-SUFFIX,anthropic.com
+CLAUDE,DOMAIN-SUFFIX,claude.ai
+CLAUDE,DOMAIN-SUFFIX,claude.com
+CLAUDE,DOMAIN-SUFFIX,claudeusercontent.com
+CLAUDE,DOMAIN-SUFFIX,claudemcpcontent.com
+# Anthropic documents this as OPTIONAL telemetry; pinned only to retain the chosen route.
+CLAUDE,DOMAIN,http-intake.logs.us5.datadoghq.com
