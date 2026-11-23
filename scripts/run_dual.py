@@ -29,8 +29,21 @@ def main() -> int:
     args.work_dir.mkdir(parents=True, exist_ok=True)
     legacy_report = args.work_dir / 'shadowrocket-report.json'
     v2_report = args.work_dir / 'v2rayn-report.json'
-    status = {'shadowrocket': execute('Shadowrocket build',
-               [sys.executable, 'scripts/build.py', '--report-file', str(legacy_report)])}
+    original_cases = ('test_build.py', 'test_hardening.py',
+                      'test_review_queue.py', 'test_sync_reporting.py')
+    original_results = [execute(f'Original test suite {pattern}',
+        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
+         '-p', pattern, '-v']) for pattern in original_cases]
+    # Independent tests: an original-suite failure cannot block v2rayN.
+    status = {}
+    failed_original = [result for result in original_results if result['exit_code']]
+    if failed_original:
+        status['shadowrocket'] = {
+            'exit_code': failed_original[0]['exit_code'],
+            'error': 'Original Shadowrocket tests failed: ' + failed_original[0]['error']}
+    else:
+        status['shadowrocket'] = execute('Shadowrocket build',
+            [sys.executable, 'scripts/build.py', '--report-file', str(legacy_report)])
     tests = execute('v2rayN independent unit tests',
                     [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_v2rayn.py', '-v'])
     if tests['exit_code'] != 0:
