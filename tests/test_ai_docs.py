@@ -14,6 +14,13 @@ class OfficialDocsAuditTests(unittest.TestCase):
         self.assertIn('gemini.google.com',hosts)
         self.assertNotIn('tracker.fake.com',hosts)
         self.assertNotIn('foo.invalid.test',hosts)
+    def test_two_label_claude_hosts_are_extracted(self):
+        html = '<html><body>claude.ai claude.com api.anthropic.com browser-intake-us5-datadoghq.com</body></html>'
+        hosts = doc.extract_hosts(html, 'claude')
+        self.assertIn('claude.ai', hosts)
+        self.assertIn('claude.com', hosts)
+        self.assertIn('browser-intake-us5-datadoghq.com', hosts)
+
     def test_bad_docs_never_publish(self):
         with self.assertRaises(ValueError):
             doc.extract_hosts('<html><p>hello</p></html>','gemini')
