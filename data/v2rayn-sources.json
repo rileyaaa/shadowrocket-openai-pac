@@ -1,7 +1,16 @@
 {
+  "ai_counts": {
+    "claude_domains": 19,
+    "claude_metacubex": 21,
+    "claude_v2fly": 21,
+    "gemini_domains": 72,
+    "gemini_metacubex": 49,
+    "gemini_v2fly": 49
+  },
   "inputs_sha256": {
     "bitbrowser": "04ee0027298c0e51c8e7ec8f88523ad25446fa78673c062def1fced8e06b2302",
     "extra_openai": "0be1baabe869faf0d3e928852b3913bf4ab68c5637a27d7875952c5f2858ecfd",
+    "manual_ai": "e5ea680f46b50bb4a8959ae9c38de8158e382db2b138298b3a75559128cabc4d",
     "manual_openai": "e124138afe19e5eef76aa611acdcf352edbe26eb46f2ac32b0e0e8f17b54561f",
     "verified_processes": "0c8e90d93dc0339dfe723ec971066236ba703a23b9532a5aa095ce08085c8413"
   },
@@ -18,6 +27,26 @@
     "blackmatrix7": {
       "sha256": "6f4047cdbf6953cf5d9b38c4ccd6da7bc6f1acb91b7a87134f25d5b8f5d2408b",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
+    },
+    "claude_metacubex": {
+      "rule_count": 21,
+      "sha256": "31ef22b857da25cdfb4080bde74a485fed52eccc6fc14311193f811945938d78",
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/anthropic.list"
+    },
+    "claude_v2fly": {
+      "rule_count": 21,
+      "sha256": "59ad6a25a6d9759995777fe98f2cf30675199fad00546a0ffe027b95ec0776f0",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/anthropic"
+    },
+    "gemini_metacubex": {
+      "rule_count": 49,
+      "sha256": "d7a51a33dccab26a25260836f23b02cc283590cd5384fcf93de82c3331ce56a9",
+      "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google-gemini.list"
+    },
+    "gemini_v2fly": {
+      "rule_count": 49,
+      "sha256": "6f768291aa81a8d88fa48fc20613f55be646674cfa24a3b3c152a97e859c33a8",
+      "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google-deepmind"
     },
     "johnshall": {
       "sha256": "0c7f7257fecf7c896924ae35943964cefb01290d5c5879ff0f182694f8660e96",
@@ -37,22 +66,29 @@
     }
   },
   "statistics": {
+    "ai_review_candidates": 8,
     "auto_domains": 23,
     "bitbrowser_domains": 12,
     "block_rules": 54325,
+    "claude_domains": 19,
+    "claude_metacubex": 21,
+    "claude_v2fly": 21,
     "direct_rules": 6,
-    "domain_rules": 84533,
+    "domain_rules": 84624,
     "external_lists_embedded": 1,
+    "gemini_domains": 72,
+    "gemini_metacubex": 49,
+    "gemini_v2fly": 49,
     "ip_rules": 573,
     "johnshall_block_rules": 54325,
     "johnshall_lines": 84676,
     "johnshall_proxy_rules": 30265,
-    "json_bytes": 2251050,
+    "json_bytes": 2254000,
     "manual_domains": 44,
     "openai_user_extras": 43,
     "process_rules": 1,
-    "proxy_rules": 30777,
-    "routing_objects": 130,
+    "proxy_rules": 30868,
+    "routing_objects": 132,
     "unparsed_community_rules_review_only": 3,
     "unsupported_rules": 0,
     "unverified_bitbrowser_domains": 0,
