@@ -171,9 +171,12 @@ def run(argv: list[str] | None = None) -> dict:
     openai_entries = [(*core.as_match(*rule.split(',', 1)), 'proxy') for rule in all_openai]
     extra = parse_user_extra(OPENAI_EXTRA.read_text(encoding='utf-8'))
     bitbrowser = core.load_bitbrowser_domains(BITBROWSER.read_text(encoding='utf-8'))
-    bit_entries = [(*core.as_match('DOMAIN-SUFFIX', name), 'proxy') for name, _, _ in bitbrowser]
+    bit_entries = [(*core.as_match('DOMAIN-SUFFIX', name), 'proxy')
+                   for name, confidence, _ in bitbrowser if confidence in ('official', 'user')]
     processes = core.load_processes(PROCESSES.read_text(encoding='utf-8'))
     proc_entries = [('process', path, 'proxy') for path in processes]
+    if 'BitBrowser.exe' not in processes:
+        raise ValueError('Required BitBrowser.exe process proxy is absent')
     ai = ai_services.collect(download)
     ai_entries = {
         service: [(*core.as_match(*rule.split(',', 1)), 'proxy')
@@ -230,12 +233,17 @@ def run(argv: list[str] | None = None) -> dict:
     stats['json_bytes'] = len(output)
     before = CONFIG.read_bytes() if CONFIG.exists() else None
     old = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
+    if before is not None and old is None:
+        raise ValueError('Existing v2rayN output has no baseline state; refusing reset')
+    if old and old.get('output_sha256') and hashlib.sha256(before or b'').hexdigest() != old['output_sha256']:
+        raise ValueError('Previous v2rayN output/state digest mismatch')
     safety_check(stats, old)
     ai_services.validate_safety(ai['counts'], old)
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
     next_sources.update(ai['records'])
-    state = {'schema_version': 1, 'sources': next_sources, 'statistics': stats,
+    state = {'schema_version': 1, 'output_sha256': hashlib.sha256(output).hexdigest(),
+             'sources': next_sources, 'statistics': stats,
              'ai_counts': ai['counts'],
              'inputs_sha256': {
                  'manual_openai': hashlib.sha256((ROOT / 'config/manual-openai.rules').read_bytes()).hexdigest(),

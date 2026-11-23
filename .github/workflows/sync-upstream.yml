@@ -36,6 +36,7 @@ concurrency:
 
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -75,9 +76,29 @@ jobs:
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
             --review-state-file data/review-notifications.json
       - name: Persist delivered review reminders
-        if: steps.telegram.outcome == 'success'
+        if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
+          # Telegram success is NOT proof of a successful GitHub publication.
+          python - "$RUNNER_TEMP/dual-status.json" <<'PY'
+          import json, sys
+          state = json.load(open(sys.argv[1], encoding='utf-8'))
+          if not state.get('publish', {}).get('success'):
+              print('::error::Refusing receipt write after failed publication.')
+              sys.exit(1)
+          PY
+          # A failed publisher may leave unrelated staged files behind.
+          # Never let receipt persistence accidentally publish those files.
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo '::error::Refusing receipt write outside main.'
+            exit 1
+          fi
+          git reset --mixed --quiet
           git add -- data/review-notifications.json
+          staged="$(git diff --cached --name-only)"
+          if [ -n "$staged" ] && [ "$staged" != "data/review-notifications.json" ]; then
+            echo '::error::Unexpected staged path in receipt commit.'
+            exit 1
+          fi
           if git diff --cached --quiet; then
             echo 'No review receipt changes.'
             exit 0

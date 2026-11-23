@@ -38,11 +38,15 @@ def main() -> int:
     # Its tests protect Shadowrocket AI but do not prevent v2rayN publishing.
     status = {}
     failed_original = [result for result in original_results if result['exit_code']]
-    ai_tests = execute('Gemini and Claude source / Shadowrocket AI unit tests',
+    ai_source_tests = execute('Shared Gemini and Claude source tests',
         [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
-         '-p', 'test_ai_*.py', '-v'])
-    if ai_tests['exit_code'] or failed_original:
-        failure = ai_tests if ai_tests['exit_code'] else failed_original[0]
+         '-p', 'test_ai_services.py', '-v'])
+    shadow_tests = execute('Shadowrocket-specific routing tests',
+        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
+         '-p', 'test_ai_shadowrocket.py', '-v'])
+    if ai_source_tests['exit_code'] or shadow_tests['exit_code'] or failed_original:
+        failure = next(result for result in (ai_source_tests, shadow_tests, *failed_original)
+                       if result['exit_code'])
         status['shadowrocket_ai'] = {'exit_code': failure['exit_code'],
             'error': 'Shadowrocket legacy parser / AI rules tests failed: ' + failure['error']}
     else:
@@ -50,10 +54,10 @@ def main() -> int:
             [sys.executable, 'scripts/build_ai_shadowrocket.py', '--report-file', str(ai_report)])
     tests = execute('v2rayN independent unit tests',
                     [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_v2rayn.py', '-v'])
-    if tests['exit_code'] != 0 or ai_tests['exit_code'] != 0:
-        status['v2rayn'] = {'exit_code': tests['exit_code'] or ai_tests['exit_code'],
+    if tests['exit_code'] != 0 or ai_source_tests['exit_code'] != 0:
+        status['v2rayn'] = {'exit_code': tests['exit_code'] or ai_source_tests['exit_code'],
                             'error': 'v2rayN / shared AI rules tests failed: ' +
-                            (tests['error'] or ai_tests['error'])}
+                            (tests['error'] or ai_source_tests['error'])}
     else:
         status['v2rayn'] = execute('v2rayN independent build',
                [sys.executable, 'scripts/build_v2rayn.py', '--report-file', str(v2_report)])

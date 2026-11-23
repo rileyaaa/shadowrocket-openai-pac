@@ -182,6 +182,12 @@ def run(argv: list[str] | None = None) -> dict:
     old = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else None
     if old and old.get('schema_version') != 1:
         raise ValueError('Unsupported prior Shadowrocket AI state version')
+    if OUTPUT.exists() and old is None:
+        raise ValueError('Existing Shadowrocket output has no baseline state; refusing reset')
+    if old and old.get('output_sha256') and (
+            not OUTPUT.exists() or
+            hashlib.sha256(OUTPUT.read_bytes()).hexdigest() != old['output_sha256']):
+        raise ValueError('Previous Shadowrocket output/state digest mismatch')
     ai_services.validate_safety(ai['counts'], old)
     enhanced = insert_ai_rules(original, ai, settings['openai_node_name'])
     if (len(enhanced.encode('utf-8')) < 1_000_000 or enhanced.count('[Rule]') != 1

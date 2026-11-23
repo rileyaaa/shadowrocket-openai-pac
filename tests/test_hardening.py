@@ -47,6 +47,22 @@ class DownloadCompletenessTests(unittest.TestCase):
                     return_value=http_response(body, headers)):
                 self.assertEqual(build.fetch("https://upstream.example/file"), b"x" * 100)
 
+    def test_http_206_is_never_a_valid_upstream(self):
+        class Partial:
+            status = 206
+            headers = {'Content-Length': '100', 'Content-Range': 'bytes 0-99/1000'}
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self, size):
+                return b'x' * 100
+        with patch('build.urllib.request.urlopen', return_value=Partial()) as fetch, \
+                patch('build.time.sleep'):
+            with self.assertRaisesRegex(ValueError, 'partial/non-200'):
+                build.fetch('https://upstream.example/file')
+        self.assertEqual(fetch.call_count, 2)
+
     def test_truncated_chunked_response_retries_and_fails(self):
         with patch("build.urllib.request.urlopen", side_effect=lambda *a, **kw:
                    http_response(b"64\r\n" + b"x" * 80, b"Transfer-Encoding: chunked\r\n")) as download, \

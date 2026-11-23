@@ -168,8 +168,8 @@ def fetch(url: str, minimum: int = 50) -> bytes:
     for attempt in range(2):  # initial request + exactly one retry
         try:
             with urllib.request.urlopen(request, timeout=75) as response:
-                if not 200 <= response.status < 300:
-                    raise ValueError(f"Unexpected HTTP status for {url}: {response.status}")
+                if response.status != 200 or response.headers.get('Content-Range'):
+                    raise ValueError(f"Unexpected partial/non-200 response for {url}: {response.status}")
                 declared = response.headers.get("Content-Length")
                 if declared is not None:
                     if not re.fullmatch(r"[0-9]+", declared.strip()):
@@ -635,7 +635,15 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
             changed.append(line)
     if converted < 10000 or before_ads < 20000:
         raise ValueError(f"Original rules unexpectedly changed: proxy={converted}, reject={before_ads}")
-    if sum(line.strip().lower() == "final,direct" for line in changed) != 1:
+    rejected = [line.strip() for line in changed if
+                re.search(r',reject(?:,|$)', line, re.I)]
+    if len(set(rejected)) < before_ads * .90:
+        raise ValueError('Johnshall ad unique coverage collapsed')
+    active_rules = [line.strip() for line in changed
+                    if line.strip() and not line.lstrip().startswith(('#', ';'))]
+    if active_rules[-1].lower() != 'final,direct':
+        raise ValueError('Johnshall FINAL must be the last effective routing rule')
+    if sum(line.lower() == 'final,direct' for line in active_rules) != 1:
         raise ValueError("Missing/duplicate Johnshall final DIRECT")
     if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
         raise ValueError("Unconverted original Proxy rule found")

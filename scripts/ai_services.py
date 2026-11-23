@@ -53,15 +53,21 @@ APPROVED_HOSTS = {
       notebooklm-pa.googleapis.com notebooklm.googleapis.com
       antigravity-pa.googleapis.com antigravity.googleapis.com
       robinfrontend-pa.googleapis.com aisandbox-pa.googleapis.com
-      aicode.googleapis.com aida.googleapis.com proactivebackend-pa.googleapis.com
-      generativelanguage.googleapis.com geller-pa.googleapis.com
+      aicode.googleapis.com aida.googleapis.com
+      generativelanguage.googleapis.com
       labstailwind.pa.googleapis.com'''.split()),
     'claude': frozenset('''servd-anthropic-website.b-cdn.net
       http-intake.logs.us5.datadoghq.com o1158394.ingest.us.sentry.io'''.split()),
 }
 MANDATORY = {
     'gemini': {'DOMAIN-SUFFIX,gemini.google.com', 'DOMAIN,generativelanguage.googleapis.com'},
-    'claude': {'DOMAIN-SUFFIX,claude.ai', 'DOMAIN-SUFFIX,anthropic.com'},
+    'claude': {
+        'DOMAIN-SUFFIX,claude.ai', 'DOMAIN-SUFFIX,anthropic.com',
+        'DOMAIN-SUFFIX,claude.com', 'DOMAIN-SUFFIX,claudeusercontent.com',
+        'DOMAIN-SUFFIX,claudemcpcontent.com',
+        'DOMAIN,browser-intake-us5-datadoghq.com',
+        'DOMAIN,http-intake.logs.us5.datadoghq.com',
+    },
 }
 VALID_HOST = re.compile(r'(?i)^[a-z0-9-]+(?:\.[a-z0-9-]+)+$')
 BLACKLIST = ('doubleclick.net', 'google-analytics.com', 'googletagmanager.com')
@@ -199,6 +205,27 @@ def evaluate_review_policy(candidates: list[dict], policy: dict,
     return output, counts
 
 
+def approved_rule_overlaps(a: str, b: str) -> bool:
+    """Whether two exact/suffix host rules can match the same hostname."""
+    ak, ah = a.split(',', 1)
+    bk, bh = b.split(',', 1)
+    if ak == 'DOMAIN' and bk == 'DOMAIN':
+        return ah == bh
+    if ak == 'DOMAIN-SUFFIX' and bk == 'DOMAIN-SUFFIX':
+        return ah == bh or ah.endswith('.' + bh) or bh.endswith('.' + ah)
+    suffix, host = (ah, bh) if ak == 'DOMAIN-SUFFIX' else (bh, ah)
+    return host == suffix or host.endswith('.' + suffix)
+
+
+def check_rejection_conflicts(approved: dict[str, set[str]], policy: dict) -> None:
+    """Human rejection may never silently lose to a manual/automatic allow."""
+    for item in policy['rejected_rules']:
+        service, rejected = item['service'], item['rule']
+        for allowed in approved[service]:
+            if approved_rule_overlaps(allowed, rejected):
+                raise ValueError(f'AI approved/rejected rule conflict: {service}: {allowed} vs {rejected}')
+
+
 def collect(download, *, manual_path: Path = MANUAL,
             review_policy_path: Path = REVIEW_POLICY,
             source_overrides: dict[str, bytes] | None = None) -> dict:
@@ -239,8 +266,9 @@ def collect(download, *, manual_path: Path = MANUAL,
         for (service, rule), sources in sorted(candidates.items())
     ]
     policy_bytes = review_policy_path.read_bytes()
-    review_candidates, review_counts = evaluate_review_policy(
-        raw_candidates, json.loads(policy_bytes.decode('utf-8-sig')))
+    policy = json.loads(policy_bytes.decode('utf-8-sig'))
+    review_candidates, review_counts = evaluate_review_policy(raw_candidates, policy)
+    check_rejection_conflicts(approved, policy)
     return {
         'rules': {service: sorted(rows) for service, rows in approved.items()},
         'records': records,
