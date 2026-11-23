@@ -51,11 +51,18 @@ class ExtractText(HTMLParser):
             self.parts.append(data)
 
 
+ADVISORY_EXACT_HOSTS = {
+    'claude': frozenset({'browser-intake-us5-datadoghq.com'}),
+    'gemini': frozenset(),
+}
+
+
 def extract_hosts(content: str, service: str) -> list[str]:
     parser = ExtractText()
     parser.feed(content)
     text = ' '.join(parser.parts)
     hosts = {h.lower() for h in HOST.findall(text) if
+             h.lower() in ADVISORY_EXACT_HOSTS[service] or
              any(h.lower() == end or h.lower().endswith('.' + end)
                  for end in ALLOWED_TAILS[service])}
     limit = 10 if service == 'gemini' else 3
