@@ -12,5 +12,5 @@
 | claude | `DOMAIN-SUFFIX,claudemcpclient.com` | claude_metacubex, claude_v2fly | 待审核 | — | — |
 | claude | `DOMAIN-SUFFIX,claudepages.dev` | claude_metacubex, claude_v2fly | 待审核 | — | — |
 | claude | `DOMAIN-SUFFIX,claudestudio.com` | claude_metacubex, claude_v2fly | 待审核 | — | — |
-| gemini | `DOMAIN-SUFFIX,geller-pa.googleapis.com` | gemini_metacubex, gemini_v2fly | 待审核 | — | — |
-| gemini | `DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com` | gemini_metacubex, gemini_v2fly | 待审核 | — | — |
+| gemini | `DOMAIN-SUFFIX,geller-pa.googleapis.com` | gemini_metacubex, gemini_v2fly | 已拒绝，复审未到期 | 2026-11-23 | 2027-05-23 |
+| gemini | `DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com` | gemini_metacubex, gemini_v2fly | 已拒绝，复审未到期 | 2026-11-23 | 2027-05-23 |
