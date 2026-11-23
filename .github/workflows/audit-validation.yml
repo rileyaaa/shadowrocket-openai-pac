@@ -32,3 +32,20 @@ jobs:
           PY
       - name: Run all offline regression tests
         run: python -B -m unittest discover -s tests -v
+      - name: Verify live upstreams and regenerate both outputs without publication
+        run: |
+          python scripts/build_ai_shadowrocket.py --report-file "$RUNNER_TEMP/shadowrocket-smoke.json"
+          python scripts/build_v2rayn.py --report-file "$RUNNER_TEMP/v2rayn-smoke.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          shadow = json.loads(Path('data/ai-shadowrocket-sources.json').read_text())
+          v2 = json.loads(Path('data/v2rayn-sources.json').read_text())
+          assert shadow['ai_counts']['claude_domains'] >= 20
+          assert shadow['ai_counts']['gemini_domains'] >= 50
+          assert v2['statistics']['process_rules'] >= 1
+          assert v2['output_sha256']
+          assert Path('Shadowrocket_Johnshall_AI.conf').is_file()
+          assert Path('v2rayN_Johnshall_AI.json').is_file()
+          print('Both live smoke builds passed; artifacts were not committed or published.')
+          PY
