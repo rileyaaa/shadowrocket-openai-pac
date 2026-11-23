@@ -12,6 +12,7 @@ SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf', 'data/ai-shadowrocket-sourc
                    'data/ai-review-queue.md')
 V2_FILES = ('v2rayN_Johnshall_OpenAI.json', 'data/v2rayn-sources.json')
 REVIEW_FILES = ('config/review-decisions.json',)
+DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
 
 
 def git(*args: str) -> subprocess.CompletedProcess:
@@ -37,6 +38,9 @@ def publish(path: Path) -> None:
             files += SHADOW_AI_FILES
         if ok['v2rayn']:
             files += V2_FILES
+        # Advisory docs snapshot only when both official pages were verified.
+        if status.get('official_docs', {}).get('exit_code') == 0:
+            files += [f for f in DOC_FILES if Path(f).is_file()]
         git('add', '-A', '--', *files)
         changed_files = git('diff', '--cached', '--name-only').stdout.splitlines()
         if not changed_files:

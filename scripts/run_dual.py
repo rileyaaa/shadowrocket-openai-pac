@@ -63,8 +63,14 @@ def main() -> int:
     else:
         status['v2rayn'] = execute('v2rayN independent build',
                [sys.executable, 'scripts/build_v2rayn.py', '--report-file', str(v2_report)])
+    # Advisory weekly check runs in this SAME existing daily workflow. On
+    # other days it skips without network access. Failure never blocks routes.
+    docs_report = args.work_dir / 'ai-docs-audit-report.json'
+    status['official_docs'] = execute('Weekly official Gemini / Claude doc advisory',
+        [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report)])
     status['reports'] = {'shadowrocket': str(legacy_report),
-                         'shadowrocket_ai': str(ai_report), 'v2rayn': str(v2_report)}
+                         'shadowrocket_ai': str(ai_report), 'v2rayn': str(v2_report),
+                         'official_docs': str(docs_report)}
     status['publish'] = {'success': False, 'state': 'pending'}
     status_path = args.work_dir / 'dual-status.json'
     status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

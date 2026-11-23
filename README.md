@@ -297,3 +297,7 @@ Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/go
 GitHub Actions 分别记录三套真实构建状态、独立安全发布、失败保留旧配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 
 此订阅覆盖经审核的域名和已知共享依赖，不保证 Chrome / 桌面客户端的所有 DNS、WebSocket、WebRTC、IPv6、UDP 一定经过代理。请使用客户端连接日志和实际出口 IP 验证 Gemini 网页、AI Studio、Claude 网页、Claude Code、登录和文件上传。Shadowrocket 的 URL Rewrite / MITM 与 v2rayN 路由规则功能不同，不承诺完全等价。
+
+### 官方文件每周复审（不阻塞每日生成）
+
+每天同一个 Actions 的 `scripts/run_dual.py` 还会调用 `scripts/audit_ai_docs.py`；仅在**台湾时间周日的定时运行**检查 Google Gemini App 防火墙与 Anthropic Claude Code 的官方网络文档。提取并比较相关主机的集合，变化时写入 `data/ai-docs-review.md`，但**绝不会直接把网页上新出现的主机自动加入代理**。如果官方网页暂时不可访问或被安全验证阻断，保留旧快照，Telegram 会记录警告，不影响任何一套已经验证成功的规则。未修改原有唯一的每天 11:00 调度。非周日的普通推送不会发起官方网页请求。

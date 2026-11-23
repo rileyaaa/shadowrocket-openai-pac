@@ -30,7 +30,8 @@ def read_json(path: str | None) -> dict | None:
 
 def emit_message(status: dict, shadow: dict | None, v2: dict | None,
                  *, when: str, event: str, run_url: str,
-                 shadow_ai: dict | None = None) -> str:
+                 shadow_ai: dict | None = None,
+                 official_docs: dict | None = None) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
               for key in ('shadowrocket', 'v2rayn', 'shadowrocket_ai')
               if key in status or key != 'shadowrocket_ai'}
@@ -111,6 +112,14 @@ def emit_message(status: dict, shadow: dict | None, v2: dict | None,
         lines.append('⚠️ ' + str(status.get('publish', {}).get('error', 'GitHub 未确认发布'))[:250])
     if shadow_ai and shadow_ai.get('ai_review_candidates'):
         lines.append(f'⚠️ Gemini/Claude 新候选待审：{len(shadow_ai["ai_review_candidates"])}，未自动批准')
+    docs_status = status.get('official_docs', {})
+    if docs_status.get('exit_code', 0) != 0:
+        lines.append('⚠️ 本周官方网络文档检查不可用；不影响规则更新：' +
+                     str(docs_status.get('error', '未知原因'))[:140])
+    elif official_docs and official_docs.get('checked'):
+        lines.append('🗓 官方网络文档：' +
+                     ('发现变化，待人工核实' if official_docs.get('changed')
+                      else '每周检查完成，域名无变化'))
     if v2 and v2.get('warnings'):
         lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
     if run_url:
@@ -135,6 +144,7 @@ def main() -> int:
     shadow = read_json(status.get('reports', {}).get('shadowrocket'))
     v2 = read_json(status.get('reports', {}).get('v2rayn'))
     shadow_ai = read_json(status.get('reports', {}).get('shadowrocket_ai'))
+    official_docs = read_json(status.get('reports', {}).get('official_docs'))
     repo = os.environ.get('GITHUB_REPOSITORY', '')
     run_id = os.environ.get('GITHUB_RUN_ID', '')
     run_url = (f'{os.environ.get("GITHUB_SERVER_URL", "https://github.com")}/'
@@ -142,7 +152,7 @@ def main() -> int:
     now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
     message = emit_message(status, shadow, v2, when=now,
                            event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url,
-                           shadow_ai=shadow_ai)
+                           shadow_ai=shadow_ai, official_docs=official_docs)
     print(message)
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary_path:
@@ -155,6 +165,10 @@ def main() -> int:
                         f.write(f'\n### {key}\n\n')
                         for item in shadow[key]:
                             f.write('- ' + str(item.get('rule', '?')) + '\n')
+            if official_docs and official_docs.get('changes'):
+                f.write('\n### 每周官方文件变化（未自动批准）\n\n')
+                for change in official_docs['changes']:
+                    f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机\n')
             if shadow_ai:
                 f.write('\n### Gemini / Claude 未批准新候选\n\n')
                 for item in shadow_ai.get('ai_review_candidates', []):
