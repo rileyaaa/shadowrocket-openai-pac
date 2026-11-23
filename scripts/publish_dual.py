@@ -3,6 +3,7 @@
 from __future__ import annotations
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -10,7 +11,8 @@ import subprocess
 # parser library; its OpenAI review metadata is maintained by Shadowrocket AI.
 SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf',
                    'data/ai-shadowrocket-sources.json', 'data/ai-review-queue.md',
-                   'rules', 'data/sources.json', 'data/review-queue.md',
+                   'rules/johnshall-apple-news.list', 'rules/openai-auto.list',
+                   'data/sources.json', 'data/review-queue.md',
                    'data/review-notifications.json')
 V2_FILES = ('v2rayN_Johnshall_AI.json', 'data/v2rayn-sources.json')
 REVIEW_FILES = ('config/review-decisions.json',)
@@ -31,6 +33,8 @@ def write(path: Path, status: dict) -> None:
 def publish(path: Path) -> None:
     status = json.loads(path.read_text(encoding='utf-8'))
     try:
+        if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_REF') != 'refs/heads/main':
+            raise RuntimeError('Refusing publish outside refs/heads/main')
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
@@ -41,8 +45,14 @@ def publish(path: Path) -> None:
         # Advisory docs snapshot only when both official pages were verified.
         if status.get('official_docs', {}).get('exit_code') == 0:
             files += [f for f in DOC_FILES if Path(f).is_file()]
+        # A previous failed commit or user-staged file must not be carried over.
+        git('reset', '--mixed', '--quiet')
         git('add', '-A', '--', *files)
         changed_files = git('diff', '--cached', '--name-only').stdout.splitlines()
+        allowed = set(files)
+        unexpected = sorted(set(changed_files) - allowed)
+        if unexpected:
+            raise RuntimeError('Unexpected staged publish paths: ' + ', '.join(unexpected))
         if not changed_files:
             status['publish'] = {'success': True, 'state': 'unchanged',
                                  'changed_files': [], 'commit': None}
@@ -56,7 +66,11 @@ def publish(path: Path) -> None:
         git('push', 'origin', 'HEAD:main')
         remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
         if remote != commit:
-            raise RuntimeError('Git push verification mismatch: remote main is not the published commit')
+            # A new commit can legitimately advance main after our push. The
+            # published commit must remain an ancestor of remote main.
+            ancestor = subprocess.run(['git', 'merge-base', '--is-ancestor', commit, remote])
+            if ancestor.returncode != 0:
+                raise RuntimeError('Git push verification mismatch: published commit not on remote main')
         status['publish'] = {'success': True, 'state': 'published',
                              'commit': commit, 'changed_files': changed_files}
         print(f'Published commit {commit}: {changed_files}')
