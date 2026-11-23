@@ -635,6 +635,10 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
             changed.append(line)
     if converted < 10000 or before_ads < 20000:
         raise ValueError(f"Original rules unexpectedly changed: proxy={converted}, reject={before_ads}")
+    rejected = [line.strip() for line in changed if
+                re.search(r',reject(?:,|$)', line, re.I)]
+    if len(set(rejected)) < before_ads * .90:
+        raise ValueError('Johnshall ad unique coverage collapsed')
     active_rules = [line.strip() for line in changed
                     if line.strip() and not line.lstrip().startswith(('#', ';'))]
     if active_rules[-1].lower() != 'final,direct':
