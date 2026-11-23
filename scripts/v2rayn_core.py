@@ -46,7 +46,9 @@ def as_match(kind: str, value: str) -> tuple[str, str]:
             net = ipaddress.ip_network(value, strict=False)
         except ValueError as exc:
             raise UnsupportedRule(f'Invalid CIDR {value}') from exc
-        if (kind == 'IP-CIDR6') != (net.version == 6):
+        # Johnshall sometimes labels IPv6 CIDRs with IP-CIDR rather than
+        # IP-CIDR6. The literal CIDR determines actual family; do not widen.
+        if kind == 'IP-CIDR6' and net.version != 6:
             raise UnsupportedRule(f'CIDR family mismatch: {kind},{value}')
         return 'ip', str(net)
     raise UnsupportedRule(f'Unsupported rule type: {kind}')

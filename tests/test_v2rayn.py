@@ -32,6 +32,8 @@ class ConversionTests(unittest.TestCase):
                          ('ip', '2001:4860::/32', 'direct'))
         self.assertEqual(core.parse_rule('GEOIP,CN,DIRECT'), ('ip', 'geoip:cn', 'direct'))
         self.assertEqual(core.parse_rule('GEOSITE,cn,Proxy'), ('domain', 'geosite:cn', 'proxy'))
+        self.assertEqual(core.parse_rule('IP-CIDR,2001:b28:f23d::/48,PROXY'),
+                         ('ip', '2001:b28:f23d::/48', 'proxy'))
         with self.assertRaises(core.UnsupportedRule):
             core.parse_rule('IP-CIDR6,1.1.1.0/24,PROXY')
         with self.assertRaises(core.UnsupportedRule):
