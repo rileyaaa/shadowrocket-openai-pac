@@ -29,6 +29,18 @@ class ConversionTests(unittest.TestCase):
         self.assertNotEqual(core.as_match('DOMAIN', 'browser-intake-us5-datadoghq.com'),
                             ('domain', 'domain:datadoghq.com'))
 
+    def test_chatgpt_webpubsub_pattern_does_not_cross_dns_label(self):
+        import re
+        field, value = core.as_match(
+            'DOMAIN-WILDCARD', 'chatgpt-async-webps-prod-*.webpubsub.azure.com')
+        self.assertEqual(field, 'domain')
+        regex = re.compile(value.removeprefix('regexp:'))
+        self.assertTrue(regex.fullmatch('chatgpt-async-webps-prod-xyz-12.webpubsub.azure.com'))
+        for wrong in ('chatgpt-async-webps-prod-x.y.webpubsub.azure.com',
+                      'chatgpt-async-webps-prod-.webpubsub.azure.com',
+                      'chatgpt-async-webps-prod-x.webpubsub.azure.com.bad.test'):
+            self.assertIsNone(regex.fullmatch(wrong))
+
     def test_ipv4_ipv6_geo_and_no_resolve(self):
         self.assertEqual(core.parse_rule('IP-CIDR,8.8.8.0/24,Proxy,no-resolve'),
                          ('ip', '8.8.8.0/24', 'proxy'))
@@ -179,6 +191,14 @@ class SafetyTests(unittest.TestCase):
                     git.assert_not_called()
             self.assertIn('Refusing publish outside refs/heads/main',
                           json.loads(path.read_text())['publish']['error'])
+
+    def test_voice_equal_count_replacement_needs_review(self):
+        old = {f'IP-CIDR,4.4.4.{i}/32' for i in range(1, 6)}
+        builder.validate_voice_overlap(old, old)
+        with self.assertRaisesRegex(ValueError, 'VOICE COVERAGE ANOMALY'):
+            builder.validate_voice_overlap(
+                old, {f'IP-CIDR,9.9.9.{i}/32' for i in range(1, 6)})
+        builder.validate_voice_overlap(set(), old)  # one-time baseline migration
 
     def test_independent_size_guards(self):
         present = {name: 1000 for name in

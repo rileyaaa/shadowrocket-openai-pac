@@ -405,6 +405,19 @@ def validate_voice_coverage(ips: list[str], old_auto: str, *, has_baseline: bool
                 f"added({len(added)}): {', '.join(added[:80])}; "
                 f"removed({len(removed)}): {', '.join(removed[:80])}"
             )
+    # Raw address counts alone are not a coverage guarantee. A same-size
+    # replacement of all official Voice destinations must require review.
+    previous_voice = {','.join(rule.split(',')[:2]) for rule in active_auto_rules(old_auto)
+                      if rule.startswith(('IP-CIDR,', 'IP-CIDR6,'))}
+    new_voice = set(ips)
+    if previous_voice and new_voice:
+        overlap = len(previous_voice & new_voice)
+        if overlap < min(len(previous_voice), len(new_voice)) * .50:
+            raise ValueError(
+                f'VOICE COVERAGE ANOMALY: address overlap {overlap}/'
+                f'{min(len(previous_voice), len(new_voice))}; '
+                'official destination set changed substantially; manual review required'
+            )
     return current
 
 

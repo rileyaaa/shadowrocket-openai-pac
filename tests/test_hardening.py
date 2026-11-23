@@ -184,6 +184,16 @@ class PipelineHardeningTests(unittest.TestCase):
         self.run_build()
         self.assertFalse(json.loads((self.root / "report.json").read_text())["config_changed"])
 
+    def test_voice_same_count_total_replacement_is_blocked(self):
+        self.run_build()
+        before = self.published_files()
+        self.sources[build.VOICE_URL] = json.dumps({'prefixes': [
+            {'ipv4Prefix': f'9.9.9.{i}/32'} for i in range(1, 6)
+        ]}).encode()
+        with self.assertRaisesRegex(ValueError, 'VOICE COVERAGE ANOMALY'):
+            self.run_build()
+        self.assertEqual(before, self.published_files())
+
     def test_voice_same_count_expansion_preserves_published_files(self):
         self.run_build()
         before = self.published_files()

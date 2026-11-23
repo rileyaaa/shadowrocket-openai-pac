@@ -107,7 +107,7 @@ python scripts/build_v2rayn.py
 
 ## GitHub Actions 成功后 Telegram 推送
 
-**Telegram 没有单独的每日定时任务**：原 Actions 每天 11:00 检查上游，但只在某次 Actions 的测试、生成和提交步骤成功后立即发一次报告。此行为适用于定时、手动、修改配置触发的 Actions。**没有上游变化也会发送检查成功、无变化。** 构建失败不会发送误导性的成功通知。
+**Telegram 没有单独的每日定时任务**：同一 GitHub Actions 每天计划在台北时间 11:00 检查上游。只要通知密钥可用，构建成功、部分成功或失败都会尝试发送**一条包含实际状态**的报告；无变化也会报告。Telegram 发送成功不等于两份订阅均成功更新。构建失败时只发布通过校验的客户端结果，失败的一端保留上一版。
 
 报告记录：触发来源、变化的上游、规则数量与变化量、新增和删除的自动规则示例及 Actions 运行链接。相同摘要也写入 Actions Summary。
 
@@ -115,7 +115,7 @@ python scripts/build_v2rayn.py
 
 **准备公开仓库时特别注意：旧提交的 Git 历史中已经出现过 Chat ID。改成 Secret 仅保护之后的提交，并不能删除历史记录。若要求 Chat ID 连历史也不可见，应使用经过清理的新公开仓库，保留现有仓库私有；不要误以为改变 Secret 就能抹除旧历史。**
 
-未设置 Secret 时，Actions 同步正常，摘要照样生成，但 Telegram 步骤会提示未配置并跳过发送。Telegram 发送暂时失败最多重试 3 次；发送异常不影响已经成功发布的配置。
+未设置 Secret 时，构建与已完成的发布不受影响，但 Telegram 通知步骤会标记失败（非静默跳过），Actions 总体状态可能显示失败。Telegram 发送暂时失败最多重试 3 次；发送异常不撤回已经发布成功的配置。
 
 ## 上游异常保护
 
@@ -313,7 +313,7 @@ v2rayN 没有绑定节点。OpenAI / Gemini / Claude / BitBrowser 命中 `proxy`
 
 Gemini 社区参考：v2fly `data/google-deepmind` 与 MetaCubeX `geo/geosite/google-gemini.list`；Claude：v2fly `data/anthropic` 与 MetaCubeX `geo/geosite/anthropic.list`。**MetaCubeX 主要是衍生格式，不能当作完全独立的域名归属证据。** 每次记录各来源 SHA-256、数量和变化，在新来源异常缩减、缺失、语法变化时保留上一版有效输出。生成文件由 Action 提交，不直接手改。
 
-`config/ai-services.rules` 只补充经过审查的独立 AI 主机。2026-11-23 起，Gemini 删除会被 Gmail / Google Play / 其他 Google 服务 / 普通网站共用的登录、字体、图片、通用 API/CDN 精确主机；保留 `jnn-pa.googleapis.com` 与 `waa-pa.clients6.google.com` 两个较窄的 Gemini App 辅助主机。官方「防火墙允许清单」不是「Gemini 专属流量清单」，Google 共享连接继续按 Johnshall 原始规则处理，即使 Gemini 页面本身走台湾 AI 节点，登录或静态资源也可能走不同出口。主要 Gemini、AI Studio、Code Assist API 仍由经过筛选的上游规则覆盖，实际覆盖情况要用客户端连接日志复核。Claude Code 的精确主机规则保持不变。新增不明域名仍只进入 `data/ai-review-queue.md` 待审，不自动代理。
+`config/ai-services.rules` 只补充经过审查的独立 AI 主机。2026-11-23 起，Gemini 删除会被 Gmail / Google Play / 其他 Google 服务 / 普通网站共用的登录、字体、图片、通用 API/CDN 精确主机；将 `jnn-pa.googleapis.com`、`waa-pa.clients6.google.com` 以及已知被普通 Google Search 使用的 Geller/Proactive 后端交还 Johnshall 原有规则。官方「防火墙允许清单」不是「Gemini 专属流量清单」，Google 共享连接继续按 Johnshall 原始规则处理，即使 Gemini 页面本身走台湾 AI 节点，登录或静态资源也可能走不同出口。主要 Gemini、AI Studio、Code Assist API 仍由经过筛选的上游规则覆盖，实际覆盖情况要用客户端连接日志复核。Claude Code 的精确主机规则保持不变。新增不明域名仍只进入 `data/ai-review-queue.md` 待审，不自动代理。
 
 GitHub Actions 分别记录两套真实构建状态、独立安全发布、失败保留上一版有效配置、无变化不生成 Commit，并最终通过 **一个 Telegram Bot 消息**汇总成功/失败/域名统计。原有人工拒绝与到期复审、Telegram 已送达状态仍按原机制运作。
 
@@ -331,4 +331,4 @@ Claude Code 官方网络清单中的可选错误报告精确主机 `browser-inta
 
 ### Gemini / Claude 人工拒绝及六个月复审
 
-`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。现阶段 AI 复审日期及数量已纳入统一 Telegram 报告；`reminder_interval_days` 为预留配置，尚未实现像旧 OpenAI 那样的独立 7 天通知送达去重，不能当作已验收功能。
+`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。现阶段 AI 待审数量纳入 Telegram 汇总，逐项复审日期保留在 GitHub 审核队列；`reminder_interval_days` 为预留配置，尚未实现像旧 OpenAI 那样的独立 7 天通知送达去重，不能当作已验收功能。

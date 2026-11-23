@@ -31,7 +31,10 @@ def as_match(kind: str, value: str) -> tuple[str, str]:
         if kind == 'DOMAIN-WILDCARD':
             if not DOMAIN_NAME.fullmatch(value):
                 raise UnsupportedRule(f'Invalid wildcard {value}')
-            # Anchored expression: no accidentally wider suffix or keyword matching.
+            if value.lower() == 'chatgpt-async-webps-prod-*.webpubsub.azure.com':
+                # The variable component in this known host is exactly one DNS label.
+                return 'domain', r'regexp:^chatgpt-async-webps-prod-[^.]+\.webpubsub\.azure\.com$'
+            # Generic wildcard semantics are preserved for other rules.
             return 'domain', 'regexp:^' + re.escape(value.lower()).replace(r'\*', '.*').replace(r'\?', '.') + '$'
         return 'domain', {
             'DOMAIN': 'full:', 'DOMAIN-SUFFIX': 'domain:',

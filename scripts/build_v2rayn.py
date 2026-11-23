@@ -133,6 +133,13 @@ def safety_check(stats: dict, old: dict | None) -> None:
             raise ValueError(f'V2RAYN UPSTREAM ANOMALY: {key} {before} -> {now}; publication blocked')
 
 
+def validate_voice_overlap(previous: set[str], current: set[str]) -> None:
+    """Require human review for a near-total same-count Voice IP rotation."""
+    if previous and current and (
+            len(previous & current) < min(len(previous), len(current)) * .50):
+        raise ValueError('V2RAYN VOICE COVERAGE ANOMALY: official destination set replaced')
+
+
 def run(argv: list[str] | None = None) -> dict:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--report-file', type=Path)
@@ -238,11 +245,17 @@ def run(argv: list[str] | None = None) -> dict:
     if old and old.get('output_sha256') and hashlib.sha256(before or b'').hexdigest() != old['output_sha256']:
         raise ValueError('Previous v2rayN output/state digest mismatch')
     safety_check(stats, old)
+    # Independent v2rayN voice baseline (not read from Shadowrocket output).
+    # Existing state without this field gets one migration baseline.
+    previous_voice = set(old.get('voice_rules', [])) if old else set()
+    current_voice = set(voice)
+    validate_voice_overlap(previous_voice, current_voice)
     ai_services.validate_safety(ai['counts'], old)
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
     next_sources.update(ai['records'])
     state = {'schema_version': 1, 'output_sha256': hashlib.sha256(output).hexdigest(),
+             'voice_rules': sorted(current_voice),
              'sources': next_sources, 'statistics': stats,
              'ai_counts': ai['counts'],
              'inputs_sha256': {
