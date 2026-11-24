@@ -44,7 +44,7 @@ def read_state(path):
 
 def covers(rules, candidate):
     return (candidate.count(',') == 1 and candidate.split(',', 1)[0] in review_queue.DOMAIN_TYPES
-            and any(legacy.domain_rule_covers(rule, candidate) for rule in rules))
+            and legacy.covering_approval_for_rejection(candidate, rules) is not None)
 
 def merge(snapshots, reports, root=ROOT, *, on=None):
     fresh = [key for key in CLIENTS if key in reports]

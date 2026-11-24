@@ -44,6 +44,41 @@ class BuildTest(unittest.TestCase):
                 self.assertEqual(build.johnshall_policy(original), policy)
                 self.assertEqual(build.map_johnshall_proxy(original, node), expected)
 
+    def test_openai_review_wildcard_coverage_is_not_compaction(self):
+        pattern = 'DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com'
+        host = 'DOMAIN,chatgpt-async-webps-prod-example.webpubsub.azure.com'
+        self.assertTrue(build.approved_openai_covers(pattern, host))
+        self.assertFalse(build.domain_rule_covers(pattern, host))
+        for rule in (
+            'DOMAIN,chatgpt-async-webps-prod-x.y.webpubsub.azure.com',
+            'DOMAIN,chatgpt-async-webps-prod-.webpubsub.azure.com',
+            'DOMAIN,chatgpt-async-webps-prod-x.webpubsub.azure.com.bad.test',
+            'DOMAIN-SUFFIX,webpubsub.azure.com',
+            'DOMAIN-SUFFIX,chatgpt-async-webps-prod-example.webpubsub.azure.com',
+            'regexp:.*webpubsub.*',
+        ):
+            with self.subTest(rule=rule):
+                self.assertFalse(build.approved_openai_covers(pattern, rule))
+
+    def test_embedded_ruleset_format_does_not_change_reviewed_scope(self):
+        url = build.RULESET_SOURCES['apple_news'][0]
+        rules = build.parse_embedded_ruleset(
+            '\ufeff# TOTAL: 2\r\n domain , a.example \r\nDomain-Suffix,b.example\r\n')
+        self.assertEqual(rules, ['DOMAIN,a.example', 'DOMAIN-SUFFIX,b.example'])
+        expected = build.inline_ruleset(f'RULE-SET,{url},Proxy', {url: rules})
+        self.assertEqual(build.inline_ruleset(f' rule-set , {url} , Proxy ', {url: rules}), expected)
+        for raw in ('# TOTAL: 2\nDOMAIN,a.example\n',
+                    '# TOTAL: 2\nDOMAIN,a.example\n domain , A.EXAMPLE \n',
+                    '# TOTAL: 1\nDOMAIN,a.example,DIRECT\n',
+                    '# TOTAL: 1\nrule-set,https://other.example/list\n'):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                build.parse_embedded_ruleset(raw)
+        for line in (f'DOMAIN-SET,{url},Proxy',
+                     'RULE-SET,https://other.example/list,Proxy',
+                     f'RULE-SET,{url},Proxy,no-resolve'):
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                build.inline_ruleset(line, {url: rules})
+
     def test_openai_rejection_blocks_full_scope_but_not_approved_child(self):
         import review_queue
         with tempfile.TemporaryDirectory() as tmp:
