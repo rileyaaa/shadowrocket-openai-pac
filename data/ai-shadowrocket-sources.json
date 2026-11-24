@@ -4,10 +4,10 @@
     "claude_metacubex": 21,
     "claude_v2fly": 21,
     "gemini_domains": 61,
-    "gemini_metacubex": 49,
+    "gemini_metacubex": 50,
     "gemini_v2fly": 50
   },
-  "build_inputs_sha256": "2768df3d9292d3b00b961f918b86a0c1231064b60842dbd540ba20cc31b378bf",
+  "build_inputs_sha256": "91026e318812ed597d684246f1d9ffef94d15de86bea64c79305a72047efd469",
   "legacy_state_sha256": "c9a0f397dabb9ae56680c4bf361a26debc1e98523ad782e6b7bbd0326a7c2f21",
   "manual_ai_sha256": "cf235ecbf69984f2113c245f8ce137e679c3931fcae645bff620088836c9b60a",
   "output_sha256": "006c32e72b5d127b4e0a88ae1bfd8e519061bb3c560081998994b919fe3ec95d",
@@ -127,6 +127,7 @@
       "rule": "DOMAIN-SUFFIX,gemma.ai",
       "service": "gemini",
       "sources": [
+        "gemini_metacubex",
         "gemini_v2fly"
       ],
       "status": "pending"
@@ -178,8 +179,8 @@
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/anthropic"
     },
     "gemini_metacubex": {
-      "rule_count": 49,
-      "sha256": "d7a51a33dccab26a25260836f23b02cc283590cd5384fcf93de82c3331ce56a9",
+      "rule_count": 50,
+      "sha256": "1026b66232b74937770793fb1f6b8079740334dde473b9c3d31af15fc020921c",
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google-gemini.list"
     },
     "gemini_v2fly": {

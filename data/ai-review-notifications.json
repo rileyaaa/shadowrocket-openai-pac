@@ -83,6 +83,7 @@
         "rule": "DOMAIN-SUFFIX,gemma.ai",
         "service": "gemini",
         "sources": [
+          "gemini_metacubex",
           "gemini_v2fly"
         ]
       },
@@ -172,6 +173,7 @@
         "rule": "DOMAIN-SUFFIX,gemma.ai",
         "service": "gemini",
         "sources": [
+          "gemini_metacubex",
           "gemini_v2fly"
         ]
       },
