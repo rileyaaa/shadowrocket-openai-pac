@@ -44,7 +44,9 @@ class ReleaseIntegrityTests(unittest.TestCase):
                   'artifact_sha256': ri.artifact_manifest(ri.V2_FILES, self.root)}
         path = self.write('report.json', json.dumps(report).encode())
         status = {'reports': {client: str(path)}}
-        self.assertEqual(ri.validate_release(client, status, self.root), report)
+        # Hash-only fixture is intentionally not a complete subscription.
+        with patch('route_semantics.verify_release_routes'):
+            self.assertEqual(ri.validate_release(client, status, self.root), report)
         self.write(output, b'broken')
         with self.assertRaisesRegex(ValueError, 'digest mismatch'):
             ri.validate_release(client, status, self.root)

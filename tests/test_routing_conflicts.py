@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from datetime import date, timedelta
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import routing_conflicts as rc
@@ -24,6 +25,25 @@ class RoutingConflictTests(unittest.TestCase):
         self.assertTrue(rc.domain_overlap('full:api.example.com', 'keyword:example'))
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'full:other.example.com'))
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'geosite:ads'))
+
+    def test_all_pairs_and_change_or_monthly_receipts(self):
+        result = rc.detect([('domain','domain:r.openai.com','block'),
+                            ('domain','full:ads.openai.com','block')],
+                           [('domain','domain:openai.com','proxy')], limit=1)
+        self.assertEqual(result['count'],2)
+        self.assertEqual(len(result['examples']),1)
+        self.assertEqual(len(result['pairs']),2)
+        on = date(2026,11,24)
+        state = {'version':1,'current':[],'delivered':[],'notified_at':None}
+        state, report = rc.evaluate(result,state,on=on)
+        self.assertTrue(report['alert'])
+        state, report = rc.evaluate(result,state,on=on)
+        self.assertEqual(len(report['added']),2)  # not acknowledged
+        state.update(delivered=report['pairs'], notified_at=on.isoformat())
+        self.assertFalse(rc.evaluate(result,state,on=on+timedelta(days=29))[1]['alert'])
+        self.assertTrue(rc.evaluate(result,state,on=on+timedelta(days=30))[1]['alert'])
+        empty = rc.detect([], [])
+        self.assertEqual(len(rc.evaluate(empty,state,on=on)[1]['removed']),2)
 
 if __name__ == '__main__':
     unittest.main()

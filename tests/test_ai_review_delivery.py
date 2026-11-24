@@ -30,7 +30,7 @@ class SharedReviewTests(unittest.TestCase):
         self.assertEqual(report['review_counts']['pending'], 2)
         self.assertEqual(report['stale_clients'], ['v2rayn'])
 
-    def test_due_seven_days_and_new_once_after_ack(self):
+    def test_due_and_pending_repeat_only_after_configured_interval(self):
         rows = [candidate('DOMAIN,new.example', ['meta']), candidate('DOMAIN,old.example', ['v2fly'])]
         reports = {'v2rayn': {'ai_review_candidates': rows}}
         state, report = delivery.merge_reports(delivery.empty_state(), reports, self.policy, on=self.now)
@@ -42,7 +42,7 @@ class SharedReviewTests(unittest.TestCase):
         state, report = delivery.merge_reports(state, reports, self.policy, on=self.now + timedelta(days=6))
         self.assertEqual(report['alerts'], [])
         state, report = delivery.merge_reports(state, reports, self.policy, on=self.now + timedelta(days=7))
-        self.assertEqual([x['rule'] for x in report['alerts']], ['DOMAIN,old.example'])
+        self.assertEqual([x['rule'] for x in report['alerts']], ['DOMAIN,new.example', 'DOMAIN,old.example'])
 
 if __name__ == '__main__':
     unittest.main()

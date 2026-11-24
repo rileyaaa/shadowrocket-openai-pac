@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo
 import notify_telegram as original
 import review_queue
 import ai_review_delivery
+import openai_review_delivery
+import routing_conflicts
 from release_integrity import valid_build_report
 
 
@@ -42,11 +44,15 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         changed_files = []
     valid = {'shadowrocket_ai': builds['shadowrocket_ai'] and valid_build_report(shadow_ai),
              'v2rayn': builds['v2rayn'] and valid_build_report(v2)}
-    complete = all(valid.values()) and published
+    review_errors = any(status.get(k) for k in ('openai_review_error', 'ai_review_error', 'routing_review_error'))
+    docs_error = status.get('official_docs', {}).get('exit_code', 0) != 0
+    complete = all(valid.values()) and published and not review_errors
     partial = published and any(valid.values())
     overall = ('成功' if complete else '部分成功' if partial else
                '待核对' if publication.get('state') == 'pushed_unverified'
                or (published and changed_files) else '失败')
+    if complete and docs_error:
+        overall = '订阅成功（文档检查告警）'
     lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
@@ -83,6 +89,9 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         sources = report.get('changed_sources', [])
         lines.append('变化来源：' + (', '.join(original.NAMES.get(s, s) for s in sources) if sources else '无'))
         stats = report.get('statistics', {})
+        deltas = report.get('source_count_deltas', {})
+        if deltas:
+            lines.append('来源规则增减：' + '；'.join(f'{original.NAMES.get(k, k)} {v:+d}' for k,v in sorted(deltas.items())))
         if key == 'shadowrocket_ai':
             if report.get('settings_changed'):
                 lines.append('节点名称：已更新')
@@ -100,7 +109,8 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                                 ('retained_ad_rules', '广告拦截'),
                                 ('conf_bytes', '订阅字节数')]:
                 if type(stats.get(prop)) is int:
-                    lines.append(f'{label}：{stats[prop]}')
+                    diff = report.get('stat_deltas', {}).get(prop)
+                    lines.append(f'{label}：{stats[prop]}' + (f' ({diff:+d})' if type(diff) is int and diff else ''))
             review_counts = report.get('ai_review_counts', {})
             lines.append('AI 审核：待审 {pending} / 暂缓 {cooling} / 到期 {due}'.format(
                 pending=review_counts.get('pending', '?'), cooling=review_counts.get('cooling', '?'),
@@ -114,33 +124,55 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                                 ('gemini_domains', 'Gemini 审核域名'),
                                 ('claude_domains', 'Claude 审核域名')]:
                 if type(stats.get(prop)) is int:
-                    lines.append(f'{label}：{stats[prop]}')
+                    diff = report.get('stat_deltas', {}).get(prop)
+                    lines.append(f'{label}：{stats[prop]}' + (f' ({diff:+d})' if type(diff) is int and diff else ''))
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
-    if valid['shadowrocket_ai']:
-        lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
-                  f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
-        new = shadow_ai.get('new_excluded_candidates', [])
-        due = shadow_ai.get('review_due_candidates', [])
-        for item in new[:4]:
-            lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
-                         ', '.join(item.get('sources', []))[:100] + ']')
-        for item in due[:4]:
-            lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
-                         f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
-        if len(new) > 4 or len(due) > 4:
-            lines.append('其余审核项请查看本次 Actions 完整摘要。')
-        counts = shadow_ai.get('manual_review_counts', {})
-        if isinstance(counts, dict):
-            lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
-                         f'到期 {counts.get("due", "?")}')
-            if counts.get('due'):
-                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 7)} 天提醒一次。')
-        for warning in shadow_ai.get('review_warnings', [])[:2]:
+    openai = status.get('openai_review')
+    if openai:
+        new, due = openai['new_candidates'], openai['due_candidates']
+        counts = openai['counts']
+        lines.append(f'OpenAI 合并审核：待审 {counts["pending"]} / 到期 {counts["due"]} / 暂缓 {counts["cooling"]}')
+        lines.append(f'本次提醒：待审 {len(new)} / 复审 {len(due)}；未处理每 {openai["reminder_interval_days"]} 天')
+        for item in new[:3]:
+            lines.append('· 待审 ' + item['rule'][:120] + ' [' + ', '.join(item['sources'])[:100] + ']')
+        for item in due[:3]:
+            lines.append(f'· 复审 {item["rule"][:120]}（上次 {item["reviewed_at"]}；到期 {item["review_due_on"]}）')
+        if len(new) > 3 or len(due) > 3:
+            lines.append('其余请查看本次 Actions 完整摘要。')
+        if openai['stale_clients']:
+            lines.append('⚠️ OpenAI 审核保留旧快照：' + ', '.join(openai['stale_clients']))
+        if openai['deployment_pending']:
+            lines.append(f'已批准但等待旧端更新：{len(openai["deployment_pending"])} 项')
+        for warning in openai['warnings'][:2]:
             lines.append('⚠️ ' + str(warning)[:140])
+    elif status.get('openai_review_error'):
+        lines.append('⚠️ OpenAI 合并审核失败：' + str(status['openai_review_error'])[:140])
     else:
-        lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
+        if valid['shadowrocket_ai']:
+            lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
+                      f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
+            new = shadow_ai.get('new_excluded_candidates', [])
+            due = shadow_ai.get('review_due_candidates', [])
+            for item in new[:4]:
+                lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
+                             ', '.join(item.get('sources', []))[:100] + ']')
+            for item in due[:4]:
+                lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
+                             f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
+            if len(new) > 4 or len(due) > 4:
+                lines.append('其余审核项请查看本次 Actions 完整摘要。')
+            counts = shadow_ai.get('manual_review_counts', {})
+            if isinstance(counts, dict):
+                lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
+                             f'到期 {counts.get("due", "?")}')
+                if counts.get('due'):
+                    lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 30)} 天提醒一次。')
+            for warning in shadow_ai.get('review_warnings', [])[:2]:
+                lines.append('⚠️ ' + str(warning)[:140])
+        else:
+            lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(publication.get('error', 'GitHub 未确认发布'))[:250])
     shared = status.get('ai_review')
@@ -155,6 +187,8 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + suffix)
         if len(alerts) > 4:
             lines.append('其余请查看本次 Actions 完整摘要。')
+        if shared.get('deployment_pending'):
+            lines.append(f'已审核但等待旧端更新：{len(shared["deployment_pending"])} 项')
         if shared.get('stale_clients'):
             lines.append('⚠️ 审核候选沿用上次快照：' + ', '.join(shared['stale_clients']))
     elif status.get('ai_review_error'):
@@ -169,13 +203,21 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('🗓 官方网络文档：' +
                      ('发现变化，待人工核实' if official_docs.get('changed')
                       else '每周检查完成，域名无变化'))
-    if valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
-        conflicts = v2['routing_conflicts']
-        lines.append(f'⚠️ v2rayN：{conflicts["count"]} 条代理规则与前置拦截有交集，未修改优先级。')
-        for item in conflicts['examples'][:2]:
-            lines.append('· ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
-    if v2 and v2.get('warnings'):
-        lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
+    routing = status.get('routing_review')
+    if status.get('routing_review_error'):
+        lines.append('⚠️ 冲突审核状态更新失败：' + str(status['routing_review_error'])[:140])
+    elif routing:
+        if routing['count'] or routing['alert']:
+            lines.append(f'v2rayN 前置拦截冲突：{routing["count"]} 对（不改变分流）')
+        if routing['alert']:
+            lines.append(f'新增 {len(routing["added"])} / 消失 {len(routing["removed"])}' +
+                         ('；到期复查' if routing['due'] else ''))
+            for label, items in (('新增', routing['added']), ('消失', routing['removed']),
+                                 ('复查', routing['pairs'] if routing['due'] and not routing['added'] and not routing['removed'] else [])):
+                for item in items[:2]:
+                    lines.append('· ' + label + ' ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
+    elif valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
+        lines.append(f'⚠️ v2rayN：{v2["routing_conflicts"]["count"]} 对前置拦截交集；完整结果见摘要。')
     if run_url:
         lines += ['', '🔗 GitHub Actions：' + run_url]
     message = '\n'.join(lines)
@@ -191,6 +233,7 @@ def main() -> int:
     p.add_argument('--status-file', required=True, type=Path)
     p.add_argument('--review-state-file', type=Path)
     p.add_argument('--ai-review-state-file', type=Path)
+    p.add_argument('--conflict-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
         'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
@@ -213,7 +256,11 @@ def main() -> int:
         with open(summary_path, 'a', encoding='utf-8') as f:
             f.write('## Shadowrocket + v2rayN 真实构建及发布报告\n\n~~~text\n'
                     + message + '\n~~~\n')
-            if shadow_ai:
+            if status.get('openai_review'):
+                f.write('\n### OpenAI 合并审核清单\n\n')
+                for item in status['openai_review']['entries']:
+                    f.write(f'- {item["rule"]} — {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}；原因 {item.get("reason", "—")}；{item["client_coverage"]}\n')
+            elif shadow_ai:
                 for key in ('new_excluded_candidates', 'review_due_candidates'):
                     if shadow_ai.get(key):
                         f.write(f'\n### OpenAI {key}\n\n')
@@ -228,6 +275,10 @@ def main() -> int:
                 for change in official_docs['changes']:
                     f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机；'
                             f'未分类 +{len(change.get("other_added", []))} / -{len(change.get("other_removed", []))}\n')
+                    for client, hosts in change.get('uncovered_by_client', {}).items():
+                        f.write(f'  - {client} 未完整覆盖：{len(hosts)} 项（仅供人工审核）\n')
+                        for host in hosts:
+                            f.write(f'    - {host}\n')
                     for key in ('added', 'removed', 'other_added', 'other_removed'):
                         for host in change.get(key, []):
                             f.write(f'  - {key}: {host}\n')
@@ -239,7 +290,7 @@ def main() -> int:
             if v2:
                 if v2.get('routing_conflicts', {}).get('count'):
                     f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
-                    for item in v2['routing_conflicts']['examples']:
+                    for item in v2['routing_conflicts'].get('pairs', v2['routing_conflicts']['examples']):
                         f.write(f'- {item["proxy_rule"]} ← {item["earlier_block_rule"]}\n')
                     f.write('\n' + v2['routing_conflicts']['limitations'] + '\n')
                 for warning in v2.get('warnings', []):
@@ -256,7 +307,15 @@ def main() -> int:
         return 1
     print('Unified Telegram report sent.')
     receipt_files = []
-    if (args.review_state_file and valid_build_report(shadow_ai)
+    if (args.review_state_file and status.get('openai_review')
+            and status.get('publish', {}).get('success') is True and run_url and summary_path):
+        try:
+            review_queue.acknowledge(openai_review_delivery.receipt_report(status['openai_review']), args.review_state_file)
+            receipt_files.append(str(args.review_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::OpenAI review receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    elif (not status.get('openai_review_error') and args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
             and status.get('publish', {}).get('success')
             and run_url and summary_path):
@@ -274,6 +333,14 @@ def main() -> int:
             receipt_files.append(str(args.ai_review_state_file))
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f'::error::AI review receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    if (args.conflict_state_file and status.get('routing_review', {}).get('alert')
+            and status.get('publish', {}).get('success') is True and run_url and summary_path):
+        try:
+            routing_conflicts.acknowledge(status['routing_review'], args.conflict_state_file)
+            receipt_files.append(str(args.conflict_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::Conflict receipt acknowledgement failed: {type(exc).__name__}')
             return 1
     # Stage only receipts explicitly acknowledged in this run.
     if args.status_file.is_file():

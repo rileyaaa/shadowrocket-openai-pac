@@ -75,7 +75,7 @@ jobs:
               # Only the disposable Actions workspace is reset. Never force push.
               git fetch --no-tags origin refs/heads/main
               git reset --hard FETCH_HEAD
-              git clean -f -- data/ai-review-notifications.json data/ai-official-docs.json data/ai-docs-review.md
+              git clean -f -- data/routing-conflicts.json data/openai-review-snapshots.json data/ai-review-notifications.json data/ai-official-docs.json data/ai-docs-review.md
               if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ -n "$REVIEW_RULE" ]; then
                 args=(--rule "$REVIEW_RULE" --reason "$REVIEW_REASON")
                 if [ -n "$REVIEW_MONTHS" ]; then args+=(--months "$REVIEW_MONTHS"); fi
@@ -96,46 +96,11 @@ jobs:
         run: |
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
             --review-state-file data/review-notifications.json \
-            --ai-review-state-file data/ai-review-notifications.json
+            --ai-review-state-file data/ai-review-notifications.json \
+            --conflict-state-file data/routing-conflicts.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
-        run: |
-          # Telegram success is NOT proof of a successful GitHub publication.
-          python - "$RUNNER_TEMP/dual-status.json" <<'PY'
-          import json, sys
-          state = json.load(open(sys.argv[1], encoding='utf-8'))
-          if not state.get('publish', {}).get('success'):
-              print('::error::Refusing receipt write after failed publication.')
-              sys.exit(1)
-          PY
-          # A failed publisher may leave unrelated staged files behind.
-          # Never let receipt persistence accidentally publish those files.
-          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo '::error::Refusing receipt write outside main.'
-            exit 1
-          fi
-          git reset --mixed --quiet
-          python - "$RUNNER_TEMP/dual-status.json" <<'PY'
-          import json, subprocess, sys
-          state = json.load(open(sys.argv[1], encoding='utf-8'))
-          paths = state.get('receipt_files', [])
-          allowed = {'data/review-notifications.json', 'data/ai-review-notifications.json'}
-          if not isinstance(paths, list) or not set(paths) <= allowed:
-              sys.exit('Unexpected receipt path.')
-          if paths:
-              subprocess.run(['git', 'add', '--', *paths], check=True)
-          staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
-          if not set(staged) <= set(paths):
-              sys.exit('Unexpected staged path in receipt commit.')
-          PY
-          if git diff --cached --quiet; then
-            echo 'No review receipt changes.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore: record delivered review reminders'
-          git push origin HEAD:main
+        run: python scripts/persist_receipts.py --status-file "$RUNNER_TEMP/dual-status.json"
       - name: Propagate independent build and publish failures
         if: always()
         run: python scripts/publish_dual.py --status-file "$RUNNER_TEMP/dual-status.json" --check

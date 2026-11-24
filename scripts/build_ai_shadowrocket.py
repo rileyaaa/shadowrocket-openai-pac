@@ -18,6 +18,7 @@ import sys
 import build as legacy  # read-only, never invoke build.run()
 import build_v2rayn as v2helpers  # only atomic writer, independent data fetch is below
 import release_integrity
+import upstream_integrity
 import ai_services
 import review_queue
 
@@ -105,8 +106,7 @@ def prepare_openai_review(voice, auto, emitted_auto, emitted_manual,
             'decisions_sha256': hashlib.sha256(decisions).hexdigest(),
         },
     }
-    for name, (url, _) in legacy.RULESET_SOURCES.items():
-        source_state['sources'][name]['rule_count'] = len(rulesets[url])
+    upstream_integrity.record_counts(source_state['sources'], source_lists, rulesets, legacy.RULESET_SOURCES)
     old_report = legacy.make_sync_report(
         old_state, source_state, old_auto, auto_text, changed,
         excluded_sources=excluded,
@@ -251,6 +251,8 @@ def run(argv: list[str] | None = None) -> dict:
             raise ValueError(f'Mandatory Gemini/Claude rule missing in output: {core}')
     outputs = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                for name, (url, raw) in fetched.items()}
+    upstream_integrity.record_counts(outputs, source_lists, rulesets, legacy.RULESET_SOURCES)
+    upstream_integrity.validate_counts(outputs, old, legacy.DOMAIN_SOURCES, legacy.RULESET_SOURCES)
     outputs.update(ai['records'])
     state = {'schema_version': 2, 'sources': outputs, 'ai_counts': ai['counts'],
              'statistics': stats,
@@ -275,9 +277,14 @@ def run(argv: list[str] | None = None) -> dict:
     original_delta = review_meta['report']
     report = {'build_success': True, 'config_changed': changed,
               'statistics': {**stats, **ai['counts'], 'conf_bytes': len(output_bytes)},
+              'source_count_deltas': upstream_integrity.count_deltas(outputs, old),
               'changed_sources': [k for k, value in outputs.items()
                                   if value != (old or {}).get('sources', {}).get(k)],
               'ai_review_candidates': ai['review_candidates'],
+              'ai_approved_rules': ai['rules'],
+              'openai_observation': {'excluded': legacy.excluded_auto_rule_sources(source_lists, auto, unparsed),
+                                     'common_rules': emitted_auto + emitted_manual,
+                                     'client_only_rules': []},
               'ai_review_counts': ai['review_counts'],
               'auto_added': original_delta['auto_added'],
               'auto_removed': original_delta['auto_removed'],
@@ -300,9 +307,7 @@ def run(argv: list[str] | None = None) -> dict:
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
         v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
     v2helpers.atomically_write(ORIGINAL_STATE, legacy_bytes)
-    v2helpers.atomically_write(ROOT / 'data/review-queue.md',
-        review_queue.render_queue(review).encode('utf-8'))
-    review_queue.write_json(ROOT / 'data/review-notifications.json', review_meta['delivery'])
+    # The shared OpenAI queue and receipts are owned by the publisher.
     if args.report_file:
         report['artifact_sha256'] = release_integrity.artifact_manifest(release_integrity.SHADOW_AI_FILES, ROOT)
         v2helpers.atomically_write(args.report_file,

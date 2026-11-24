@@ -37,7 +37,7 @@ def read_state(path):
 def candidate_key(item):
     return item['service'] + '|' + item['rule']
 
-def merge_reports(state, reports, policy, *, on=None):
+def merge_reports(state, reports, policy, *, on=None, manual=None):
     on = on or review_queue.today()
     snapshots = dict(state['snapshots'])
     fresh = []
@@ -59,7 +59,18 @@ def merge_reports(state, reports, policy, *, on=None):
             row['clients'].add(client)
     candidates = [{**item, 'sources': sorted(item['sources']), 'clients': sorted(item['clients'])}
                   for _, item in sorted(merged.items())]
-    entries, counts = ai_services.evaluate_review_policy(candidates, policy, on=on)
+    manual = manual or {}
+    deployment, active = [], []
+    for item in candidates:
+        allowed = list(manual.get(item['service'], []))
+        for client in fresh:
+            allowed += reports[client].get('ai_approved_rules', {}).get(item['service'], [])
+        if not set(item['clients']).intersection(fresh) and any(
+                ai_services.approved_rule_covers(rule, item['rule']) for rule in allowed):
+            deployment.append({**item, 'status': 'deployment_pending'})
+        else:
+            active.append(item)
+    entries, counts = ai_services.evaluate_review_policy(active, policy, on=on)
     alerts, sent = [], {}
     for item in entries:
         if item['status'] not in ('pending', 'due'):
@@ -78,11 +89,11 @@ def merge_reports(state, reports, policy, *, on=None):
             sent[key] = old
         else:
             notified = None
-        if notified is None or (item['status'] == 'due' and
-                on >= notified + timedelta(days=policy['reminder_interval_days'])):
+        if notified is None or on >= notified + timedelta(days=policy['reminder_interval_days']):
             alerts.append({**item, 'key': key, 'cycle': cycle})
     return ({'version': 1, 'snapshots': snapshots, 'sent': sent},
-            {'review_candidates': entries, 'review_counts': counts, 'alerts': alerts,
+            {'review_candidates': entries + deployment, 'review_counts': counts, 'alerts': alerts,
+             'deployment_pending': deployment,
              'fresh_clients': fresh, 'stale_clients': [c for c in CLIENTS if c not in fresh],
              'reminder_interval_days': policy['reminder_interval_days']})
 
@@ -93,7 +104,8 @@ def prepare(reports, *, state_path=STATE, queue_path=QUEUE, policy_path=POLICY):
         print('::warning::Invalid AI receipt state; restarting reminders')
         state = empty_state()
     policy = json.loads(policy_path.read_text(encoding='utf-8'))
-    state, report = merge_reports(state, reports, policy)
+    manual = ai_services.load_manual(ai_services.MANUAL.read_text(encoding='utf-8'))
+    state, report = merge_reports(state, reports, policy, manual=manual)
     queue = ai_services.render_review_queue(report)
     if report['stale_clients']:
         queue += '\n> 本次未刷新：' + ', '.join(report['stale_clients']) + '；保留其上次有效候选（如有）。\n'

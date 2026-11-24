@@ -9,6 +9,9 @@ import subprocess
 
 from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
 import ai_review_delivery
+import openai_review_delivery
+import routing_conflicts
+import review_queue
 REVIEW_FILES = ('config/review-decisions.json',)
 AI_REVIEW_FILES = ('data/ai-review-queue.md', 'data/ai-review-notifications.json')
 DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
@@ -57,6 +60,15 @@ def publish(path: Path) -> None:
                 print(f'::error::{key}: {status[key]["error"]}')
             else:
                 files += owned
+        openai_reports = {k: v for k, v in verified_reports.items()
+                          if isinstance(v.get('openai_observation'), dict)}
+        if openai_reports:
+            try:
+                status['openai_review'] = openai_review_delivery.prepare(openai_reports)
+                files += openai_review_delivery.FILES
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                status['openai_review_error'] = str(exc)
+                print('::warning::OpenAI review queue not updated: ' + str(exc))
         # The shared review queue has independent ownership.
         review_reports = {k: v for k, v in verified_reports.items()
                           if isinstance(v.get('ai_review_candidates'), list)}
@@ -67,9 +79,25 @@ def publish(path: Path) -> None:
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 status['ai_review_error'] = str(exc)
                 print('::warning::AI review queue not updated: ' + str(exc))
-        # Advisory docs snapshot only when both official pages were verified.
+        conflict_report = verified_reports.get('v2rayn', {}).get('routing_conflicts')
+        if isinstance(conflict_report, dict) and 'pairs' in conflict_report:
+            try:
+                policy, _ = review_queue.load_policy(Path('config/review-decisions.json'), review_queue.today())
+                status['routing_review'] = routing_conflicts.prepare(
+                    conflict_report, Path(routing_conflicts.STATE), interval=policy['reminder_interval_days'])
+                files.append(routing_conflicts.STATE)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                status['routing_review_error'] = str(exc)
+                print('::warning::Routing conflict review not updated: ' + str(exc))
+        # Official docs remain advisory. A skipped or incomplete report
+        # must never stage partially updated advisory files.
         if status.get('official_docs', {}).get('exit_code') == 0:
-            files += [f for f in DOC_FILES if Path(f).is_file()]
+            from audit_ai_docs import validate_advisory
+            try:
+                files += validate_advisory(status, DOC_FILES)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                status['official_docs'] = {'exit_code': 1, 'error': str(exc)}
+                print('::warning::Official docs advisory not published: ' + str(exc))
         # A previous failed commit or user-staged file must not be carried over.
         git('reset', '--mixed', '--quiet')
         git('add', '-A', '--', *files)
@@ -165,6 +193,10 @@ def check(path: Path) -> int:
         failed.append('publish')
     if status.get('ai_review_error'):
         failed.append('ai_review')
+    if status.get('openai_review_error'):
+        failed.append('openai_review')
+    if status.get('routing_review_error'):
+        failed.append('routing_review')
     if failed:
         print(f'::error::Failed tasks: {", ".join(failed)}')
         return 1

@@ -41,7 +41,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_J
 
 **旧版已停用并删除**：原先单独 OpenAI 的小火箭配置和旧文件名的 v2rayN JSON 均不再更新。客户端必须换到以上地址；单纯刷新旧地址不能自动跳转。
 
-`scripts/build.py` 与 `scripts/notify_telegram.py` 保留为验证过的解析/发送基础库，但每日工作流不再运行旧订阅生成入口。OpenAI Voice 覆盖保护、来源 SHA-256、社区候选审核、半年复审、Telegram 提醒回执统一由全 AI Shadowrocket 建置器继续维护；`rules/openai-auto.list`、`data/sources.json`、`data/review-queue.md` 为基线和审计资料，**不是第三份客户端订阅**。
+`scripts/build.py` 与 `scripts/notify_telegram.py` 保留为验证过的解析/发送基础库，但每日工作流不再运行旧订阅生成入口。OpenAI Voice 覆盖保护与来源 SHA-256 继续保留独立基线；社区候选审核、半年复审及 Telegram 提醒回执合并两个客户端的有效报告；`rules/openai-auto.list`、`data/sources.json`、`data/review-queue.md` 为基线和审计资料，**不是第三份客户端订阅**。
 
 ## 原 OpenAI 分流设计与历史决策
 
@@ -157,7 +157,7 @@ python scripts/build_v2rayn.py
 | 字段 | 含义 |
 |---|---|
 | `default_review_months` | 默认复审间隔，初始 6 个日历月，可改为 12 |
-| `reminder_interval_days` | 已到期但未处理时，两次成功提醒之间的间隔，初始 7 天 |
+| `reminder_interval_days` | 已到期但未处理时，两次成功提醒之间的间隔，默认 30 天 |
 | `rejected_rules[].rule` | 完整规则，精确匹配；拒绝父域规则不自动拒绝子域或不同写法 |
 | `reason` | 人工不通过的原因 |
 | `reviewed_at` | 上次人工审核日期，格式 `YYYY-MM-DD`，按台北日期计算 |
@@ -195,7 +195,7 @@ python scripts/review_queue.py --rule 'DOMAIN-SUFFIX,algolia.net' --reason '仍�
 ### 提醒与更新的行为
 
 - 未到复审日期的拒绝项跳过提醒。到期当天或之后第一次成功同步时，原 Telegram 消息会列出复审项、上次审核日期和到期日期；Actions Summary 展示完整清单和此前原因。月底按实际月末计算，例如 8 月 31 日的半年后为次年 2 月末。
-- 到期还未处理时，默认每 7 天再提醒一次；更新审核日期后重新进入半年或一年周期。候选从上游消失则暂不提醒，人工记录保留；以后再次出现仍按原决定和日期处理。
+- 到期还未处理时，默认每 30 天再提醒一次；更新审核日期后重新进入半年或一年周期。候选从上游消失则暂不提醒，人工记录保留；以后再次出现仍按原决定和日期处理。
 - 新的未审核项随原通知报告；发送失败时保持待送达，下一次成功同步重试。已送达的新候选不每天重复报“新增”，仍保留在审核清单中。
 - 只有 Telegram 返回成功才记录送达日期；发送失败、缺少 Secret 都不会提前消耗提醒。送达状态保存在 `data/review-notifications.json`，通知后另行提交；若发送成功但回执提交失败，下次可能重复提醒，避免静默漏报。
 - 人工审核记录文件变更由 `data/sources.json` 中的审查指纹识别，Telegram 会单独提示「人工审核记录文件已变更，分流配置无变化」，不会再错误地显示「检查成功，无变化」；初次建立审查指纹不会误报成新审核决定。
@@ -258,7 +258,7 @@ https://raw.githubusercontent.com/rileyaaa/shadowrocket-openai-pac/main/v2rayN_J
 
 ### 独立构建和每日维护
 
-- 原 `scripts/build.py` 和 `scripts/notify_telegram.py` 保持不变，作为解析及发送基础函数库；**不再执行旧配置生成入口**。OpenAI 审核、Voice 基线和提醒回执继续由全 AI Shadowrocket 建置器维护。
+- 原 `scripts/build.py` 和 `scripts/notify_telegram.py` 保持不变，作为解析及发送基础函数库；**不再执行旧配置生成入口**。OpenAI Voice 基线由 Shadowrocket 建置器维护；OpenAI 审核候选与提醒回执由两个通过校验的客户端报告合并维护。
 - 新 `scripts/build_v2rayn.py` 独立下载 Johnshall、四份 OpenAI 社区域名源、官方 ChatGPT Voice IP 与 Apple News 内嵌规则集，**不读取已生成 `.conf` 来转换**；读取原项目审核通过的 `config/manual-openai.rules` 与仅用于 v2rayN 的用户显式例外；转换可识别的完整 Johnshall 分流，不以少量 `geosite:cn` 取代源规则。
 - 每天台北时间 **11:00（UTC 03:00）** 使用**同一个** `.github/workflows/sync-upstream.yml` 调度两份独立客户端订阅，分别验证，成功的产物合并为**一次 Git 推送**；未改变时不提交。单个构建失败不发布其失败产物，也不阻止另一套成功产物发布。各构建的状态由独立状态文件记录，失败不会伪装成功。
 - `scripts/notify_combined.py` 统一复用**未修改**的旧 Telegram API 发送函数和人工审核送达确认逻辑，向原 `TELEGRAM_BOT_TOKEN`、`TELEGRAM_CHAT_ID` 发送**一条综合报告**；只有成功发送后才更新审核提醒送达记录，并由工作流单独持久化。Git 推送失败与 Telegram 失败在报告/Actions 状态中独立体现，后者不会撤销已发布文件。
@@ -339,4 +339,15 @@ Claude Code 官方网络清单中的可选错误报告精确主机 `browser-inta
 
 ### Gemini / Claude 人工拒绝及六个月复审
 
-`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。两套客户端通过发布校验后合并候选（服务 + 规则去重，合并来源）；失败的一端保留其上次有效候选（如有）并明确标注。新待审项在 Telegram 成功送达且完整 Actions 摘要可用后记录回执，已到期且未处理的记录按 `reminder_interval_days`（默认 7 天）重复提醒。共享通知状态保存在 `data/ai-review-notifications.json`，与订阅路由解耦，不会自动放行任何候选。
+`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":30,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。两套客户端通过发布校验后合并候选（服务 + 规则去重，合并来源）；失败的一端保留其上次有效候选（如有）并明确标注。新待审项在 Telegram 成功送达且完整 Actions 摘要可用后记录回执，已到期且未处理的记录按 `reminder_interval_days`（默认 30 天）重复提醒。共享通知状态保存在 `data/ai-review-notifications.json`，与订阅路由解耦，不会自动放行任何候选。
+
+
+### 2026-11-24 第二轮维护改进
+
+- 上游四个 OpenAI 社区域名源及 Apple News 内嵌源各自保存独立规则数量基线；真实异常保留上一版。Voice 与 Johnshall 特批仍绑定来源与历史基线，不放松普通保护。
+- 发布前额外检查最终配置的核心域名首个明确匹配动作、AI/Voice 层、v2rayN 本地直连、进程与广告顺序及 FINAL；这是静态验证，不代替 DNS、TUN 或真实客户端测试。
+- OpenAI 候选使用 `data/openai-review-snapshots.json` 保存两端观察，合并 `data/review-queue.md`；v2rayN 专属例外仅标记该端覆盖，不改变共用人工批准。已审核但旧端未成功更新的候选单独标记。未处理的待审与到期复审每 30 天再次提醒；首次发现仍即时提醒，送达失败下次重试。
+- 每周官方文档检查首次记录全部已知主机、保留通配范围并比较两端已批准规则；星期日错过或失败时，下一次定时同步补查，失败不阻断订阅。未分类主机始终仅供人工观察。
+- `data/routing-conflicts.json` 保存所有静态可证明的冲突对及成功提醒回执，新增、消失或范围变化立即提醒，未变化只显示数量、每 30 天复查一次。不可见的 geodata、复杂正则交集及真实 DNS/进程捕获仍需要客户端验证；广告优先级保持不变。
+
+- `tests/test_release_end_to_end.py` 在临时本地 Git bare 仓库内运行两个真实生成器与发布、通知、回执入口；上游及 Telegram 均为离线测试样本，覆盖重复通知、单端失败、远端并发和回执未提交后重试，不接触生产仓库或真实 Bot。

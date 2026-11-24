@@ -71,7 +71,9 @@ jobs:
           reports = {'shadowrocket_ai': str(Path(os.environ['RUNNER_TEMP']) / 'shadowrocket-smoke.json'),
                      'v2rayn': str(Path(os.environ['RUNNER_TEMP']) / 'v2rayn-smoke.json')}
           verified = {client: validate_release(client, {'reports': reports}) for client in reports}
-          import ai_review_delivery
+          import ai_review_delivery, openai_review_delivery
+          openai_audit = openai_review_delivery.prepare(verified)
+          assert set(openai_audit['fresh_clients']) == set(reports)
           audit = ai_review_delivery.prepare(verified)
           assert set(audit['fresh_clients']) == set(reports)
           assert Path('data/ai-review-queue.md').is_file()

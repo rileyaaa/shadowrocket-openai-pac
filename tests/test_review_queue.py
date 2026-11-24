@@ -81,8 +81,8 @@ class ManualReviewTests(unittest.TestCase):
         self.assertEqual(len(late["due_candidates"]), 1)
         self.assertEqual(len(self.evaluate(date(2026, 11, 4))["due_candidates"]), 1)
         self.ack(late, date(2026, 11, 4))
-        self.assertEqual(self.evaluate(date(2026, 11, 10))["due_candidates"], [])
-        self.assertEqual(len(self.evaluate(date(2026, 11, 11))["due_candidates"]), 1)
+        self.assertEqual(self.evaluate(date(2026, 12, 3))["due_candidates"], [])
+        self.assertEqual(len(self.evaluate(date(2026, 12, 4))["due_candidates"]), 1)
 
     def test_manual_rejection_requires_exact_published_candidate(self):
         before = self.policy_path.read_bytes()
