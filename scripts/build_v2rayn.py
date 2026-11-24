@@ -23,6 +23,7 @@ import urllib.request
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
 import release_integrity
+import routing_conflicts
 import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -277,6 +278,8 @@ def run(argv: list[str] | None = None) -> dict:
              + core.compact(ordinary, 'Johnshall original order')
              + [{'remarks': 'Johnshall FINAL direct', 'outboundTag': 'direct',
                  'port': '0-65535', 'enabled': True}])
+    conflicts = routing_conflicts.detect(blocked, bit_entries + voice_entries + openai_entries + extra
+                                         + ai_entries['gemini'] + ai_entries['claude'])
     voice_counts = legacy.voice_address_counts(voice)
     original_stats = {**johnshall_stats, **voice_counts, 'voice_prefixes': len(voice),
                       'auto_domains': len(auto), 'manual_domains': len(manual),
@@ -328,6 +331,7 @@ def run(argv: list[str] | None = None) -> dict:
               'statistics': stats, 'changed_sources': source_changes,
               'ai_review_candidates': ai['review_candidates'],
               'ai_review_counts': ai['review_counts'],
+              'routing_conflicts': conflicts,
               'warnings': [
                   'URL Rewrite and MITM are not v2rayN routing rules and cannot be carried over.',
                   'REJECT variants map to block; no-resolve is not a portable Xray routing modifier.',

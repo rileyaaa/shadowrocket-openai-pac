@@ -30,9 +30,9 @@ HOST = re.compile(r'(?i)(?<![a-z0-9-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,63}(?
 ALLOWED_TAILS = {
     'gemini': ('google.com', 'googleapis.com', 'googleusercontent.com', 'gstatic.com',
                'google.dev', 'google', 'deepmind.com', 'withgoogle.com', 'google.ai',
-               'clients6.google.com', 'ai.studio', 'goog'),
+               'clients6.google.com', 'ai.studio', 'goog', 'run.app'),
     'claude': ('anthropic.com', 'claude.ai', 'claude.com', 'claudeusercontent.com',
-               'datadoghq.com', 'sentry.io', 'b-cdn.net', 'googleapis.com'),
+               'datadoghq.com', 'sentry.io', 'b-cdn.net', 'googleapis.com', 'claudemcpcontent.com'),
 }
 
 class ExtractText(HTMLParser):
@@ -57,11 +57,14 @@ ADVISORY_EXACT_HOSTS = {
 }
 
 
-def extract_hosts(content: str, service: str) -> list[str]:
+def observed_hosts(content: str) -> set[str]:
     parser = ExtractText()
     parser.feed(content)
-    text = ' '.join(parser.parts)
-    hosts = {h.lower() for h in HOST.findall(text) if
+    return {h.lower() for h in HOST.findall(' '.join(parser.parts))}
+
+
+def extract_hosts(content: str, service: str) -> list[str]:
+    hosts = {h for h in observed_hosts(content) if
              h.lower() in ADVISORY_EXACT_HOSTS[service] or
              any(h.lower() == end or h.lower().endswith('.' + end)
                  for end in ALLOWED_TAILS[service])}
@@ -106,14 +109,27 @@ def run(argv: list[str] | None = None):
         html=((args.source_dir / (key+'.html')).read_text(encoding='utf-8')
               if args.source_dir else fetch_doc(url))
         hosts=extract_hosts(html,service)
-        signature=hashlib.sha256('\n'.join(hosts).encode()).hexdigest()
-        current[key]={'url':url,'sha256':signature,'hosts':hosts}
-        previous=(old or {}).get('sources',{}).get(key,{}).get('hosts',[])
+        # Unrecognized visible hostnames are advisory-only, potentially
+        # navigation/text false positives. Never silently filter them out.
+        other=sorted(observed_hosts(html)-set(hosts))
+        if len(other)>500:
+            raise ValueError('Too many unclassified official-document hostnames')
+        signature=hashlib.sha256(json.dumps([hosts,other]).encode()).hexdigest()
+        current[key]={'url':url,'sha256':signature,'hosts':hosts,'other_hosts':other}
+        previous_record=(old or {}).get('sources',{}).get(key,{})
+        previous=previous_record.get('hosts',[])
         if previous:
             added=sorted(set(hosts)-set(previous))
             removed=sorted(set(previous)-set(hosts))
-            if added or removed:
-                comparisons.append({'service':service,'source':key,'added':added,'removed':removed})
+            before_other=previous_record.get('other_hosts',[])
+            other_added=sorted(set(other)-set(before_other))
+            other_removed=sorted(set(before_other)-set(other))
+            if added or removed or other_added or other_removed:
+                comparisons.append({'service':service,'source':key,'added':added,'removed':removed,
+                                    'other_added':other_added,'other_removed':other_removed})
+        elif other:
+            comparisons.append({'service':service,'source':key,'added':[],'removed':[],
+                                'other_added':other,'other_removed':[]})
     # Never overwrite unresolved advisory findings from earlier weeks.
     data={'schema_version':1,'sources':current}
     from build_v2rayn import atomically_write
@@ -128,6 +144,8 @@ def run(argv: list[str] | None = None):
             lines += [f"### {item['service']} — {item['source']}"]
             lines += [f'- 新增：`{x}`' for x in item['added']]
             lines += [f'- 移除：`{x}`' for x in item['removed']]
+            lines += [f'- 未分类主机新增（仅观察）：`{x}`' for x in item.get('other_added', [])]
+            lines += [f'- 未分类主机移除：`{x}`' for x in item.get('other_removed', [])]
         review_text = previous_review.rstrip() + '\n\n' + '\n'.join(lines) + '\n'
         atomically_write(REVIEW, review_text.encode('utf-8'))
     if not STATE.exists() or STATE.read_bytes()!=state_bytes:

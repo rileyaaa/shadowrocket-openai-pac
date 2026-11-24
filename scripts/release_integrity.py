@@ -23,7 +23,7 @@ CLIENT_INPUTS = {
                         'config/review-decisions.json',
                         'config/reviewed-johnshall-ad-decrease.json',
                         'config/reviewed-voice-expansion.json'),
-    'v2rayn': ('scripts/build_v2rayn.py', 'config/v2rayn/openai-extra.rules',
+    'v2rayn': ('scripts/build_v2rayn.py', 'scripts/routing_conflicts.py', 'config/v2rayn/openai-extra.rules',
                'config/v2rayn/verified-processes.txt', 'data/bitbrowser_domains.txt'),
 }
 

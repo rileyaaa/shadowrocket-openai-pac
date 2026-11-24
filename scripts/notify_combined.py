@@ -168,6 +168,11 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('🗓 官方网络文档：' +
                      ('发现变化，待人工核实' if official_docs.get('changed')
                       else '每周检查完成，域名无变化'))
+    if valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
+        conflicts = v2['routing_conflicts']
+        lines.append(f'⚠️ v2rayN：{conflicts["count"]} 条代理规则与前置拦截有交集，未修改优先级。')
+        for item in conflicts['examples'][:2]:
+            lines.append('· ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
     if v2 and v2.get('warnings'):
         lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
     if run_url:
@@ -220,13 +225,22 @@ def main() -> int:
             if official_docs and official_docs.get('changes'):
                 f.write('\n### 每周官方文件变化（未自动批准）\n\n')
                 for change in official_docs['changes']:
-                    f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机\n')
+                    f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机；'
+                            f'未分类 +{len(change.get("other_added", []))} / -{len(change.get("other_removed", []))}\n')
+                    for key in ('added', 'removed', 'other_added', 'other_removed'):
+                        for host in change.get(key, []):
+                            f.write(f'  - {key}: {host}\n')
             if status.get('ai_review'):
                 f.write('\n### Gemini / Claude 合并审核清单\n\n')
                 for item in status['ai_review']['review_candidates']:
                     f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])}) '
                             f'— {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}\n')
             if v2:
+                if v2.get('routing_conflicts', {}).get('count'):
+                    f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
+                    for item in v2['routing_conflicts']['examples']:
+                        f.write(f'- {item["proxy_rule"]} ← {item["earlier_block_rule"]}\n')
+                    f.write('\n' + v2['routing_conflicts']['limitations'] + '\n')
                 for warning in v2.get('warnings', []):
                     f.write('\n- ⚠️ ' + str(warning) + '\n')
     token, chat_id = (os.environ.get('TELEGRAM_BOT_TOKEN', '').strip(),
