@@ -77,6 +77,10 @@ jobs:
           audit = ai_review_delivery.prepare(verified)
           assert set(audit['fresh_clients']) == set(reports)
           assert Path('data/ai-review-queue.md').is_file()
+          import approved_dependency_review
+          review = approved_dependency_review.prepare()
+          assert review['groups']
+          print('Both clients passed positive coverage, non-target isolation and reviewed scope checks.')
           PY
           python - <<'PY'
           import json

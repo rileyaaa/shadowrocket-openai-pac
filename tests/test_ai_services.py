@@ -59,6 +59,10 @@ class AIInputTests(unittest.TestCase):
         self.assertNotIn('DOMAIN-SUFFIX,datadoghq.com', parsed['claude'])
         self.assertNotIn('DOMAIN-SUFFIX,sentry.io', parsed['claude'])
 
+    def test_gemini_core_is_pinned_against_feed_removal(self):
+        pinned = set(ai.load_manual(ai.MANUAL.read_text(encoding='utf-8'))['gemini'])
+        self.assertTrue(ai.MANDATORY['gemini'].issubset(pinned))
+
     def test_claude_core_is_pinned_against_feed_removal(self):
         pinned = set(ai.load_manual(ai.MANUAL.read_text(encoding='utf-8'))['claude'])
         self.assertTrue(ai.MANDATORY['claude'].issubset(pinned))

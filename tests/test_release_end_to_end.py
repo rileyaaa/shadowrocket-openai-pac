@@ -170,7 +170,8 @@ class ReleaseEndToEndTests(unittest.TestCase):
         p=self.command(sys.executable,'-B','-c',NOTIFY,'--status-file',str(path),
             '--review-state-file','data/review-notifications.json',
             '--ai-review-state-file','data/ai-review-notifications.json',
-            '--conflict-state-file','data/routing-conflicts.json',ok=not fail,
+            '--conflict-state-file','data/routing-conflicts.json',
+            '--dependency-state-file','data/approved-dependency-notifications.json',ok=not fail,
             env={'FIXTURE_TELEGRAM_FAIL':'1' if fail else '0'})
         if fail:
             self.assertEqual(p.returncode,1)
@@ -189,7 +190,10 @@ class ReleaseEndToEndTests(unittest.TestCase):
         self.assertIn('DOMAIN-SUFFIX,openai.com,Fixture AI',shadow)
         self.assertEqual(status['routing_review']['count'],1)
         self.assertEqual(len(status['openai_review']['new_candidates']),1)
+        self.assertTrue(status['approved_dependency_review']['alerts'])
         self.notify(first,fail=True)
+        self.assertNotEqual(self.command('git','--git-dir='+str(self.remote),'cat-file','-e',
+                           'refs/heads/main:data/approved-dependency-notifications.json',ok=False).returncode,0)
         self.assertEqual(json.loads(self.remote_text('data/review-notifications.json'))['sent'],{})
         self.notify(first)
         self.receipts(first)
@@ -197,6 +201,7 @@ class ReleaseEndToEndTests(unittest.TestCase):
                       json.loads(self.remote_text('data/review-notifications.json'))['sent'])
         self.assertEqual(len(json.loads(self.remote_text('data/routing-conflicts.json'))['delivered']),1)
         self.assertTrue(json.loads(self.remote_text('data/ai-review-notifications.json'))['sent'])
+        self.assertTrue(json.loads(self.remote_text('data/approved-dependency-notifications.json'))['sent'])
 
         repeat=self.build_pair('repeat')
         status=self.publish(repeat)
@@ -204,6 +209,7 @@ class ReleaseEndToEndTests(unittest.TestCase):
         self.assertFalse(status['routing_review']['alert'])
         self.assertEqual(status['openai_review']['new_candidates'],[])
         self.assertEqual(status['ai_review']['alerts'],[])
+        self.assertEqual(status['approved_dependency_review']['alerts'],[])
         self.notify(repeat)
         self.receipts(repeat)
 

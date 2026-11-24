@@ -85,5 +85,5 @@ def validate_release(client: str, status: dict, root: Path = ROOT) -> dict:
             if state.get(key) != manifest[name]:
                 raise ValueError('Auxiliary state digest mismatch: ' + name)
     from route_semantics import verify_release_routes
-    verify_release_routes(client, root, state)
+    verify_release_routes(client, root, state, report)
     return report

@@ -64,6 +64,10 @@ MANDATORY = {
     'gemini': {
         'DOMAIN-SUFFIX,gemini.google.com',
         'DOMAIN,generativelanguage.googleapis.com',
+        'DOMAIN-SUFFIX,aistudio.google.com',
+        'DOMAIN-SUFFIX,ai.studio',
+        'DOMAIN,cloudaicompanion.googleapis.com',
+        'DOMAIN-SUFFIX,notebooklm.google.com',
         'DOMAIN,antigravity-cli-auto-updater-974169037036.us-central1.run.app',
         'DOMAIN,antigravity-hub-auto-updater-974169037036.us-central1.run.app',
     },

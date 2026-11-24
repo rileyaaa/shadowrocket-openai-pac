@@ -21,8 +21,18 @@ GEMINI,DOMAIN,notebooklm.cloud.google
 GEMINI,DOMAIN,notebook.cloud.google
 GEMINI,DOMAIN,ai.google
 GEMINI,DOMAIN,ai.google.com
-# Gemini Code Assist primary AI endpoints come from the reviewed community feeds.
-# Its shared login/Cloud APIs do not override the baseline geographic routes.
+# Core Gemini product entrances already present in both reviewed feeds.
+# Pin the SAME existing match types; do not add generic Google login/CDN scopes.
+# https://aistudio.google.com/docs/get-started
+# https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings
+# https://docs.cloud.google.com/gemini/docs/codeassist/set-up-gemini
+GEMINI,DOMAIN-SUFFIX,gemini.google.com
+GEMINI,DOMAIN,generativelanguage.googleapis.com
+GEMINI,DOMAIN-SUFFIX,aistudio.google.com
+GEMINI,DOMAIN-SUFFIX,ai.studio
+GEMINI,DOMAIN,cloudaicompanion.googleapis.com
+GEMINI,DOMAIN-SUFFIX,notebooklm.google.com
+# Shared Google login/Cloud APIs continue to follow the baseline geographic routes.
 # Reference: https://cloud.google.com/gemini/docs/codeassist/set-up-gemini
 # Claude Code network requirements; core anthropic.com/claude.ai covered by suffix.
 # Exact optional error reporting: never route the generic datadoghq.com suffix.
