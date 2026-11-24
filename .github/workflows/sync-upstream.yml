@@ -74,7 +74,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
-            --review-state-file data/review-notifications.json
+            --review-state-file data/review-notifications.json \
+            --ai-review-state-file data/ai-review-notifications.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
@@ -94,11 +95,15 @@ jobs:
           fi
           git reset --mixed --quiet
           git add -- data/review-notifications.json
-          staged="$(git diff --cached --name-only)"
-          if [ -n "$staged" ] && [ "$staged" != "data/review-notifications.json" ]; then
-            echo '::error::Unexpected staged path in receipt commit.'
-            exit 1
+          if [ -f data/ai-review-notifications.json ]; then
+            git add -- data/ai-review-notifications.json
           fi
+          while IFS= read -r staged; do
+            case "$staged" in
+              ''|data/review-notifications.json|data/ai-review-notifications.json) ;;
+              *) echo '::error::Unexpected staged path in receipt commit.'; exit 1 ;;
+            esac
+          done < <(git diff --cached --name-only)
           if git diff --cached --quiet; then
             echo 'No review receipt changes.'
             exit 0

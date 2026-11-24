@@ -8,7 +8,9 @@ from pathlib import Path
 import subprocess
 
 from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
+import ai_review_delivery
 REVIEW_FILES = ('config/review-decisions.json',)
+AI_REVIEW_FILES = ('data/ai-review-queue.md', 'data/ai-review-notifications.json')
 DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
 
 
@@ -31,17 +33,28 @@ def publish(path: Path) -> None:
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
+        verified_reports = {}
         for key, owned in (('shadowrocket_ai', SHADOW_AI_FILES), ('v2rayn', V2_FILES)):
             if not ok[key]:
                 continue
             try:
-                validate_release(key, status)
+                verified_reports[key] = validate_release(key, status)
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 status[key] = {'exit_code': 1, 'error': 'Release verification failed: ' + str(exc)}
                 ok[key] = False
                 print(f'::error::{key}: {status[key]["error"]}')
             else:
                 files += owned
+        # The shared review queue has independent ownership.
+        review_reports = {k: v for k, v in verified_reports.items()
+                          if isinstance(v.get('ai_review_candidates'), list)}
+        if review_reports:
+            try:
+                status['ai_review'] = ai_review_delivery.prepare(review_reports)
+                files += AI_REVIEW_FILES
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                status['ai_review_error'] = str(exc)
+                print('::warning::AI review queue not updated: ' + str(exc))
         # Advisory docs snapshot only when both official pages were verified.
         if status.get('official_docs', {}).get('exit_code') == 0:
             files += [f for f in DOC_FILES if Path(f).is_file()]
@@ -118,6 +131,8 @@ def check(path: Path) -> int:
               if status.get(key, {}).get('exit_code') != 0]
     if not status.get('publish', {}).get('success'):
         failed.append('publish')
+    if status.get('ai_review_error'):
+        failed.append('ai_review')
     if failed:
         print(f'::error::Failed tasks: {", ".join(failed)}')
         return 1

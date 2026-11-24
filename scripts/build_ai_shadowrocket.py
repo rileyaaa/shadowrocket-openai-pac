@@ -296,7 +296,6 @@ def run(argv: list[str] | None = None) -> dict:
     v2helpers.atomically_write(OUTPUT, output_bytes)
     v2helpers.atomically_write(STATE, (json.dumps(state, ensure_ascii=False, indent=2,
                                                   sort_keys=True) + '\n').encode('utf-8'))
-    v2helpers.atomically_write(REVIEW_QUEUE, ai_services.render_review_queue(ai).encode('utf-8'))
     v2helpers.atomically_write(ORIGINAL_AUTO, review_meta['auto_text'].encode('utf-8'))
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
         v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))

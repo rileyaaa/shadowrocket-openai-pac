@@ -339,4 +339,4 @@ Claude Code 官方网络清单中的可选错误报告精确主机 `browser-inta
 
 ### Gemini / Claude 人工拒绝及六个月复审
 
-`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。现阶段 AI 待审数量纳入 Telegram 汇总，逐项复审日期保留在 GitHub 审核队列；`reminder_interval_days` 为预留配置，尚未实现像旧 OpenAI 那样的独立 7 天通知送达去重，不能当作已验收功能。
+`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。两套客户端通过发布校验后合并候选（服务 + 规则去重，合并来源）；失败的一端保留其上次有效候选（如有）并明确标注。新待审项在 Telegram 成功送达且完整 Actions 摘要可用后记录回执，已到期且未处理的记录按 `reminder_interval_days`（默认 7 天）重复提醒。共享通知状态保存在 `data/ai-review-notifications.json`，与订阅路由解耦，不会自动放行任何候选。

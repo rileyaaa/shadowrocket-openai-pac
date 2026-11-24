@@ -142,10 +142,24 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(publication.get('error', 'GitHub 未确认发布'))[:250])
-    if shadow_ai and shadow_ai.get('ai_review_candidates'):
-        counts = shadow_ai.get('ai_review_counts', {})
-        lines.append('⚠️ Gemini/Claude 未批准候选：{}，其中到期复审 {}（不会自动放行）'.format(
-            len(shadow_ai['ai_review_candidates']), counts.get('due', 0)))
+    shared = status.get('ai_review')
+    if shared:
+        counts = shared['review_counts']
+        alerts = shared['alerts']
+        lines.append(f'Gemini/Claude 合并审核：待审 {counts["pending"]} / 暂缓 {counts["cooling"]} / 到期 {counts["due"]}')
+        lines.append(f'本次需提醒：{len(alerts)} 条（到期未处理每 {shared["reminder_interval_days"]} 天）')
+        for item in alerts[:4]:
+            suffix = (f'（上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}）'
+                      if item['status'] == 'due' else '（新增待审）')
+            lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + suffix)
+        if len(alerts) > 4:
+            lines.append('其余请查看本次 Actions 完整摘要。')
+        if shared.get('stale_clients'):
+            lines.append('⚠️ 审核候选沿用上次快照：' + ', '.join(shared['stale_clients']))
+    elif status.get('ai_review_error'):
+        lines.append('⚠️ 合并审核队列更新失败：' + str(status['ai_review_error'])[:140])
+    elif not any(valid.values()):
+        lines.append('⚠️ 无有效客户端报告；AI 审核快照未刷新')
     docs_status = status.get('official_docs', {})
     if docs_status.get('exit_code', 0) != 0:
         lines.append('⚠️ 本周官方网络文档检查不可用；不影响规则更新：' +
@@ -170,6 +184,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--status-file', required=True, type=Path)
     p.add_argument('--review-state-file', type=Path)
+    p.add_argument('--ai-review-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
         'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
@@ -206,10 +221,11 @@ def main() -> int:
                 f.write('\n### 每周官方文件变化（未自动批准）\n\n')
                 for change in official_docs['changes']:
                     f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机\n')
-            if shadow_ai:
-                f.write('\n### Gemini / Claude 未批准新候选\n\n')
-                for item in shadow_ai.get('ai_review_candidates', []):
-                    f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])})\n')
+            if status.get('ai_review'):
+                f.write('\n### Gemini / Claude 合并审核清单\n\n')
+                for item in status['ai_review']['review_candidates']:
+                    f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])}) '
+                            f'— {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}\n')
             if v2:
                 for warning in v2.get('warnings', []):
                     f.write('\n- ⚠️ ' + str(warning) + '\n')
@@ -226,11 +242,20 @@ def main() -> int:
     print('Unified Telegram report sent.')
     if (args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
-            and status.get('publish', {}).get('success')):
+            and status.get('publish', {}).get('success')
+            and run_url and summary_path):
         try:
             review_queue.acknowledge(shadow_ai, args.review_state_file)
         except (OSError, ValueError, TypeError) as exc:
             print(f'::error::Telegram delivered, but review acknowledgement failed: {type(exc).__name__}')
+            return 1
+    if (args.ai_review_state_file and status.get('ai_review')
+            and status.get('publish', {}).get('success') is True
+            and run_url and summary_path):
+        try:
+            ai_review_delivery.acknowledge(status['ai_review'], args.ai_review_state_file)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::AI review receipt acknowledgement failed: {type(exc).__name__}')
             return 1
     return 0
 

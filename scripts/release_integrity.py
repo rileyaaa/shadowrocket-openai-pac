@@ -7,7 +7,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf',
-                   'data/ai-shadowrocket-sources.json', 'data/ai-review-queue.md',
+                   'data/ai-shadowrocket-sources.json',
                    'rules/johnshall-apple-news.list', 'rules/openai-auto.list',
                    'data/sources.json', 'data/review-queue.md',
                    'data/review-notifications.json')
