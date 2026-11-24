@@ -10,25 +10,36 @@ SNAPSHOT = 'data/openai-review-snapshots.json'
 FILES = (SNAPSHOT, 'data/review-queue.md', 'data/review-notifications.json')
 CLIENTS = ('shadowrocket_ai', 'v2rayn')
 
+def validate_observation(row):
+    """Validate approved coverage separately from raw, audit-only candidates."""
+    if not isinstance(row, dict):
+        raise ValueError('Invalid OpenAI client observation')
+    if (not isinstance(row.get('excluded'), dict)
+            or any(not isinstance(rule, str) or not rule.strip()
+                   or not isinstance(sources, list) or not sources
+                   or any(not isinstance(source, str) or not source.strip() for source in sources)
+                   for rule, sources in row['excluded'].items())):
+        raise ValueError('Invalid OpenAI excluded-source map')
+    for key in ('common_rules', 'client_only_rules'):
+        if not isinstance(row.get(key), list) or any(
+                not isinstance(rule, str) or rule.count(',') != 1
+                or legacy.domain_rule(*rule.split(',', 1)) != rule for rule in row[key]):
+            raise ValueError('Invalid OpenAI coverage list')
+    return row
+
+
 def read_state(path):
     if not path.exists():
         return {}
     doc = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(doc, dict) or doc.get('version') != 1 or not isinstance(doc.get('snapshots'), dict):
+    if (not isinstance(doc, dict) or type(doc.get('version')) is not int
+            or doc['version'] != 1 or not isinstance(doc.get('snapshots'), dict)):
         raise ValueError('Invalid OpenAI review snapshots')
     rows = doc['snapshots']
     for client, row in rows.items():
-        if client not in CLIENTS or not isinstance(row, dict):
+        if client not in CLIENTS:
             raise ValueError('Invalid OpenAI client observation')
-        if (not isinstance(row.get('excluded'), dict)
-                or any(not isinstance(k, str) or not isinstance(v, list)
-                       or any(not isinstance(s, str) for s in v)
-                       for k, v in row['excluded'].items())):
-            raise ValueError('Invalid OpenAI excluded-source map')
-        for key in ('common_rules', 'client_only_rules'):
-            if not isinstance(row.get(key), list) or any(
-                    not isinstance(rule, str) or rule.count(',') != 1 for rule in row[key]):
-                raise ValueError('Invalid OpenAI coverage list')
+        validate_observation(row)
     return rows
 
 def covers(rules, candidate):
@@ -39,7 +50,7 @@ def merge(snapshots, reports, root=ROOT, *, on=None):
     fresh = [key for key in CLIENTS if key in reports]
     updated = dict(snapshots)
     for key in fresh:
-        updated[key] = reports[key]['openai_observation']
+        updated[key] = validate_observation(reports[key]['openai_observation'])
     excluded, observed = {}, {}
     for key, row in updated.items():
         for rule, sources in row['excluded'].items():

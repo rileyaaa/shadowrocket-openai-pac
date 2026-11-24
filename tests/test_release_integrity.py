@@ -101,6 +101,26 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertNotIn('v2rayN_Johnshall_AI.json', staged)
         self.assertEqual(publish.check(status), 1)
 
+    def test_no_valid_client_never_commits_pending_manual_rejection(self):
+        for shadow_code, v2_code in ((1,1),(0,0)):
+            status = self.write('all-failed.json', json.dumps({
+                'shadowrocket_ai': {'exit_code':shadow_code},
+                'v2rayn': {'exit_code':v2_code}}).encode())
+            calls = []
+            def git(*args):
+                calls.append(args)
+                return SimpleNamespace(stdout='')
+            with patch.dict('os.environ', {'GITHUB_REF':'refs/heads/main'}), \
+                    patch.object(publish,'remote_head',return_value=''), \
+                    patch.object(publish,'git',side_effect=git), \
+                    patch.object(publish,'validate_release',side_effect=ValueError('bad release')):
+                publish.publish(status)
+            result = json.loads(status.read_text())
+            self.assertFalse(result['publish']['success'])
+            self.assertEqual(result['publish']['state'],'not-published')
+            self.assertFalse(any(a[0] in ('add','commit','push') for a in calls))
+            self.assertEqual(publish.check(status),1)
+
     def test_stale_checkout_rejected_before_staging(self):
         status = self.write('stale.json', b'{"shadowrocket_ai":{"exit_code":0},"v2rayn":{"exit_code":0}}')
         with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \

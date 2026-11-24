@@ -309,30 +309,41 @@ def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
     )
 
 
+def covering_approval_for_rejection(raw: str, rules: list[str]) -> str | None:
+    """Find a common approval that would contradict rejection of this scope.
+
+    Keep conservative wildcard handling separate from within-layer compaction.
+    Unknown community syntax stays review-only.
+    """
+    if raw.count(',') != 1:
+        return None
+    try:
+        rejected = domain_rule(*raw.split(',', 1))
+    except ValueError:
+        return None
+    for allowed in rules:
+        if domain_rule_covers(allowed, rejected):
+            return allowed
+        if allowed.startswith('DOMAIN-WILDCARD,') and rejected.startswith('DOMAIN,'):
+            _, pattern = johnshall_semantics.as_match(*allowed.split(',', 1))
+            if re.fullmatch(pattern.removeprefix('regexp:'), rejected.split(',', 1)[1]) is not None:
+                return allowed
+    return None
+
+
 def check_openai_rejections(rules: list[str], root: Path | None = None) -> None:
     """Guard actual common approvals against exact/full-scope rejections.
 
     A rejected parent suffix is not a rejection of every narrower, separately
-    approved hostname. Raw unsupported source entries remain audit-only.
-    Client-specific v2rayN exceptions are deliberately excluded from this check.
+    approved hostname. Client-specific v2rayN exceptions remain independent.
     """
     root = root if root is not None else ROOT
     policy, _ = review_queue.load_policy(root / 'config/review-decisions.json', review_queue.today())
     for item in policy['rejected_rules']:
         raw = item['rule']
-        if raw.count(',') != 1:
-            continue
-        try:
-            rejected = domain_rule(*raw.split(',', 1))
-        except ValueError:
-            continue
-        for allowed in rules:
-            conflict = domain_rule_covers(allowed, rejected)
-            if not conflict and allowed.startswith('DOMAIN-WILDCARD,') and rejected.startswith('DOMAIN,'):
-                _, pattern = johnshall_semantics.as_match(*allowed.split(',', 1))
-                conflict = re.fullmatch(pattern.removeprefix('regexp:'), rejected.split(',', 1)[1]) is not None
-            if conflict:
-                raise ValueError(f'OpenAI approved/rejected rule conflict: {allowed} vs {raw}')
+        allowed = covering_approval_for_rejection(raw, rules)
+        if allowed is not None:
+            raise ValueError(f'OpenAI approved/rejected rule conflict: {allowed} vs {raw}')
 
 
 def compact_rules_within_layer(rules: list[str]) -> list[str]:

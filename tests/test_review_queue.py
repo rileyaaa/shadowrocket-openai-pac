@@ -96,6 +96,32 @@ class ManualReviewTests(unittest.TestCase):
         self.assertEqual(len(recorded), 1)
         self.assertEqual(recorded[0]["rule"], self.rule)
 
+    def test_manual_rejection_cannot_conflict_with_current_common_approval(self):
+        covered = 'DOMAIN,approved.vendor.example'
+        extra = 'DOMAIN,v2-only.vendor.example'
+        ip = 'IP-ASN,20473,no-resolve'
+        raw = 'include:unrecognized-vendor'
+        broad = 'DOMAIN-SUFFIX,shared.example'
+        scope = 'DOMAIN,approved.shared.example'
+        wildcard = 'DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com'
+        host = 'DOMAIN,chatgpt-async-webps-prod-example.webpubsub.azure.com'
+        review.write_json(self.root / 'data/openai-review-snapshots.json', {
+            'version': 1, 'snapshots': {
+                'shadowrocket_ai': {'excluded': {r:['fixture'] for r in (covered,extra,ip,raw,broad,host)},
+                    'common_rules': [covered,scope,wildcard], 'client_only_rules': []},
+                'v2rayn': {'excluded': {extra:['fixture']},
+                    'common_rules': [], 'client_only_rules': [extra]},
+            }})
+        before = self.policy_path.read_bytes()
+        for rule in (covered,ip,host):
+            with self.subTest(rule=rule), self.assertRaisesRegex(ValueError, '不在当前已发布'):
+                review.record_rejection(self.policy_path, rule, 'fixture', on=self.on)
+            self.assertEqual(self.policy_path.read_bytes(), before)
+        for rule in (extra,broad,raw):
+            review.record_rejection(self.policy_path, rule, 'fixture', on=self.on)
+        self.assertEqual({x['rule'] for x in json.loads(self.policy_path.read_text())['rejected_rules']},
+                         {extra,broad,raw})
+
     def test_missing_or_corrupt_candidate_baseline_blocks_new_rejection(self):
         state = self.root / "data/sources.json"
         before = self.policy_path.read_bytes()

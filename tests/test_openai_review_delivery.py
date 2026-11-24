@@ -33,6 +33,26 @@ class OpenAIReviewDeliveryTests(unittest.TestCase):
                 _, result, _ = delivery.merge(snapshots, {'v2rayn': observation(rule, extra=[rule])}, root, on=now+timedelta(days=30))
                 self.assertEqual(len(result['new_candidates']), 1)
 
+    def test_corrupt_coverage_snapshot_cannot_poison_future_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            snapshot = root / delivery.SNAPSHOT
+            raw = 'include:unknown'
+            good = observation(raw, common=['DOMAIN,api.openai.com'])['openai_observation']
+            review.write_json(snapshot, {'version':1, 'snapshots':{'v2rayn':good}})
+            self.assertEqual(delivery.read_state(snapshot)['v2rayn'],good)
+            for bad in ('DOMAIN,*.example.com','DOMAIN,UPPER.example','INVALID,example.com'):
+                row = observation(raw, common=[bad])['openai_observation']
+                review.write_json(snapshot, {'version':1,'snapshots':{'v2rayn':row}})
+                with self.subTest(bad=bad), self.assertRaises(ValueError):
+                    delivery.read_state(snapshot)
+                with self.assertRaises(ValueError):
+                    delivery.merge({}, {'v2rayn':{'openai_observation':row}}, root)
+            row = observation(raw)['openai_observation']
+            row['excluded'][raw] = []
+            with self.assertRaises(ValueError):
+                delivery.validate_observation(row)
+
     def test_approved_but_stale_client_not_pending(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
