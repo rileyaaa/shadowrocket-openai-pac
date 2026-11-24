@@ -2,7 +2,23 @@
 
 此處保留歷次尚未清理的觀察紀錄；任何候選都不會自動加入代理。
 
-## 2026-11-24 — 官方文件變更
+## 2026-11-24 — 首次基线（已审核）
+
+**审核结论：已处理，无需调整两端分流规则。** 本次是首次建立官方文件主机集合，并非确认官方当天新增全部主机；以下原始自动观察明细保留供追溯。
+
+依据：2026-11-24 定时运行 [45398987434](https://github.com/rileyaaa/shadowrocket-openai-pac/actions/runs/45398987434)；首次快照 `data/ai-official-docs.json`；人工核对 [Gemini App firewall settings](https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings) 与 [Claude Code network configuration](https://code.claude.com/docs/en/network-config) 的可获取官方正文。
+
+| 服务 | 已分类主机 | 两端均已完整覆盖 | 两端均未完整覆盖 | 其他观察项 | 审核决定 |
+|---|---:|---:|---:|---:|---|
+| Gemini | 26 | 1 | 25 | 8 | 不新增专用规则 |
+| Claude | 26 | 23 | 3 | 96 | 不新增专用规则 |
+
+- **Gemini：** 官方防火墙清单含 34 项（26 项已分类、8 项其他观察），目的为保障 Gemini 可访问相关 Google/Workspace 服务，非 AI 独占出口清单。核心 `gemini.google.com` 已覆盖；其余 25 项为共享 Google API、搜索/辅助后端、图片、字体、地图、Play、脚本等主机，缺少必须走同一 AI 专用出口的证据。8 项其他观察（YouTube 图片/视频、DoubleClick、Analytics、Tag Manager 等）亦属共享服务。维持既有 Johnshall 路由和广告规则；不把整个 Google 或其共享 API/CDN 纳入 AI 层。
+- **Claude：** 已覆盖的 23 项保留原规则，包括官方 API、认证、下载、MCP、浏览器桥接、Claude 内容域和两个已批准的精确 Datadog 遥测主机。未完整覆盖的 `fonts.googleapis.com` 和 `mintlify.b-cdn.net` 不在可获取的 Claude Code 必需连接表中，属共享字体/文档基础设施；`storage.googleapis.com` 是官方明确列出的共享 Cloud Storage 端点（插件元数据、安装统计、部分签名制品上传，以及较旧版本安装/更新），但同一主机承载其他项目的存储请求，不能凭域名区分租户。官方还说明制品发布在此主机受阻时可回退到 API；本次不增加共享主机专用规则，保持原普通路由，若实际插件或制品业务失败再依据客户端日志评估。
+- **Claude 其他 96 项：** 该集合是宽松页面文本提取结果，不是官方必需域名清单。诸如 `raw.githubusercontent.com`、`formulae.brew.sh`、`registry.npmjs.org` 确有文档说明的发布说明、特定安装方式的更新或软件包下载用途，但为通用服务，维持原路由；其余包含导航、文档托管/CDN、示例地址，以及 `.js`、`.png`、`.otf`、组件名等误识别文本，未发现有充分证据的新 AI 专属入口，不作为批准候选。
+- **处理边界：** 不修改官方比较快照、生成订阅、人工规则、节点、通知或排程。本次为官方文档与已有双端覆盖报告的静态审核，不代表实际客户端已验证全部请求出口。原始主机集合仍供下次定时比较；未来实际变化另行审核。
+
+### 原始观察明细（首次基线）
 
 ### gemini — gemini_app_firewall
 - 新增：`apis.google.com`
