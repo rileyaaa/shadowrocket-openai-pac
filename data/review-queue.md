@@ -1,8 +1,8 @@
 # 上游人工审核清单
 
 本文件自动生成，请修改 `config/review-decisions.json` 记录人工不通过结果。
-到期仅提醒重新审核，不会自动放行；新增未审核项仅在首次送达前重试。
-默认 6 个日历月复审；到期后未处理，每 7 天提醒一次。
+到期仅提醒重新审核，不会自动放行；首次送达失败会重试。
+默认 6 个日历月复审；到期后未处理，每 30 天提醒一次。
 已覆盖规则免重复审核；社区 IP/ASN 仅留档，Voice 目的 IP 仅采用官方 JSON。
 
 | 规则 | 来源 | 状态 | 上次审核 | 下次复审 | 原因 / 已有覆盖 |
@@ -34,3 +34,35 @@
 | IP-ASN,20473,no-resolve | blackmatrix7 | 社区 IP/ASN，仅留档；IP 只取官方 Voice | — | — | — |
 | IP-CIDR,24.199.123.28/32,no-resolve | blackmatrix7 | 社区 IP/ASN，仅留档；IP 只取官方 Voice | — | — | — |
 | IP-CIDR,64.23.132.171/32,no-resolve | blackmatrix7 | 社区 IP/ASN，仅留档；IP 只取官方 Voice | — | — | — |
+
+> 新候选首次提醒；未处理的待审或到期项按配置间隔再次汇总提醒。
+
+| 规则 | Shadowrocket | v2rayN |
+|---|---|---|
+| DOMAIN,browser-intake-datadoghq.com | 未由专用规则覆盖 | 客户端专属例外覆盖（不等于共用批准） |
+| DOMAIN,o33249.ingest.sentry.io | 共用规则覆盖 | 共用规则覆盖 |
+| DOMAIN,o33249.ingest.us.sentry.io | 共用规则覆盖 | 共用规则覆盖 |
+| DOMAIN,static.cloudflareinsights.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-KEYWORD,openai | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,ai.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,algolia.net | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,api.statsig.com | 未由专用规则覆盖 | 客户端专属例外覆盖（不等于共用批准） |
+| DOMAIN-SUFFIX,auth0.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,challenges.cloudflare.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,client-api.arkoselabs.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,events.statsigapi.net | 未由专用规则覆盖 | 客户端专属例外覆盖（不等于共用批准） |
+| DOMAIN-SUFFIX,featuregates.org | 未由专用规则覆盖 | 客户端专属例外覆盖（不等于共用批准） |
+| DOMAIN-SUFFIX,identrust.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,intercom.io | 共用规则覆盖 | 共用规则覆盖 |
+| DOMAIN-SUFFIX,intercomcdn.com | 共用规则覆盖 | 共用规则覆盖 |
+| DOMAIN-SUFFIX,launchdarkly.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,observeit.net | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,openai.org | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,openaiapi-site.azureedge.net | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,openaicom.imgix.net | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,segment.io | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,sentry.io | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| DOMAIN-SUFFIX,stripe.com | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| IP-ASN,20473,no-resolve | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| IP-CIDR,24.199.123.28/32,no-resolve | 未由专用规则覆盖 | 未由专用规则覆盖 |
+| IP-CIDR,64.23.132.171/32,no-resolve | 未由专用规则覆盖 | 未由专用规则覆盖 |

@@ -1,0 +1,367 @@
+{
+  "snapshots": {
+    "shadowrocket_ai": {
+      "client_only_rules": [],
+      "common_rules": [
+        "DOMAIN,openaiapi-site.azureedge.net",
+        "DOMAIN,openaiassets.blob.core.windows.net",
+        "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+        "DOMAIN,openaicom.imgix.net",
+        "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+        "DOMAIN,production-openaicom-storage.azureedge.net",
+        "DOMAIN-SUFFIX,oaiusercontent.com",
+        "DOMAIN-SUFFIX,openai.com",
+        "DOMAIN-SUFFIX,chatgpt.site",
+        "DOMAIN-SUFFIX,crixet.com",
+        "DOMAIN-SUFFIX,oaistatic.com",
+        "DOMAIN-SUFFIX,oaistatsig.com",
+        "DOMAIN-SUFFIX,chat.com",
+        "DOMAIN-SUFFIX,chatgpt.com",
+        "DOMAIN-SUFFIX,sora.com",
+        "DOMAIN-SUFFIX,host.livekit.cloud",
+        "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+        "DOMAIN-SUFFIX,turn.livekit.cloud",
+        "DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net",
+        "DOMAIN,openai.qualtrics.com",
+        "DOMAIN,openai-api.arkoselabs.com",
+        "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+        "DOMAIN-SUFFIX,openai.fm",
+        "DOMAIN,chatkit.world",
+        "DOMAIN,openai-photobooth-demo.vercel.app",
+        "DOMAIN,openai-realtime-solar-system-demo.vercel.app",
+        "DOMAIN-SUFFIX,openai.com",
+        "DOMAIN-SUFFIX,oaistatic.com",
+        "DOMAIN-SUFFIX,oaiusercontent.com",
+        "DOMAIN-SUFFIX,oaistatsig.com",
+        "DOMAIN-SUFFIX,sora.com",
+        "DOMAIN-SUFFIX,chat.com",
+        "DOMAIN-SUFFIX,crixet.com",
+        "DOMAIN,openai.com.cdn.cloudflare.net",
+        "DOMAIN,openaiapi-site.azureedge.net",
+        "DOMAIN,openaiassets.blob.core.windows.net",
+        "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+        "DOMAIN,openaicom.imgix.net",
+        "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+        "DOMAIN,production-openaicom-storage.azureedge.net",
+        "DOMAIN-SUFFIX,chatgpt.com",
+        "DOMAIN-SUFFIX,chatgpt.site",
+        "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+        "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+        "DOMAIN-SUFFIX,host.livekit.cloud",
+        "DOMAIN-SUFFIX,turn.livekit.cloud",
+        "DOMAIN,cdn.openaimerge.com",
+        "DOMAIN,openai.qualtrics.com",
+        "DOMAIN,chat.openai.com.cdn.cloudflare.net",
+        "DOMAIN,openai-api.arkoselabs.com",
+        "DOMAIN-SUFFIX,ct.sendgrid.net",
+        "DOMAIN-SUFFIX,intercom.io",
+        "DOMAIN-SUFFIX,intercomcdn.com",
+        "DOMAIN,cdn.workos.com",
+        "DOMAIN,challenges.cloudflare.com",
+        "DOMAIN,forwarder.workos.com",
+        "DOMAIN,frontend-apps-multi-region.workos.com",
+        "DOMAIN,humb.apple.com",
+        "DOMAIN,images.workoscdn.com",
+        "DOMAIN,js.stripe.com",
+        "DOMAIN,o207216.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.us.sentry.io",
+        "DOMAIN,rum.browser-intake-datadoghq.com",
+        "DOMAIN,setup.workos.com",
+        "DOMAIN,workos.imgix.net"
+      ],
+      "excluded": {
+        "DOMAIN,browser-intake-datadoghq.com": [
+          "blackmatrix7",
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,o33249.ingest.sentry.io": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,o33249.ingest.us.sentry.io": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,static.cloudflareinsights.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-KEYWORD,openai": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,ai.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,algolia.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,api.statsig.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,auth0.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,challenges.cloudflare.com": [
+          "acl4ssr"
+        ],
+        "DOMAIN-SUFFIX,client-api.arkoselabs.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,events.statsigapi.net": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,featuregates.org": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,identrust.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,intercom.io": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,intercomcdn.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,launchdarkly.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,observeit.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,openai.org": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN-SUFFIX,openaiapi-site.azureedge.net": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,openaicom.imgix.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,segment.io": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,sentry.io": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,stripe.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "IP-ASN,20473,no-resolve": [
+          "blackmatrix7"
+        ],
+        "IP-CIDR,24.199.123.28/32,no-resolve": [
+          "blackmatrix7"
+        ],
+        "IP-CIDR,64.23.132.171/32,no-resolve": [
+          "blackmatrix7"
+        ]
+      }
+    },
+    "v2rayn": {
+      "client_only_rules": [
+        "DOMAIN-SUFFIX,openai.com",
+        "DOMAIN-SUFFIX,oaistatic.com",
+        "DOMAIN-SUFFIX,oaiusercontent.com",
+        "DOMAIN-SUFFIX,oaistatsig.com",
+        "DOMAIN-SUFFIX,sora.com",
+        "DOMAIN-SUFFIX,chat.com",
+        "DOMAIN-SUFFIX,crixet.com",
+        "DOMAIN-SUFFIX,chatgpt.com",
+        "DOMAIN-SUFFIX,chatgpt.site",
+        "DOMAIN,openai.com.cdn.cloudflare.net",
+        "DOMAIN,openaiapi-site.azureedge.net",
+        "DOMAIN,openaiassets.blob.core.windows.net",
+        "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+        "DOMAIN,openaicom.imgix.net",
+        "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+        "DOMAIN,production-openaicom-storage.azureedge.net",
+        "DOMAIN,cdn.openaimerge.com",
+        "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+        "DOMAIN-SUFFIX,host.livekit.cloud",
+        "DOMAIN-SUFFIX,turn.livekit.cloud",
+        "DOMAIN,cdn.workos.com",
+        "DOMAIN,forwarder.workos.com",
+        "DOMAIN,setup.workos.com",
+        "DOMAIN,images.workoscdn.com",
+        "DOMAIN,workos.imgix.net",
+        "DOMAIN,challenges.cloudflare.com",
+        "DOMAIN,humb.apple.com",
+        "DOMAIN-SUFFIX,intercom.io",
+        "DOMAIN-SUFFIX,intercomcdn.com",
+        "DOMAIN-SUFFIX,ct.sendgrid.net",
+        "DOMAIN,js.stripe.com",
+        "DOMAIN,o207216.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.us.sentry.io",
+        "DOMAIN,browser-intake-datadoghq.com",
+        "DOMAIN,rum.browser-intake-datadoghq.com",
+        "DOMAIN,openai.qualtrics.com",
+        "DOMAIN-SUFFIX,statsig.com",
+        "DOMAIN-SUFFIX,statsigapi.net",
+        "DOMAIN-SUFFIX,featuregates.org",
+        "DOMAIN-SUFFIX,featureassets.org",
+        "DOMAIN-SUFFIX,prodregistryv2.org"
+      ],
+      "common_rules": [
+        "DOMAIN,openaiapi-site.azureedge.net",
+        "DOMAIN,openaiassets.blob.core.windows.net",
+        "DOMAIN,openaicom-api-bdcpf8c6d2e9atf6.z01.azurefd.net",
+        "DOMAIN,openaicom.imgix.net",
+        "DOMAIN,openaicomproductionae4b.blob.core.windows.net",
+        "DOMAIN,production-openaicom-storage.azureedge.net",
+        "DOMAIN-SUFFIX,oaiusercontent.com",
+        "DOMAIN-SUFFIX,openai.com",
+        "DOMAIN-SUFFIX,chatgpt.site",
+        "DOMAIN-SUFFIX,crixet.com",
+        "DOMAIN-SUFFIX,oaistatic.com",
+        "DOMAIN-SUFFIX,oaistatsig.com",
+        "DOMAIN-SUFFIX,chat.com",
+        "DOMAIN-SUFFIX,chatgpt.com",
+        "DOMAIN-SUFFIX,sora.com",
+        "DOMAIN-SUFFIX,host.livekit.cloud",
+        "DOMAIN-SUFFIX,chatgpt.livekit.cloud",
+        "DOMAIN-SUFFIX,turn.livekit.cloud",
+        "DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net",
+        "DOMAIN,openai.qualtrics.com",
+        "DOMAIN,chat.openai.com.cdn.cloudflare.net",
+        "DOMAIN,openai-api.arkoselabs.com",
+        "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
+        "DOMAIN-SUFFIX,openai.fm",
+        "DOMAIN,chatkit.world",
+        "DOMAIN,openai-photobooth-demo.vercel.app",
+        "DOMAIN,openai-realtime-solar-system-demo.vercel.app",
+        "DOMAIN,openai.com.cdn.cloudflare.net",
+        "DOMAIN,cdn.openaimerge.com",
+        "DOMAIN-SUFFIX,ct.sendgrid.net",
+        "DOMAIN-SUFFIX,intercom.io",
+        "DOMAIN-SUFFIX,intercomcdn.com",
+        "DOMAIN,cdn.workos.com",
+        "DOMAIN,challenges.cloudflare.com",
+        "DOMAIN,forwarder.workos.com",
+        "DOMAIN,frontend-apps-multi-region.workos.com",
+        "DOMAIN,humb.apple.com",
+        "DOMAIN,images.workoscdn.com",
+        "DOMAIN,js.stripe.com",
+        "DOMAIN,o207216.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.sentry.io",
+        "DOMAIN,o33249.ingest.us.sentry.io",
+        "DOMAIN,rum.browser-intake-datadoghq.com",
+        "DOMAIN,setup.workos.com",
+        "DOMAIN,workos.imgix.net"
+      ],
+      "excluded": {
+        "DOMAIN,browser-intake-datadoghq.com": [
+          "blackmatrix7",
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,o33249.ingest.sentry.io": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,o33249.ingest.us.sentry.io": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN,static.cloudflareinsights.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-KEYWORD,openai": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,ai.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,algolia.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,api.statsig.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,auth0.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,challenges.cloudflare.com": [
+          "acl4ssr"
+        ],
+        "DOMAIN-SUFFIX,client-api.arkoselabs.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,events.statsigapi.net": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,featuregates.org": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,identrust.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,intercom.io": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,intercomcdn.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,launchdarkly.com": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,observeit.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,openai.org": [
+          "metacubex",
+          "v2fly"
+        ],
+        "DOMAIN-SUFFIX,openaiapi-site.azureedge.net": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,openaicom.imgix.net": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,segment.io": [
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,sentry.io": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "DOMAIN-SUFFIX,stripe.com": [
+          "acl4ssr",
+          "blackmatrix7"
+        ],
+        "IP-ASN,20473,no-resolve": [
+          "blackmatrix7"
+        ],
+        "IP-CIDR,24.199.123.28/32,no-resolve": [
+          "blackmatrix7"
+        ],
+        "IP-CIDR,64.23.132.171/32,no-resolve": [
+          "blackmatrix7"
+        ]
+      }
+    }
+  },
+  "version": 1
+}

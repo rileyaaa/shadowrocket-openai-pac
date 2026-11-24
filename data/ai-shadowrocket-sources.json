@@ -7,8 +7,8 @@
     "gemini_metacubex": 49,
     "gemini_v2fly": 50
   },
-  "build_inputs_sha256": "f4b4520802b011669138e12613b50088bc5991171cd28a3acdcbe20d25257c6e",
-  "legacy_state_sha256": "c35dd3a7b816de6d8a92a6606680e8984f6039c2770fec9498a91b2a2ee98340",
+  "build_inputs_sha256": "6f11df19a39d9d8f9329741ce1553d8cf71c0f5b25dadfca2370c5634d23b206",
+  "legacy_state_sha256": "c9a0f397dabb9ae56680c4bf361a26debc1e98523ad782e6b7bbd0326a7c2f21",
   "manual_ai_sha256": "cf12f96f6baa582bc8b619e80f2732a02a58c7fce656ab9a6aea2691d1f30596",
   "output_sha256": "006c32e72b5d127b4e0a88ae1bfd8e519061bb3c560081998994b919fe3ec95d",
   "review_candidates": [
@@ -149,18 +149,21 @@
     "due": 0,
     "pending": 1
   },
-  "review_decisions_sha256": "bae6af0675afddf6df11944f6747082b458249431582e90e265722cf3dae89af",
+  "review_decisions_sha256": "54e074dae9af804b90a9bf828617c2c874cdf409e69ab487f7765982d6bfecf7",
   "schema_version": 2,
   "sources": {
     "acl4ssr": {
+      "rule_count": 17,
       "sha256": "3fde01190c82d9911cb247d99e941cb3b8e53c410e574240bc7d2a9227b153ab",
       "url": "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list"
     },
     "apple_news": {
+      "rule_count": 2,
       "sha256": "ec57625e5b938396b92034c0d71eadbd0c4a1adbff8243f05d8bb97441ad1b26",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AppleNews/AppleNews.list"
     },
     "blackmatrix7": {
+      "rule_count": 32,
       "sha256": "6f4047cdbf6953cf5d9b38c4ccd6da7bc6f1acb91b7a87134f25d5b8f5d2408b",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
@@ -189,10 +192,12 @@
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
+      "rule_count": 24,
       "sha256": "8a4f1b16302f882117d3c106d2ac21f108acbd4714dd7373d403745c0f338aa8",
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
     },
     "v2fly": {
+      "rule_count": 25,
       "sha256": "25d53e9af3e04d926210d6436bd791594ef4b86f2dc3c108510ac8059d76d969",
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai"
     },

@@ -1,0 +1,12 @@
+{
+  "current": [
+    {
+      "earlier_block_rule": "domain:r.openai.com",
+      "field": "domain",
+      "proxy_rule": "domain:openai.com"
+    }
+  ],
+  "delivered": [],
+  "notified_at": null,
+  "version": 1
+}

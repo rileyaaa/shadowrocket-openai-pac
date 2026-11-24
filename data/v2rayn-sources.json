@@ -7,9 +7,9 @@
     "gemini_metacubex": 49,
     "gemini_v2fly": 50
   },
-  "build_inputs_sha256": "fd17e1fe400a9af5768b98796e1f50bd2df7a0af2ff5eaf1b9a68620dfe5518a",
+  "build_inputs_sha256": "40c294197e386f5194513aeceabc1a99ac971524c664e8ddd816c38ecc2a2781",
   "inputs_sha256": {
-    "ai_review_decisions": "bae6af0675afddf6df11944f6747082b458249431582e90e265722cf3dae89af",
+    "ai_review_decisions": "54e074dae9af804b90a9bf828617c2c874cdf409e69ab487f7765982d6bfecf7",
     "bitbrowser": "2bd9ce38ec3bffbb047332b75ea75bbd09eb857937268ffaa3da2243d19caa29",
     "extra_openai": "0be1baabe869faf0d3e928852b3913bf4ab68c5637a27d7875952c5f2858ecfd",
     "manual_ai": "cf12f96f6baa582bc8b619e80f2732a02a58c7fce656ab9a6aea2691d1f30596",
@@ -20,14 +20,17 @@
   "schema_version": 2,
   "sources": {
     "acl4ssr": {
+      "rule_count": 17,
       "sha256": "3fde01190c82d9911cb247d99e941cb3b8e53c410e574240bc7d2a9227b153ab",
       "url": "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Ruleset/OpenAi.list"
     },
     "apple_news": {
+      "rule_count": 2,
       "sha256": "ec57625e5b938396b92034c0d71eadbd0c4a1adbff8243f05d8bb97441ad1b26",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AppleNews/AppleNews.list"
     },
     "blackmatrix7": {
+      "rule_count": 32,
       "sha256": "6f4047cdbf6953cf5d9b38c4ccd6da7bc6f1acb91b7a87134f25d5b8f5d2408b",
       "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/OpenAI/OpenAI.list"
     },
@@ -56,10 +59,12 @@
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
+      "rule_count": 24,
       "sha256": "8a4f1b16302f882117d3c106d2ac21f108acbd4714dd7373d403745c0f338aa8",
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/openai.list"
     },
     "v2fly": {
+      "rule_count": 25,
       "sha256": "25d53e9af3e04d926210d6436bd791594ef4b86f2dc3c108510ac8059d76d969",
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/openai"
     },
