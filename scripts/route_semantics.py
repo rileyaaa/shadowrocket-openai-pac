@@ -317,8 +317,8 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
 def verify_release_routes(client, root, state, report):
     expected = reviewed_domain_sets(client, root, report)
     if client == 'shadowrocket_ai':
-        settings = json.loads((root / 'config/user-settings.json').read_text(encoding='utf-8'))
         import build as legacy
+        settings = legacy.load_settings(root / 'config/user-settings.json')
         auto_rows = [x.strip() for x in
                      (root / 'rules/openai-auto.list').read_text(encoding='utf-8').splitlines()
                      if x.strip() and not x.lstrip().startswith(('#', ';'))]
