@@ -35,7 +35,7 @@ def read_json(path: str | None) -> dict | None:
 
 def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                  *, when: str, event: str, run_url: str,
-                 official_docs: dict | None = None, limit=3900) -> str:
+                 official_docs: dict | None = None, limit=3900, compact=False) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
               for key in ('shadowrocket_ai', 'v2rayn')}
     publication = status.get('publish', {})
@@ -64,6 +64,11 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
              f'📤 GitHub 发布：{status.get("publish", {}).get("state", "未执行")}', '']
+    if compact:
+        lines = ['📡 代理规则同步', f'时间：{when}（台北）', f'总体状态：{overall}']
+        if event and event != 'schedule':
+            lines.append('触发：' + original.EVENTS.get(event, event))
+        lines.append('')
     sections = [('shadowrocket_ai', '🚀 Shadowrocket 小火箭（OpenAI + Gemini + Claude）', shadow_ai),
                 ('v2rayn', '💻 v2rayN（OpenAI + Gemini + Claude）', v2)]
     for key, title, report in sections:
@@ -72,6 +77,45 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         output = {'shadowrocket_ai': 'Shadowrocket_Johnshall_AI.conf',
                   'v2rayn': 'v2rayN_Johnshall_AI.json'}[key]
         released = output in changed_files
+        if compact:
+            name = 'Shadowrocket' if key == 'shadowrocket_ai' else 'v2rayN'
+            uncertain = publication.get('state') == 'pushed_unverified'
+            if uncertain or (released and not success):
+                result = '⚠️ 已推送，待核对'
+            elif not success:
+                result = ('❌ 构建失败，保留旧版' if build.get('exit_code') != 0
+                          else '⚠️ 构建报告不可用')
+            elif not published:
+                result = '❌ 构建成功，发布未确认'
+            else:
+                result = '✅ 已更新' if released else '✅ 无变化'
+            lines.append(f'{name}：{result}')
+            if not success:
+                error = str(build.get('error') or '构建报告缺失或不可信')
+                lines.append('  原因：' + ' '.join(error.split())[-180:])
+            if success and published and released:
+                sources = report.get('changed_sources', [])
+                if sources:
+                    names = [original.NAMES.get(s, s) for s in sources[:3]]
+                    lines.append('  来源：' + '、'.join(str(x)[:40] for x in names)
+                                 + (' 等' if len(sources) > 3 else ''))
+                diffs = []
+                for prop, label in (('johnshall_lines', '原规则'), ('voice_prefixes', 'Voice'),
+                                    ('gemini_domains', 'Gemini'), ('claude_domains', 'Claude'),
+                                    ('bitbrowser_domains', 'BitBrowser')):
+                    delta = report.get('stat_deltas', {}).get(prop)
+                    if type(delta) is int and delta:
+                        diffs.append(f'{label} {delta:+d}')
+                added, removed = report.get('auto_added', []), report.get('auto_removed', [])
+                if added or removed:
+                    diffs.append(f'OpenAI 自动 +{len(added)}/-{len(removed)}')
+                if diffs:
+                    lines.append('  变化：' + '；'.join(diffs))
+                if report.get('settings_changed'):
+                    lines.append('  节点名称已更新')
+            if success and report.get('review_decisions_changed'):
+                lines.append('  人工审核记录已更新')
+            continue
         lines += ['━━━━━━━━━━━━━━', title,
                   f'构建：{"✅ 成功" if success else "❌ 失败 / 报告不可用"}']
         if not success:
@@ -136,18 +180,24 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     alert_start = len(lines)
-    lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
+    lines += (['', '🔔 需关注'] if compact else ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核'])
+    alert_body = len(lines)
     openai = status.get('openai_review')
     if openai:
         new, due = openai['new_candidates'], openai['due_candidates']
         counts = openai['counts']
-        lines.append(f'OpenAI 合并审核：待审 {counts["pending"]} / 到期 {counts["due"]} / 暂缓 {counts["cooling"]}')
-        lines.append(f'本次提醒：待审 {len(new)} / 复审 {len(due)}；未处理每 {openai["reminder_interval_days"]} 天')
-        for item in new[:3]:
-            lines.append('· 待审 ' + item['rule'][:120] + ' [' + ', '.join(item['sources'])[:100] + ']')
-        for item in due[:3]:
-            lines.append(f'· 复审 {item["rule"][:120]}（上次 {item["reviewed_at"]}；到期 {item["review_due_on"]}）')
-        if len(new) > 3 or len(due) > 3:
+        if not compact:
+            lines.append(f'OpenAI 合并审核：待审 {counts["pending"]} / 到期 {counts["due"]} / 暂缓 {counts["cooling"]}')
+            lines.append(f'本次提醒：待审 {len(new)} / 复审 {len(due)}；未处理每 {openai["reminder_interval_days"]} 天')
+        elif new or due:
+            lines.append(f'OpenAI 审核：待审 {len(new)} / 复审 {len(due)}')
+        for item in new[:2 if compact else 3]:
+            lines.append('· 待审 ' + item['rule'][:120]
+                         + ('' if compact else ' [' + ', '.join(item['sources'])[:100] + ']'))
+        for item in due[:2 if compact else 3]:
+            lines.append(f'· 复审 {item["rule"][:120]}'
+                         + ('' if compact else f'（上次 {item["reviewed_at"]}；到期 {item["review_due_on"]}）'))
+        if len(new) > (2 if compact else 3) or len(due) > (2 if compact else 3):
             lines.append('其余请查看本次 Actions 完整摘要。')
         if openai['stale_clients']:
             lines.append('⚠️ OpenAI 审核保留旧快照：' + ', '.join(openai['stale_clients']))
@@ -159,10 +209,10 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('⚠️ OpenAI 合并审核失败：' + str(status['openai_review_error'])[:140])
     else:
         if valid['shadowrocket_ai']:
-            lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
-                      f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
             new = shadow_ai.get('new_excluded_candidates', [])
             due = shadow_ai.get('review_due_candidates', [])
+            if not compact or new or due:
+                lines.append(f'OpenAI 新增待审核：{len(new)}；到期复审：{len(due)}')
             for item in new[:4]:
                 lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
                              ', '.join(item.get('sources', []))[:100] + ']')
@@ -172,7 +222,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             if len(new) > 4 or len(due) > 4:
                 lines.append('其余审核项请查看本次 Actions 完整摘要。')
             counts = shadow_ai.get('manual_review_counts', {})
-            if isinstance(counts, dict):
+            if not compact and isinstance(counts, dict):
                 lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
                              f'到期 {counts.get("due", "?")}')
                 if counts.get('due'):
@@ -187,13 +237,16 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if shared:
         counts = shared['review_counts']
         alerts = shared['alerts']
-        lines.append(f'Gemini/Claude 合并审核：待审 {counts["pending"]} / 暂缓 {counts["cooling"]} / 到期 {counts["due"]}')
-        lines.append(f'本次需提醒：{len(alerts)} 条（到期未处理每 {shared["reminder_interval_days"]} 天）')
-        for item in alerts[:4]:
+        if not compact:
+            lines.append(f'Gemini/Claude 合并审核：待审 {counts["pending"]} / 暂缓 {counts["cooling"]} / 到期 {counts["due"]}')
+            lines.append(f'本次需提醒：{len(alerts)} 条（到期未处理每 {shared["reminder_interval_days"]} 天）')
+        elif alerts:
+            lines.append(f'Gemini/Claude 审核：{len(alerts)} 条需处理')
+        for item in alerts[:2 if compact else 4]:
             suffix = (f'（上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}）'
                       if item['status'] == 'due' else '（新增待审）')
-            lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + suffix)
-        if len(alerts) > 4:
+            lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + ('' if compact else suffix))
+        if len(alerts) > (2 if compact else 4):
             lines.append('其余请查看本次 Actions 完整摘要。')
         if shared.get('deployment_pending'):
             lines.append(f'已审核但等待旧端更新：{len(shared["deployment_pending"])} 项')
@@ -207,7 +260,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if docs_status.get('exit_code', 0) != 0:
         lines.append('⚠️ 本周官方网络文档检查不可用；不影响规则更新：' +
                      str(docs_status.get('error', '未知原因'))[:140])
-    elif official_docs and official_docs.get('checked'):
+    elif official_docs and official_docs.get('checked') and (not compact or official_docs.get('changed')):
         lines.append('🗓 官方网络文档：' +
                      ('发现变化，待人工核实' if official_docs.get('changed')
                       else '每周检查完成，域名无变化'))
@@ -215,7 +268,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if status.get('routing_review_error'):
         lines.append('⚠️ 冲突审核状态更新失败：' + str(status['routing_review_error'])[:140])
     elif routing:
-        if routing['count'] or routing['alert']:
+        if routing['alert'] or (not compact and routing['count']):
             lines.append(f'v2rayN 前置拦截冲突：{routing["count"]} 对（不改变分流）')
         if routing['alert']:
             lines.append(f'新增 {len(routing["added"])} / 消失 {len(routing["removed"])}' +
@@ -230,11 +283,16 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if status.get('approved_dependency_review_error'):
         lines.append('⚠️ 已批准共享依赖复审清单不可用（不影响订阅）：' + str(status['approved_dependency_review_error'])[:140])
     elif dependencies:
-        lines.append(f'已批准共享依赖：{len(dependencies["groups"])} 组 / 待复审 {dependencies["due_count"]} 组')
+        if not compact:
+            lines.append(f'已批准共享依赖：{len(dependencies["groups"])} 组 / 待复审 {dependencies["due_count"]} 组')
         if dependencies['alerts']:
-            lines.append(f'本次复审提醒：{len(dependencies["alerts"])} 组（不自动改规则；完整范围见 Actions 摘要）')
-            for item in dependencies['alerts'][:2]:
-                lines.append('· ' + item['id'])
+            lines.append(f'共享依赖复审：{len(dependencies["alerts"])} 组需处理' if compact else
+                         f'本次复审提醒：{len(dependencies["alerts"])} 组（不自动改规则；完整范围见 Actions 摘要）')
+            if not compact:
+                for item in dependencies['alerts'][:2]:
+                    lines.append('· ' + item['id'])
+    if compact and len(lines) == alert_body:
+        del lines[alert_start:]
     return fit_message(lines[:alert_start], lines[alert_start:], run_url, limit=limit)
 
 
@@ -292,7 +350,7 @@ def main() -> int:
     now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
     report_context = {'when': now, 'event': os.environ.get('GITHUB_EVENT_NAME', ''),
                       'run_url': run_url, 'official_docs': official_docs}
-    message = emit_message(status, shadow_ai, v2, **report_context)
+    message = emit_message(status, shadow_ai, v2, compact=True, **report_context)
     print(message)
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary_path:
