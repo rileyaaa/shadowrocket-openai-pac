@@ -156,13 +156,15 @@ def render_dns(settings: dict[str, str]) -> str:
     return DNS.replace("#proxy=JOHNSHALL_PROXY_NODE", f"#proxy={encoded}")
 
 
-def fetch(url: str, minimum: int = 50) -> bytes:
+def fetch(url: str, minimum: int = 50, *, user_agent: str = "shadowrocket-openai-pac/1.0") -> bytes:
     """Download an upstream; one retry for network, HTTP or truncated responses.
 
     Both failed attempts abort publication. Never fall back to incomplete data.
     """
+    if not url.startswith("https://"):
+        raise ValueError("Only secure HTTPS upstream URLs permitted")
     request = urllib.request.Request(
-        url, headers={"User-Agent": "shadowrocket-openai-pac/1.0", "Accept": "*/*",
+        url, headers={"User-Agent": user_agent, "Accept": "*/*",
                       "Accept-Encoding": "identity"}
     )
     for attempt in range(2):  # initial request + exactly one retry
@@ -394,7 +396,11 @@ def parse_voice(raw: bytes) -> list[str]:
                 raise ValueError("Voice prefix must be a CIDR string")
             # Never silently widen a host address with an erroneous subnet mask.
             network = ipaddress.ip_network(value, strict=True)
+            # ipaddress.is_global is not a public-unicast test: multicast
+            # and deprecated IPv6 site-local space may also return True.
             if (network.version != version or not network.is_global
+                    or network.is_multicast or network.is_reserved
+                    or (version == 6 and network.is_site_local)
                     or network.prefixlen < VOICE_MIN_PREFIX[version]):
                 raise ValueError(f"Unsafe voice network: {network}")
             results.add(network)

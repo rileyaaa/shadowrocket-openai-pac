@@ -16,6 +16,10 @@ def group_for(test_id: str) -> str:
     if module == 'unittest':
         # Failed imports must never be silently omitted.
         return 'shared'
+    # The transport is shared but each client still makes its own requests.
+    # A regression in its contract affects both builds.
+    if module == 'test_hardening' and 'DownloadCompletenessTests' in parts:
+        return 'shared'
     if module in SHADOW_MODULES:
         return 'shadowrocket'
     if module == 'test_ai_docs':
