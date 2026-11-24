@@ -43,6 +43,48 @@ class MaintenanceNotificationTests(unittest.TestCase):
         for line in alerts + [url]:
             self.assertIn(line,result)
 
+    def test_advisory_failure_does_not_report_unqualified_success(self):
+        status = {'shadowrocket_ai': {'exit_code':0}, 'v2rayn': {'exit_code':0},
+                  'publish': {'success':True,'state':'unchanged'},
+                  'approved_dependency_review_error': 'fixture invalid ledger'}
+        report = {'build_success':True,'config_changed':False,'statistics':{'routing_objects':1}}
+        msg = notify.emit_message(status,report,report,when='2026-11-24',event='schedule',run_url='')
+        self.assertIn('总体状态：订阅成功（共享依赖复审告警）',msg)
+        status['official_docs'] = {'exit_code':1}
+        msg = notify.emit_message(status,report,report,when='2026-11-24',event='schedule',run_url='')
+        self.assertIn('总体状态：订阅成功（文档检查、共享依赖复审告警）',msg)
+
+    def test_actions_summary_has_untruncated_statistics(self):
+        status = {'shadowrocket_ai': {'exit_code':0}, 'v2rayn': {'exit_code':0},
+                  'publish': {'success':True,'state':'unchanged'}}
+        report = {'build_success':True,'config_changed':False,
+                  'statistics':{'routing_objects':131,'block_rules':52915},
+                  'changed_sources':['fixture-'+'x'*100]*55}
+        kwargs = {'when':'2026-11-24','event':'schedule','run_url':'https://github.com/example/actions/runs/1'}
+        short = notify.emit_message(status,report,report,**kwargs)
+        full = notify.emit_message(status,report,report,limit=None,**kwargs)
+        self.assertLessEqual(len(short),3900)
+        self.assertGreater(len(full),3900)
+        self.assertIn('拦截规则：52915',full)
+        self.assertNotIn('部分详情省略',full)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root/'report.json'
+            path.write_text(json.dumps(report),encoding='utf-8')
+            status['reports'] = {'shadowrocket_ai':str(path),'v2rayn':str(path)}
+            state = root/'status.json'
+            state.write_text(json.dumps(status),encoding='utf-8')
+            summary = root/'summary.md'
+            env = {'TELEGRAM_BOT_TOKEN':'fixture','TELEGRAM_CHAT_ID':'fixture',
+                   'GITHUB_REPOSITORY':'example/test','GITHUB_RUN_ID':'1',
+                   'GITHUB_STEP_SUMMARY':str(summary)}
+            with patch.dict(os.environ,env), patch.object(sys,'argv',[
+                    'notify_combined.py','--status-file',str(state)]), patch.object(notify.original,'send') as send:
+                self.assertEqual(notify.main(),0)
+            self.assertLessEqual(len(send.call_args.args[2]),3900)
+            self.assertIn('拦截规则：52915',summary.read_text(encoding='utf-8'))
+            self.assertNotIn('部分详情省略',summary.read_text(encoding='utf-8'))
+
     def test_dependency_group_classification(self):
         self.assertEqual(test_groups.group_for('test_v2rayn.SafetyTests.test_no_change_no_commit'), 'shared')
         self.assertEqual(test_groups.group_for('test_release_remediation.PublishedBaselineTests.test_shadow_v2_auxiliary_tamper_is_detected'), 'shadowrocket')

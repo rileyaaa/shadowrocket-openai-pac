@@ -2,6 +2,7 @@ from pathlib import Path
 from datetime import date
 import sys
 import unittest
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 import audit_ai_docs as doc
 
@@ -33,6 +34,27 @@ class OfficialDocsAuditTests(unittest.TestCase):
     def test_official_sources_are_bounded_and_are_advisory(self):
         self.assertEqual(set(doc.SOURCES),{'gemini_app_firewall','claude_code_network'})
         self.assertTrue(all(url.startswith('https://') for url, _ in doc.SOURCES.values()))
+
+    def test_partial_or_truncated_official_response_is_rejected(self):
+        class Response:
+            status = 200
+            def __init__(self, headers, body=b'x'*1200):
+                self.headers, self.body = headers, body
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self, n): return self.body
+        for headers, body in [
+                ({'Content-Range':'bytes 0-1199/2400'}, b'x'*1200),
+                ({'Content-Length':'2400'}, b'x'*1200),
+                ({'Content-Length':'invalid'}, b'x'*1200),
+                ({'Content-Length':'1200'}, b'\xff'*1200)]:
+            with self.subTest(headers=headers), patch.object(doc,'urlopen',return_value=Response(headers,body)):
+                with self.assertRaises(ValueError):
+                    doc.fetch_doc('https://example.invalid/doc')
+        with patch.object(doc,'urlopen',return_value=Response({'Content-Length':'1200'})):
+            self.assertEqual(doc.fetch_doc('https://example.invalid/doc'), 'x'*1200)
+        with patch.object(doc,'urlopen',return_value=Response({})):
+            self.assertEqual(doc.fetch_doc('https://example.invalid/doc'), 'x'*1200)
 
     def test_weekly_failure_catches_up_on_monday(self):
         self.assertTrue(doc.scheduled_due(date(2027,5,24),'schedule',{'checked_on':'2027-05-16'}))

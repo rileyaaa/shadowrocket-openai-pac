@@ -113,7 +113,13 @@ def send(bot_token: str, chat_id: str, text: str) -> None:
     for attempt in range(3):
         try:
             with urllib.request.urlopen(req, timeout=20) as response:
-                if not json.loads(response.read().decode("utf-8")).get("ok"):
+                # A malformed or merely truthy value is not proof of delivery.
+                # Do not expose a response or request URL containing secrets.
+                try:
+                    reply = json.loads(response.read().decode("utf-8"))
+                except (ValueError, UnicodeError):
+                    raise RuntimeError("Invalid Telegram API response") from None
+                if not isinstance(reply, dict) or reply.get("ok") is not True:
                     raise RuntimeError("Telegram API returned no success")
                 return
         except urllib.error.HTTPError as exc:

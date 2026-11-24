@@ -1,6 +1,8 @@
 """Offline candidate merging and durable reminder regressions."""
 from datetime import date, timedelta
 from pathlib import Path
+import json
+import tempfile
 import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
@@ -29,6 +31,27 @@ class SharedReviewTests(unittest.TestCase):
             'shadowrocket_ai': {'ai_review_candidates': []}}, self.policy, on=self.now)
         self.assertEqual(report['review_counts']['pending'], 2)
         self.assertEqual(report['stale_clients'], ['v2rayn'])
+
+    def test_corrupt_candidate_snapshot_is_detected_before_merge(self):
+        # A syntactically invalid rule used to survive read_state and poison
+        # every future one-client refresh instead of entering recovery.
+        for rule in ('broken', 'DOMAIN,UPPER.example', 'DOMAIN-SUFFIX,*.example.com',
+                     'IP-CIDR,8.8.8.8/32'):
+            row = candidate(rule, ['meta'])
+            with tempfile.TemporaryDirectory() as temp:
+                path = Path(temp) / 'state.json'
+                state = delivery.empty_state()
+                state['snapshots']['shadowrocket_ai'] = [row]
+                path.write_text(json.dumps(state), encoding='utf-8')
+                with self.subTest(rule=rule), self.assertRaises(ValueError):
+                    delivery.read_state(path)
+            with self.assertRaises(ValueError):
+                delivery.merge_reports(delivery.empty_state(), {
+                    'v2rayn': {'ai_review_candidates': [row]}}, self.policy, on=self.now)
+        good = candidate('DOMAIN,valid.example', ['meta'])
+        state, report = delivery.merge_reports(delivery.empty_state(), {
+            'v2rayn': {'ai_review_candidates': [good]}}, self.policy, on=self.now)
+        self.assertEqual(report['review_counts']['pending'], 1)
 
     def test_due_and_pending_repeat_only_after_configured_interval(self):
         rows = [candidate('DOMAIN,new.example', ['meta']), candidate('DOMAIN,old.example', ['v2fly'])]
