@@ -1,0 +1,45 @@
+name: One-time Actions history cleanup
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/temporary-clean-history.yml']
+permissions:
+  actions: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Delete historical completed runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_PAGER: cat
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GH_REPO" = "rileyaaa/shadowrocket-openai-pac"
+          gh api --paginate "repos/$GH_REPO/actions/runs?per_page=100&status=completed" \
+            --jq '.workflow_runs[] | [.id, .status] | @tsv' > "$RUNNER_TEMP/history.tsv"
+          awk -v self="$GITHUB_RUN_ID" '$1 != self && $2 == "completed" { print $1 }' "$RUNNER_TEMP/history.tsv" | sort -u > "$RUNNER_TEMP/delete-ids.txt"
+          echo "Historical completed runs to delete: $(wc -l < "$RUNNER_TEMP/delete-ids.txt")"
+          deleted=0
+          failed=0
+          while IFS= read -r id; do
+            if gh api --method DELETE "repos/$GH_REPO/actions/runs/$id" --silent; then
+              deleted=$((deleted+1))
+            else
+              sleep 15
+              if gh api --method DELETE "repos/$GH_REPO/actions/runs/$id" --silent; then
+                deleted=$((deleted+1))
+              else
+                echo "Deletion failed for run $id"
+                failed=$((failed+1))
+              fi
+            fi
+            if (( deleted % 25 == 0 )); then echo "Deleted $deleted runs so far"; fi
+            sleep 1
+          done < "$RUNNER_TEMP/delete-ids.txt"
+          echo "Deleted: $deleted; failed: $failed"
+          gh api --paginate "repos/$GH_REPO/actions/runs?per_page=100" --jq '.workflow_runs[] | [.id, .status, .path] | @tsv'
+          test "$failed" -eq 0
