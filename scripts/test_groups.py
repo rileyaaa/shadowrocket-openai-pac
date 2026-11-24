@@ -20,6 +20,8 @@ def group_for(test_id: str) -> str:
     # A regression in its contract affects both builds.
     if module == 'test_hardening' and 'DownloadCompletenessTests' in parts:
         return 'shared'
+    if module == 'test_build' and name.startswith('test_voice'):
+        return 'shared'
     if module in SHADOW_MODULES:
         return 'shadowrocket'
     if module == 'test_ai_docs':

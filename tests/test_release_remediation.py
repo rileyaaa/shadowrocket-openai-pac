@@ -226,9 +226,9 @@ class VoiceAndBitBrowserTests(unittest.TestCase):
             def __enter__(self): return self
             def __exit__(self, *args): return False
             def read(self, n): return b'x' * 50
-        with patch.object(v2.urllib.request, 'urlopen', return_value=Response()) as req, \
-                patch.object(v2.time, 'sleep'):
-            with self.assertRaisesRegex(ValueError, 'partial response'):
+        with patch.object(v2.legacy.urllib.request, 'urlopen', return_value=Response()) as req, \
+                patch.object(v2.legacy.time, 'sleep'):
+            with self.assertRaisesRegex(ValueError, 'partial/non-200'):
                 v2.download('https://example.invalid/list', minimum=10)
             self.assertEqual(req.call_count, 2)
 
