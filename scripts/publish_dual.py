@@ -55,7 +55,7 @@ def publish(path: Path) -> None:
                 continue
             try:
                 verified_reports[key] = validate_release(key, status)
-            except (OSError, ValueError, TypeError, KeyError) as exc:
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 status[key] = {'exit_code': 1, 'error': 'Release verification failed: ' + str(exc)}
                 ok[key] = False
                 print(f'::error::{key}: {status[key]["error"]}')

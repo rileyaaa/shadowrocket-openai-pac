@@ -136,7 +136,7 @@ def load_published_baseline() -> tuple[dict | None, dict | None, str]:
         raise ValueError('Incomplete published Shadowrocket baseline: missing ' + ', '.join(missing))
     state = json.loads(STATE.read_text(encoding='utf-8'))
     old_legacy = json.loads(ORIGINAL_STATE.read_text(encoding='utf-8'))
-    if not isinstance(state, dict) or state.get('schema_version') not in (1, 2):
+    if not isinstance(state, dict) or type(state.get('schema_version')) is not int or state['schema_version'] not in (1, 2):
         raise ValueError('Unknown published Shadowrocket baseline version')
     required = ('output_sha256', 'ai_counts', 'statistics', 'sources')
     if any(not isinstance(state.get(key), dict) or not state[key] for key in required[1:]):

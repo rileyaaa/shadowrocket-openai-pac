@@ -124,7 +124,13 @@ def reviewed_domain_sets(client, root, report):
     import v2rayn_core as core
     from build_v2rayn import parse_user_extra, selected_bitbrowser_domains
     manual = set(legacy.parse_manual(root / 'config/manual-openai.rules'))
-    openai = set(report['openai_observation']['common_rules'])
+    def reviewed_rules(value):
+        if not isinstance(value, list) or any(
+                not isinstance(rule, str) or rule.count(',') != 1 for rule in value):
+            raise ValueError('Malformed reviewed domain rules in build report')
+        return set(value)
+
+    openai = reviewed_rules(report['openai_observation']['common_rules'])
     if not all(rule in manual or legacy.is_openai_specific_rule(rule) for rule in openai):
         raise ValueError('Unreviewed common OpenAI scope in build report')
     if not manual <= openai:
@@ -136,7 +142,7 @@ def reviewed_domain_sets(client, root, report):
     supplemental = ai_services.load_manual((root / 'config/ai-services.rules').read_text(encoding='utf-8'))
     approved = {}
     for service in ('gemini', 'claude'):
-        rules = set(report['ai_approved_rules'][service])
+        rules = reviewed_rules(report['ai_approved_rules'][service])
         for rule in rules:
             kind, host = rule.split(',', 1)
             if rule not in supplemental[service] and (
@@ -226,7 +232,8 @@ def require_route_shape(row, field):
 
 
 def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
-    if not isinstance(rules, list) or len(rules) < 3:
+    if (not isinstance(rules, list) or len(rules) < 3
+            or not all(isinstance(row, dict) for row in rules)):
         raise ValueError('Invalid final v2rayN routing list')
     require_route_shape(rules[0], 'ip')
     require_route_shape(rules[1], 'domain')
@@ -253,11 +260,13 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
         if row.get('enabled') is not True:
             raise ValueError('Disabled final v2rayN routing rule')
         action = row.get('outboundTag')
-        if 'domain' in row:
-            domain_rows.append((row['domain'], action))
         if i < 2 or i == len(rules) - 1:
+            if 'domain' in row:
+                domain_rows.append((row['domain'], action))
             continue
         remark = row.get('remarks', '')
+        if not isinstance(remark, str):
+            raise ValueError('Invalid final v2rayN layer label')
         rank = next((j for j, name in enumerate(ranks) if remark.startswith(name + ' / ')), -1)
         if rank < 0 or rank < last_rank:
             raise ValueError('Unexpected final v2rayN routing layer order')
@@ -275,6 +284,8 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
             require_route_shape(row, 'domain' if 'domain' in row else 'ip')
             if rank == 7 and action not in ('proxy', 'direct'):
                 raise ValueError('Unexpected policy in final v2rayN ordinary layer')
+        if 'domain' in row:
+            domain_rows.append((row['domain'], action))
         if rank == 0:
             if action != 'block':
                 raise ValueError('Unexpected final v2rayN ad policy')

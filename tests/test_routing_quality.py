@@ -83,6 +83,21 @@ class RoutingQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'order or boundary'):
             sem.verify_shadow_layers(body.replace(sem.SHADOW_LAYERS[2], '# lost'), expected)
 
+    def test_malformed_v2_serialized_objects_fail_as_validation_errors(self):
+        local = {'ip':['127.0.0.0/8', '::1/128', 'geoip:private'],
+                 'outboundTag':'direct','enabled':True}
+        localhost = {'domain':['full:localhost','domain:localhost.localdomain'],
+                     'outboundTag':'direct','enabled':True}
+        final = {'port':'0-65535','outboundTag':'direct','enabled':True}
+        for bad in (None, 5, ['ip']):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, 'routing list'):
+                sem.verify_v2([local, localhost, bad, final], [], [])
+        with self.assertRaisesRegex(ValueError, 'layer label'):
+            sem.verify_v2([local, localhost, {'remarks': None, 'enabled': True}, final], [], [])
+        with self.assertRaisesRegex(ValueError, 'matching values'):
+            sem.verify_v2([local, localhost, {'remarks':'Johnshall ads and tracking / block',
+                'enabled':True,'outboundTag':'block','domain':[5]}, final], [], [])
+
     def test_v2_extra_predicate_cannot_narrow_existing_route(self):
         for field, value in (('ip', ['8.8.8.8/32']), ('process', ['BitBrowser.exe']),
                              ('domain', ['full:localhost']), ('port', '0-65535')):

@@ -75,16 +75,21 @@ class PublishedBaselineTests(unittest.TestCase):
         return metadata
 
     def install_v2(self, version=1):
-        output = b'[{"outboundTag":"proxy"}]\n'
+        voice = [f'IP-CIDR,8.8.4.{i}/32' for i in range(1, 6)]
+        output = json.dumps([{'remarks': 'OpenAI official Voice IPs / proxy',
+                              'outboundTag': 'proxy', 'enabled': True,
+                              'ip': [rule.split(',', 1)[1] for rule in voice]}]).encode()
         state = {
             'schema_version': version, 'output_sha256': digest(output),
             'statistics': {'bitbrowser_domains': 11,
                            'official_bitbrowser_domains': 3,
-                           'user_requested_bitbrowser_domains': 8},
+                           'user_requested_bitbrowser_domains': 8,
+                           'voice_prefixes': 5, 'voice_ipv4_addresses': 5,
+                           'voice_ipv6_addresses': 0},
             'sources': {'johnshall': {'sha256': 'a' * 64}},
             'ai_counts': {'gemini_domains': 61},
             'inputs_sha256': {'bitbrowser': 'b' * 64},
-            'voice_rules': [f'IP-CIDR,8.8.4.{i}/32' for i in range(1, 6)],
+            'voice_rules': voice,
         }
         if version == 2:
             state['statistics']['bitbrowser_effective_domains'] = 11
@@ -144,6 +149,28 @@ class PublishedBaselineTests(unittest.TestCase):
         self.install_v2()
         v2.STATE.unlink()
         with self.assertRaisesRegex(ValueError, 'output/state file missing'):
+            v2.load_published_baseline()
+
+    def test_v2_voice_baseline_must_match_published_routes_and_counts(self):
+        for version in (1, 2):
+            state = self.install_v2(version=version)
+            state['voice_rules'][0] = 'IP-CIDR,9.9.9.9/32'
+            self.write(v2.STATE, json.dumps(state).encode())
+            with self.subTest(version=version), self.assertRaisesRegex(ValueError, 'Voice layer does not match'):
+                v2.load_published_baseline()
+        state = self.install_v2(version=2)
+        state['statistics']['voice_ipv4_addresses'] = 6
+        self.write(v2.STATE, json.dumps(state).encode())
+        with self.assertRaisesRegex(ValueError, 'Voice statistic mismatch'):
+            v2.load_published_baseline()
+        state = self.install_v2(version=2)
+        rows = json.loads(v2.CONFIG.read_bytes())
+        rows[0]['enabled'] = False
+        body = json.dumps(rows).encode()
+        state['output_sha256'] = digest(body)
+        self.write(v2.CONFIG, body)
+        self.write(v2.STATE, json.dumps(state).encode())
+        with self.assertRaisesRegex(ValueError, 'Voice layer is disabled'):
             v2.load_published_baseline()
 
     def test_v2_requires_valid_v2_effective_count_or_verified_old_shape(self):
