@@ -81,9 +81,61 @@ class MaintenanceNotificationTests(unittest.TestCase):
             with patch.dict(os.environ,env), patch.object(sys,'argv',[
                     'notify_combined.py','--status-file',str(state)]), patch.object(notify.original,'send') as send:
                 self.assertEqual(notify.main(),0)
-            self.assertLessEqual(len(send.call_args.args[2]),3900)
+            self.assertLess(len(send.call_args.args[2]),250)
+            self.assertNotIn('52915',send.call_args.args[2])
             self.assertIn('拦截规则：52915',summary.read_text(encoding='utf-8'))
             self.assertNotIn('部分详情省略',summary.read_text(encoding='utf-8'))
+
+    def test_compact_daily_message_keeps_only_actionable_information(self):
+        status = {'shadowrocket_ai': {'exit_code':0}, 'v2rayn': {'exit_code':0},
+                  'publish': {'success':True,'state':'unchanged'},
+                  'openai_review': {'new_candidates':[], 'due_candidates':[],
+                      'counts':{'pending':1,'due':0,'cooling':20},
+                      'stale_clients':[], 'deployment_pending':[], 'warnings':[],
+                      'reminder_interval_days':30},
+                  'ai_review': {'review_counts':{'pending':1,'due':0,'cooling':10},
+                      'alerts':[], 'reminder_interval_days':30},
+                  'routing_review': {'count':1,'alert':False},
+                  'approved_dependency_review': {'groups':[{}]*10,'due_count':8,'alerts':[]}}
+        report = {'build_success':True,'config_changed':False,
+                  'statistics':{'johnshall_lines':83266,'routing_objects':131,'block_rules':52915},
+                  'changed_sources':['voice']}
+        kwargs = {'when':'2026-11-24 11:00:00','event':'schedule',
+                  'run_url':'https://github.com/example/actions/runs/1'}
+        compact = notify.emit_message(status,report,report,compact=True,
+                    official_docs={'checked':True,'changed':False},**kwargs)
+        self.assertLess(len(compact),250)
+        for value in ('总体状态：成功','Shadowrocket：✅ 无变化','v2rayN：✅ 无变化',kwargs['run_url']):
+            self.assertIn(value,compact)
+        for value in ('需关注','83266','52915','变化来源','前置拦截冲突','共享依赖','官方网络文档'):
+            self.assertNotIn(value,compact)
+        full = notify.emit_message(status,report,report,limit=None,**kwargs)
+        self.assertIn('52915',full)
+        self.assertIn('已批准共享依赖：10 组 / 待复审 8 组',full)
+
+    def test_compact_updates_failures_and_all_due_reminders_are_visible(self):
+        status = {'shadowrocket_ai': {'exit_code':0}, 'v2rayn': {'exit_code':1,'error':'upstream incomplete'},
+                  'publish': {'success':True,'state':'published','changed_files':['Shadowrocket_Johnshall_AI.conf']},
+                  'openai_review': {'new_candidates':[{'rule':'DOMAIN,new.example','sources':['v2fly']}],
+                      'due_candidates':[{'rule':'DOMAIN,old.example','reviewed_at':'2026-01-01','review_due_on':'2026-07-01'}],
+                      'counts':{'pending':1,'due':1,'cooling':20},'stale_clients':[],
+                      'deployment_pending':[],'warnings':[],'reminder_interval_days':30},
+                  'ai_review': {'review_counts':{'pending':1,'due':0,'cooling':10},
+                      'alerts':[{'service':'gemini','rule':'DOMAIN,gemini-new.example','status':'pending'}],
+                      'reminder_interval_days':30},
+                  'routing_review': {'count':1,'alert':True,'added':[{'proxy_rule':'domain:openai.com',
+                      'earlier_block_rule':'domain:r.openai.com'}],'removed':[],'due':False,'pairs':[]},
+                  'approved_dependency_review': {'groups':[{}]*10,'due_count':8,'alerts':[{}]*8}}
+        report = {'build_success':True,'config_changed':True,'statistics':{'johnshall_lines':83266},
+                  'changed_sources':['voice'],'stat_deltas':{'voice_prefixes':2},
+                  'auto_added':['IP-CIDR,8.8.8.8/32'],'auto_removed':[]}
+        kwargs = {'when':'2026-11-24','event':'schedule','run_url':'https://github.com/example/actions/runs/1'}
+        msg = notify.emit_message(status,report,None,compact=True,official_docs={'checked':True,'changed':True},**kwargs)
+        for value in ('部分成功','Shadowrocket：✅ 已更新','构建失败，保留旧版','upstream incomplete',
+                      'Voice +2','DOMAIN,new.example','DOMAIN,old.example','DOMAIN,gemini-new.example',
+                      '前置拦截冲突','共享依赖复审：8 组','官方网络文档',kwargs['run_url']):
+            self.assertIn(value,msg)
+        self.assertLess(len(msg),1000)
 
     def test_dependency_group_classification(self):
         self.assertEqual(test_groups.group_for('test_v2rayn.SafetyTests.test_no_change_no_commit'), 'shared')
