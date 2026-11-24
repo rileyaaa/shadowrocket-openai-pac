@@ -15,6 +15,19 @@ class SecondAuditGuards(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'a:'):
             guard.validate_counts({'a': {'rule_count': 10}, 'b': {'rule_count': 30}},
                 {'sources': {'a': {'rule_count': 20}, 'b': {'rule_count': 30}}}, ['a','b'], [])
+    def test_missing_current_source_count_cannot_reset_baseline(self):
+        records = {'a': {'rule_count': 20}, 'apple': {'rule_count': 2}}
+        old = {'schema_version': 2, 'sources': {
+            'a': {'sha256': 'a'*64}, 'apple': {'rule_count': 2}}}
+        with self.assertRaisesRegex(ValueError, 'rule_count baseline: a'):
+            guard.validate_counts(records, old, ['a'], ['apple'])
+        old['schema_version'] = 1
+        guard.validate_counts(records, old, ['a'], ['apple'])
+        old['sources'].pop('a')
+        with self.assertRaisesRegex(ValueError, 'source record: a'):
+            guard.validate_counts(records, old, ['a'], ['apple'])
+        guard.validate_counts(records, None, ['a'], ['apple'])
+
     def test_shadow_actual_policy_not_only_hash(self):
         voice = ['IP-CIDR,8.8.8.8/32']
         prefix = '[General]\n[Rule]\nIP-CIDR,8.8.8.8/32,AI,no-resolve\n'

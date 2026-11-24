@@ -197,6 +197,7 @@ def run(argv: list[str] | None = None) -> dict:
     all_auto = list(dict.fromkeys(x for rows in source_lists.values() for x in rows))
     auto = legacy.filter_auto_domains(all_auto)
     manual = legacy.parse_manual(ROOT / 'config/manual-openai.rules')
+    legacy.check_openai_rejections(auto + manual, ROOT)
     emitted_auto, emitted_manual = legacy.compact_openai_rules(auto, manual)
     original, stats = legacy.generate(base.decode('utf-8-sig'), voice, emitted_auto,
                                       emitted_manual, settings=settings, rulesets=rulesets)

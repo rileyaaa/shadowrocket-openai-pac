@@ -103,7 +103,6 @@ OFFICIAL_CODEX_SHARED_RULES = frozenset({
     "DOMAIN,o33249.ingest.us.sentry.io",
 })
 DOMAIN_CHARS = re.compile(r"^[a-z0-9_.*?-]+$")
-PROXY_POLICY = re.compile(r",proxy(?=,|\s*$)", flags=re.I)
 CONFIG = ROOT / "Shadowrocket_Johnshall_OpenAI.conf"
 
 DNS = """# Route-aware DNS:
@@ -204,6 +203,8 @@ def domain_rule(kind: str, value: str) -> str:
         raise ValueError(f"Invalid domain rule {kind},{value}")
     if kind != "DOMAIN-WILDCARD" and ("*" in value or "?" in value):
         raise ValueError(f"Unexpected wildcard {kind},{value}")
+    if kind in {"DOMAIN", "DOMAIN-SUFFIX"} and any(not label for label in value.split(".")):
+        raise ValueError(f"Empty hostname label {kind},{value}")
     return f"{kind},{value}"
 
 
@@ -306,6 +307,32 @@ def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
         and narrow_type in {"DOMAIN", "DOMAIN-SUFFIX"}
         and (narrow_host == broad_host or narrow_host.endswith("." + broad_host))
     )
+
+
+def check_openai_rejections(rules: list[str], root: Path | None = None) -> None:
+    """Guard actual common approvals against exact/full-scope rejections.
+
+    A rejected parent suffix is not a rejection of every narrower, separately
+    approved hostname. Raw unsupported source entries remain audit-only.
+    Client-specific v2rayN exceptions are deliberately excluded from this check.
+    """
+    root = root if root is not None else ROOT
+    policy, _ = review_queue.load_policy(root / 'config/review-decisions.json', review_queue.today())
+    for item in policy['rejected_rules']:
+        raw = item['rule']
+        if raw.count(',') != 1:
+            continue
+        try:
+            rejected = domain_rule(*raw.split(',', 1))
+        except ValueError:
+            continue
+        for allowed in rules:
+            conflict = domain_rule_covers(allowed, rejected)
+            if not conflict and allowed.startswith('DOMAIN-WILDCARD,') and rejected.startswith('DOMAIN,'):
+                _, pattern = johnshall_semantics.as_match(*allowed.split(',', 1))
+                conflict = re.fullmatch(pattern.removeprefix('regexp:'), rejected.split(',', 1)[1]) is not None
+            if conflict:
+                raise ValueError(f'OpenAI approved/rejected rule conflict: {allowed} vs {raw}')
 
 
 def compact_rules_within_layer(rules: list[str]) -> list[str]:
@@ -664,6 +691,27 @@ def split_base(source: str):
             source[matches[2].start():].strip("\n"))
 
 
+def johnshall_policy(line: str) -> str | None:
+    """Return the policy of an active ordinary/embedded source rule only."""
+    if not line.strip() or line.lstrip().startswith(('#', ';')):
+        return None
+    parts = line.split(',')
+    if parts[0].strip().upper() == 'FINAL':
+        return None
+    if len(parts) < 3:
+        raise ValueError('Malformed Johnshall rule: ' + line)
+    return parts[2].strip().upper()
+
+
+def map_johnshall_proxy(line: str, node: str) -> str:
+    """Change only the policy field; never rewrite a match value or comment."""
+    if johnshall_policy(line) != 'PROXY':
+        return line
+    parts = line.split(',')
+    parts[2] = re.sub(r'(?i)proxy', lambda _: node, parts[2], count=1)
+    return ','.join(parts)
+
+
 def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None,
              rulesets: dict[str, list[str]] | None = None):
     settings = settings if settings is not None else load_settings()
@@ -691,18 +739,20 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
     converted = 0
     before_ads = 0
     for line in original_rules.splitlines():
-        if not line.lstrip().startswith("#") and line.strip():
-            if re.search(r",reject(?:,|$)", line, re.I):
-                before_ads += 1
-            line, count = PROXY_POLICY.subn(lambda _: f",{johnshall_proxy_node}", line)
-            converted += count
+        policy = johnshall_policy(line)
+        if policy in johnshall_semantics.REJECTIONS:
+            before_ads += 1
+        if policy == 'PROXY':
+            converted += 1
+            line = map_johnshall_proxy(line, johnshall_proxy_node)
+        if policy is not None:
             changed.extend(inline_ruleset(line, rulesets or {}))
         else:
             changed.append(line)
     if converted < 10000 or before_ads < 20000:
         raise ValueError(f"Original rules unexpectedly changed: proxy={converted}, reject={before_ads}")
-    rejected = [line.strip() for line in changed if
-                re.search(r',reject(?:,|$)', line, re.I)]
+    rejected = [line.strip() for line in changed
+                if johnshall_policy(line) in johnshall_semantics.REJECTIONS]
     if len(set(rejected)) < before_ads * .90:
         raise ValueError('Johnshall ad unique coverage collapsed')
     active_rules = [line.strip() for line in changed
@@ -711,7 +761,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
         raise ValueError('Johnshall FINAL must be the last effective routing rule')
     if sum(line.lower() == 'final,direct' for line in active_rules) != 1:
         raise ValueError("Missing/duplicate Johnshall final DIRECT")
-    if any(PROXY_POLICY.search(line) for line in changed if line and not line.lstrip().startswith("#")):
+    if any(johnshall_policy(line) == 'PROXY' for line in changed):
         raise ValueError("Unconverted original Proxy rule found")
     # IP rule priority first. This only covers official Voice IPs, NOT all OpenAI.
     openai_ip_rules = [f"{rule},{openai_node},no-resolve" for rule in ips]
@@ -896,6 +946,7 @@ def run():
     domains = filter_auto_domains(all_auto_domains)
     excluded_candidates = excluded_auto_rule_sources(source_lists, domains, unparsed_sources)
     manual = parse_manual(ROOT / "config/manual-openai.rules")
+    check_openai_rejections(domains + manual, ROOT)
     emitted_auto, emitted_manual = compact_openai_rules(domains, manual)
     built, stats = generate(
         original.decode("utf-8-sig"), ips, emitted_auto, emitted_manual, settings=settings, rulesets=rulesets

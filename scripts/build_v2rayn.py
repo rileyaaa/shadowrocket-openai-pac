@@ -238,6 +238,7 @@ def run(argv: list[str] | None = None) -> dict:
         line for item in sources.values() for line in item)))
     manual = legacy.parse_manual(ROOT / 'config/manual-openai.rules')
     all_openai = list(dict.fromkeys(auto + manual))
+    legacy.check_openai_rejections(all_openai, ROOT)
     voice_entries = [(*core.as_match(*rule.split(',', 1)), 'proxy') for rule in voice]
     openai_entries = [(*core.as_match(*rule.split(',', 1)), 'proxy') for rule in all_openai]
     extra = parse_user_extra(OPENAI_EXTRA.read_text(encoding='utf-8'))

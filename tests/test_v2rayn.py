@@ -29,6 +29,15 @@ class ConversionTests(unittest.TestCase):
         self.assertNotEqual(core.as_match('DOMAIN', 'browser-intake-us5-datadoghq.com'),
                             ('domain', 'domain:datadoghq.com'))
 
+    def test_invalid_match_syntax_does_not_silently_change_scope(self):
+        for kind, value in (('DOMAIN','*.example.com'), ('DOMAIN-SUFFIX','x?.example.com'),
+                            ('DOMAIN-KEYWORD','open*ai'), ('GEOSITE','foo.bar'),
+                            ('DOMAIN','a..example.com'), ('DOMAIN-SUFFIX','.example.com')):
+            with self.subTest(kind=kind,value=value), self.assertRaises(core.UnsupportedRule):
+                core.as_match(kind, value)
+        self.assertEqual(core.as_match('DOMAIN-KEYWORD', 'proxy'), ('domain','keyword:proxy'))
+        self.assertEqual(core.as_match('DOMAIN', '_service.example.com'), ('domain','full:_service.example.com'))
+
     def test_chatgpt_webpubsub_pattern_does_not_cross_dns_label(self):
         import re
         field, value = core.as_match(

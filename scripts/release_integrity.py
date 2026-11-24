@@ -15,12 +15,12 @@ RELEASE_FILES = {'shadowrocket_ai': SHADOW_AI_FILES, 'v2rayn': V2_FILES}
 COMMON_INPUTS = ('scripts/build.py', 'scripts/v2rayn_core.py',
                  'scripts/ai_services.py', 'scripts/release_integrity.py',
                  'scripts/upstream_integrity.py', 'scripts/route_semantics.py',
+                 'scripts/review_queue.py', 'config/review-decisions.json',
                  'config/manual-openai.rules', 'config/ai-services.rules',
                  'config/ai-review-decisions.json')
 CLIENT_INPUTS = {
     'shadowrocket_ai': ('scripts/build_ai_shadowrocket.py', 'scripts/build_v2rayn.py',
-                        'scripts/review_queue.py', 'config/user-settings.json',
-                        'config/review-decisions.json',
+                        'config/user-settings.json',
                         'config/reviewed-johnshall-ad-decrease.json',
                         'config/reviewed-voice-expansion.json'),
     'v2rayn': ('scripts/build_v2rayn.py', 'scripts/routing_conflicts.py',
