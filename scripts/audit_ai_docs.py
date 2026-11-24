@@ -80,12 +80,21 @@ def fetch_doc(url: str) -> str:
     request = Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; AI domain change audit)',
                                      'Accept-Encoding': 'identity'})
     with urlopen(request, timeout=22) as response:
-        if response.status != 200:
-            raise ValueError(f'Official page returned HTTP {response.status}')
+        if response.status != 200 or response.headers.get('Content-Range'):
+            raise ValueError(f'Official page returned partial/non-200 HTTP {response.status}')
+        declared = response.headers.get('Content-Length')
+        if declared is not None:
+            if not re.fullmatch(r'[0-9]+', declared.strip()):
+                raise ValueError('Invalid official page Content-Length')
+            declared = int(declared)
+            if not 1000 <= declared <= 2_500_000:
+                raise ValueError('Official page incomplete or oversized')
         body = response.read(2_500_001)
         if not 1000 <= len(body) <= 2_500_000:
             raise ValueError('Official page incomplete or oversized')
-        return body.decode('utf-8', errors='replace')
+        if declared is not None and len(body) != declared:
+            raise ValueError('Official page truncated')
+        return body.decode('utf-8')
 
 
 def scheduled_due(on, event, old):
@@ -121,6 +130,8 @@ def validate_advisory(status, paths):
     if not report_path:
         return []  # no advisory run
     report = json.loads(Path(report_path).read_text(encoding='utf-8'))
+    if not isinstance(report, dict):
+        raise ValueError('Invalid official docs advisory report')
     if report.get('checked') is False:
         return []
     manifest = report.get('artifact_sha256')
@@ -155,7 +166,7 @@ def run(argv: list[str] | None = None):
         if path and path.is_file():
             try:
                 approved[client] = validate_release(client, {'reports': {client: str(path)}})['ai_approved_rules']
-            except (OSError, ValueError, TypeError, KeyError) as exc:
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 print(f'::warning::Docs coverage unavailable for {client}: {type(exc).__name__}')
     current={}
     comparisons=[]

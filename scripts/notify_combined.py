@@ -35,7 +35,7 @@ def read_json(path: str | None) -> dict | None:
 
 def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                  *, when: str, event: str, run_url: str,
-                 official_docs: dict | None = None) -> str:
+                 official_docs: dict | None = None, limit=3900) -> str:
     builds = {key: status.get(key, {}).get('exit_code') == 0
               for key in ('shadowrocket_ai', 'v2rayn')}
     publication = status.get('publish', {})
@@ -52,8 +52,14 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     overall = ('成功' if complete else '部分成功' if partial else
                '待核对' if publication.get('state') == 'pushed_unverified'
                or (published and changed_files) else '失败')
-    if complete and docs_error:
-        overall = '订阅成功（文档检查告警）'
+    if complete:
+        advisory_warnings = []
+        if docs_error:
+            advisory_warnings.append('文档检查')
+        if status.get('approved_dependency_review_error'):
+            advisory_warnings.append('共享依赖复审')
+        if advisory_warnings:
+            overall = '订阅成功（' + '、'.join(advisory_warnings) + '告警）'
     lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
@@ -229,14 +235,14 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             lines.append(f'本次复审提醒：{len(dependencies["alerts"])} 组（不自动改规则；完整范围见 Actions 摘要）')
             for item in dependencies['alerts'][:2]:
                 lines.append('· ' + item['id'])
-    return fit_message(lines[:alert_start], lines[alert_start:], run_url)
+    return fit_message(lines[:alert_start], lines[alert_start:], run_url, limit=limit)
 
 
 def fit_message(details, alerts, run_url, limit=3900):
     """Keep review counts and warnings visible when the daily report is long."""
     footer = ['', '🔗 GitHub Actions：' + run_url] if run_url else []
     full = '\n'.join(details + alerts + footer)
-    if len(full) <= limit:
+    if limit is None or len(full) <= limit:
         return full
     omitted = '…部分详情省略，完整内容见 GitHub Actions 执行摘要。'
     # Preserve the header and every alert-category summary first. Examples
@@ -277,25 +283,29 @@ def main() -> int:
     v2 = read_json(status.get('reports', {}).get('v2rayn'))
     shadow_ai = read_json(status.get('reports', {}).get('shadowrocket_ai'))
     official_docs = read_json(status.get('reports', {}).get('official_docs'))
+    if status.get('official_docs', {}).get('exit_code', 0) != 0:
+        official_docs = None  # Unverified advisory data must not look published.
     repo = os.environ.get('GITHUB_REPOSITORY', '')
     run_id = os.environ.get('GITHUB_RUN_ID', '')
     run_url = (f'{os.environ.get("GITHUB_SERVER_URL", "https://github.com")}/'
                f'{repo}/actions/runs/{run_id}') if repo and run_id else ''
     now = datetime.now(ZoneInfo('Asia/Taipei')).strftime('%Y-%m-%d %H:%M:%S')
-    message = emit_message(status, shadow_ai, v2, when=now,
-                           event=os.environ.get('GITHUB_EVENT_NAME', ''), run_url=run_url,
-                           official_docs=official_docs)
+    report_context = {'when': now, 'event': os.environ.get('GITHUB_EVENT_NAME', ''),
+                      'run_url': run_url, 'official_docs': official_docs}
+    message = emit_message(status, shadow_ai, v2, **report_context)
     print(message)
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary_path:
         with open(summary_path, 'a', encoding='utf-8') as f:
+            # Telegram length limits must never truncate the Actions summary.
+            full_message = emit_message(status, shadow_ai, v2, limit=None, **report_context)
             f.write('## Shadowrocket + v2rayN 真实构建及发布报告\n\n~~~text\n'
-                    + message + '\n~~~\n')
+                    + full_message + '\n~~~\n')
             if status.get('openai_review'):
                 f.write('\n### OpenAI 合并审核清单\n\n')
                 for item in status['openai_review']['entries']:
                     f.write(f'- {item["rule"]} — {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}；原因 {item.get("reason", "—")}；{item["client_coverage"]}\n')
-            elif shadow_ai:
+            elif status.get('shadowrocket_ai', {}).get('exit_code') == 0 and valid_build_report(shadow_ai):
                 for key in ('new_excluded_candidates', 'review_due_candidates'):
                     if shadow_ai.get(key):
                         f.write(f'\n### OpenAI {key}\n\n')
@@ -329,7 +339,7 @@ def main() -> int:
                             f'上次 {item["reviewed_at"] or "待核实"}；到期 {item["due_on"] or "待首次复核"}\n'
                             f'  - 规则：{", ".join(item["rules"])}\n'
                             f'  - 依据：{item["evidence"]}\n  - 复审重点：{item["note"]}\n')
-            if v2:
+            if status.get('v2rayn', {}).get('exit_code') == 0 and valid_build_report(v2):
                 if v2.get('routing_conflicts', {}).get('count'):
                     f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
                     for item in v2['routing_conflicts'].get('pairs', v2['routing_conflicts']['examples']):

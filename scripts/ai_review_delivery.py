@@ -16,20 +16,36 @@ CLIENTS = ('shadowrocket_ai', 'v2rayn')
 def empty_state():
     return {'version': 1, 'snapshots': {}, 'sent': {}}
 
+def validate_candidate_rows(rows):
+    """Reject damaged observations before coverage or reminder calculations."""
+    if not isinstance(rows, list):
+        raise ValueError('Invalid AI candidate list')
+    for row in rows:
+        if (not isinstance(row, dict) or row.get('service') not in ('gemini', 'claude')
+                or not isinstance(row.get('rule'), str)
+                or not isinstance(row.get('sources'), list) or not row['sources']
+                or any(not isinstance(source, str) or not source.strip()
+                       for source in row['sources'])):
+            raise ValueError('Invalid AI candidate observation')
+        kind, separator, host = row['rule'].partition(',')
+        if (not separator or kind not in ('DOMAIN', 'DOMAIN-SUFFIX')
+                or ai_services.check_hostname(host) != host):
+            raise ValueError('Invalid AI candidate rule')
+    return rows
+
+
 def read_state(path):
     if not path.is_file():
         return empty_state()
     state = json.loads(path.read_text(encoding='utf-8'))
-    if (not isinstance(state, dict) or state.get('version') != 1
+    if (not isinstance(state, dict) or type(state.get('version')) is not int or state['version'] != 1
             or not isinstance(state.get('snapshots'), dict)
             or not isinstance(state.get('sent'), dict)):
         raise ValueError('Invalid shared AI receipt state')
     for client, rows in state['snapshots'].items():
-        if client not in CLIENTS or not isinstance(rows, list) or any(
-                not isinstance(row, dict) or row.get('service') not in ('gemini', 'claude')
-                or not isinstance(row.get('rule'), str) or not isinstance(row.get('sources'), list)
-                or any(not isinstance(s, str) for s in row['sources']) for row in rows):
-            raise ValueError('Invalid AI candidate snapshot')
+        if client not in CLIENTS:
+            raise ValueError('Invalid AI candidate snapshot client')
+        validate_candidate_rows(rows)
     if any(not isinstance(value, dict) for value in state['sent'].values()):
         raise ValueError('Invalid AI receipt record')
     return state
@@ -43,9 +59,7 @@ def merge_reports(state, reports, policy, *, on=None, manual=None):
     fresh = []
     for client in CLIENTS:
         if client in reports:
-            rows = reports[client].get('ai_review_candidates')
-            if not isinstance(rows, list):
-                raise ValueError('Missing AI candidate list: ' + client)
+            rows = validate_candidate_rows(reports[client].get('ai_review_candidates'))
             # Keep only stable observations, not daily computed review dates.
             snapshots[client] = [{k: item[k] for k in ('service', 'rule', 'sources')}
                                  for item in rows]

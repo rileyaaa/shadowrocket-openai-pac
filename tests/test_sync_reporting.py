@@ -231,6 +231,19 @@ class SyncReportTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 2)
         sleep.assert_called_once_with(2)
 
+    def test_telegram_acknowledgement_requires_literal_success(self):
+        class Fake:
+            def __init__(self, body): self.body = body
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return self.body
+        for body in (b'[]', b'null', b'{"ok":"false"}', b'{"ok":1}',
+                     b'{"ok":false}', b'not json', b'\xff'):
+            with self.subTest(body=body), patch("notify_telegram.urllib.request.urlopen",
+                                               return_value=Fake(body)):
+                with self.assertRaises(RuntimeError):
+                    notify_telegram.send("example-test-token", "1234", "Hello")
+
     def test_telegram_is_post_payload_with_chat_id(self):
         class Fake:
             def __enter__(self):
