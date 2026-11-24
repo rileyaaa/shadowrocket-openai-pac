@@ -96,7 +96,7 @@ class ReleaseEndToEndTests(unittest.TestCase):
               + ''.join(f'DOMAIN,ad{i}.example,Reject\n' for i in range(20001))
               + 'DOMAIN,r.openai.com,Reject\n'
               + '# preserve original fixture ordering and comments\n'*22000
-              + f'RULE-SET,{apple},Proxy\nFINAL,direct\n'
+              + f'RULE-SET,{apple},Proxy\n final , DIRECT \n# FINAL,direct is the fallback\n'
               + '[URL Rewrite]\n^http://example.com https://example.com 302\n'
               + '[MITM]\nhostname = example.com\n'+build.JOHNSHALL_FOOTER+'\n')
         (p/'upstream.conf').write_text(base,encoding='utf-8')

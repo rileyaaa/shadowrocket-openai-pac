@@ -244,9 +244,9 @@ def run(argv: list[str] | None = None) -> dict:
     ai_services.validate_safety(ai['counts'], old)
     enhanced = insert_ai_rules(original, ai, settings['openai_node_name'])
     if (len(enhanced.encode('utf-8')) < 1_000_000 or enhanced.count('[Rule]') != 1
-            or enhanced.count('FINAL,direct') != 1 or
-            not enhanced.rstrip().endswith(legacy.JOHNSHALL_FOOTER)):
+            or not enhanced.rstrip().endswith(legacy.JOHNSHALL_FOOTER)):
         raise ValueError('Generated AI Shadowrocket configuration failed integrity checks')
+    legacy.validate_shadow_final(legacy.split_base(enhanced)[2].splitlines())
     for core in ai_services.MANDATORY['gemini'] | ai_services.MANDATORY['claude']:
         if f'{core},{settings["openai_node_name"]},force-remote-dns' not in enhanced:
             raise ValueError(f'Mandatory Gemini/Claude rule missing in output: {core}')

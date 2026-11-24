@@ -11,11 +11,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
-import calendar
 import hashlib
 import json
 from pathlib import Path
 import re
+from review_queue import add_months, domain_rule_covers as approved_rule_covers
 
 ROOT = Path(__file__).resolve().parents[1]
 MANUAL = ROOT / 'config/ai-services.rules'
@@ -164,13 +164,6 @@ def load_manual(text: str) -> dict[str, list[str]]:
     return {service: list(dict.fromkeys(items)) for service, items in parsed.items()}
 
 
-def add_months(day: date, months: int) -> date:
-    total = day.year * 12 + day.month - 1 + months
-    year, month = divmod(total, 12)
-    month += 1
-    return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
-
-
 def evaluate_review_policy(candidates: list[dict], policy: dict,
                            *, on: date | None = None) -> tuple[list[dict], dict]:
     """Reject/renew entries remain rejected; expiry only schedules review."""
@@ -228,15 +221,6 @@ def evaluate_review_policy(candidates: list[dict], policy: dict,
                         review_due_on=due.isoformat(), reason=record['reason'])
         output.append(item)
     return output, counts
-
-
-def approved_rule_covers(allowed: str, candidate: str) -> bool:
-    """Full coverage, not mere overlap: exact approval cannot approve a suffix."""
-    ak, ah = allowed.split(',', 1)
-    ck, ch = candidate.split(',', 1)
-    return (allowed == candidate or
-            (ak == 'DOMAIN-SUFFIX' and ck in ('DOMAIN', 'DOMAIN-SUFFIX')
-             and (ch == ah or ch.endswith('.' + ah))))
 
 
 def approved_rule_overlaps(a: str, b: str) -> bool:

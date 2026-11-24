@@ -4,8 +4,17 @@ import argparse
 import unittest
 
 GROUPS = ('shared', 'shadowrocket', 'v2rayn', 'docs')
-SHADOW_MODULES = {'test_build', 'test_hardening', 'test_review_queue',
-                  'test_sync_reporting', 'test_ai_shadowrocket'}
+SHADOW_MODULES = {'test_hardening', 'test_sync_reporting', 'test_ai_shadowrocket'}
+# The legacy build module contains both shared parsers and Shadowrocket-only
+# rendering. Keep client-specific rendering tests isolated.
+SHADOW_BUILD_TESTS = {
+    'test_only_johnshall_policy_field_is_replaced',
+    'test_independent_layers_with_internal_dedup_only',
+    'test_manual_coverage_invariant_and_two_sources',
+    'test_only_two_user_variables', 'test_node_names_can_change_without_changing_tests',
+    'test_exact_node_name_and_dns_escaping', 'test_settings_fail_closed',
+    'test_build_uses_nodes_directly_no_groups', 'test_shadow_final_validation',
+}
 SHARED_V2_PREFIXES = ('test_publish', 'test_publisher', 'test_telegram',
                       'test_single_telegram', 'test_both_success',
                       'test_no_change', 'test_git_push', 'test_only_two', 'test_atomic')
@@ -20,7 +29,13 @@ def group_for(test_id: str) -> str:
     # A regression in its contract affects both builds.
     if module == 'test_hardening' and 'DownloadCompletenessTests' in parts:
         return 'shared'
-    if module == 'test_build' and name.startswith('test_voice'):
+    if module == 'test_build':
+        return 'shadowrocket' if name in SHADOW_BUILD_TESTS else 'shared'
+    if module == 'test_sync_reporting' and name.startswith(
+            ('test_upstream_download', 'test_upstream_truncated', 'test_telegram',
+             'test_excluded_rules')):
+        return 'shared'
+    if module == 'test_release_remediation' and name == 'test_v2_downloader_rejects_http200_content_range':
         return 'shared'
     if module in SHADOW_MODULES:
         return 'shadowrocket'
