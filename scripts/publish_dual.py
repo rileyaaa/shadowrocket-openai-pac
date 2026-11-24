@@ -11,6 +11,7 @@ from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
 import ai_review_delivery
 import openai_review_delivery
 import routing_conflicts
+import approved_dependency_review
 import review_queue
 REVIEW_FILES = ('config/review-decisions.json',)
 AI_REVIEW_FILES = ('data/ai-review-queue.md', 'data/ai-review-notifications.json')
@@ -89,6 +90,14 @@ def publish(path: Path) -> None:
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 status['routing_review_error'] = str(exc)
                 print('::warning::Routing conflict review not updated: ' + str(exc))
+        # Existing shared-dependency approvals are reviewed on a separate
+        # calendar; this advisory never grants, removes or blocks routes.
+        if any(verified_reports.values()):
+            try:
+                status['approved_dependency_review'] = approved_dependency_review.prepare()
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                status['approved_dependency_review_error'] = str(exc)
+                print('::warning::Approved dependency review unavailable: ' + str(exc))
         # Official docs remain advisory. A skipped or incomplete report
         # must never stage partially updated advisory files.
         if status.get('official_docs', {}).get('exit_code') == 0:

@@ -18,6 +18,7 @@ import review_queue
 import ai_review_delivery
 import openai_review_delivery
 import routing_conflicts
+import approved_dependency_review
 from release_integrity import valid_build_report
 
 
@@ -218,6 +219,15 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                     lines.append('· ' + label + ' ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
     elif valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
         lines.append(f'⚠️ v2rayN：{v2["routing_conflicts"]["count"]} 对前置拦截交集；完整结果见摘要。')
+    dependencies = status.get('approved_dependency_review')
+    if status.get('approved_dependency_review_error'):
+        lines.append('⚠️ 已批准共享依赖复审清单不可用（不影响订阅）：' + str(status['approved_dependency_review_error'])[:140])
+    elif dependencies:
+        lines.append(f'已批准共享依赖：{len(dependencies["groups"])} 组 / 待复审 {dependencies["due_count"]} 组')
+        if dependencies['alerts']:
+            lines.append(f'本次复审提醒：{len(dependencies["alerts"])} 组（不自动改规则；完整范围见 Actions 摘要）')
+            for item in dependencies['alerts'][:2]:
+                lines.append('· ' + item['id'])
     if run_url:
         lines += ['', '🔗 GitHub Actions：' + run_url]
     message = '\n'.join(lines)
@@ -234,6 +244,7 @@ def main() -> int:
     p.add_argument('--review-state-file', type=Path)
     p.add_argument('--ai-review-state-file', type=Path)
     p.add_argument('--conflict-state-file', type=Path)
+    p.add_argument('--dependency-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
         'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
@@ -287,6 +298,13 @@ def main() -> int:
                 for item in status['ai_review']['review_candidates']:
                     f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])}) '
                             f'— {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}\n')
+            if status.get('approved_dependency_review'):
+                f.write('\n### 已批准共享依赖复审（仅提醒，不自动调整）\n\n')
+                for item in status['approved_dependency_review']['groups']:
+                    f.write(f'- {item["id"]} / {item["scope"]}：{item["status"]}；'
+                            f'上次 {item["reviewed_at"] or "待核实"}；到期 {item["due_on"] or "待首次复核"}\n'
+                            f'  - 规则：{", ".join(item["rules"])}\n'
+                            f'  - 依据：{item["evidence"]}\n  - 复审重点：{item["note"]}\n')
             if v2:
                 if v2.get('routing_conflicts', {}).get('count'):
                     f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
@@ -341,6 +359,14 @@ def main() -> int:
             receipt_files.append(str(args.conflict_state_file))
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f'::error::Conflict receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    if (args.dependency_state_file and status.get('approved_dependency_review', {}).get('alerts')
+            and status.get('publish', {}).get('success') is True and run_url and summary_path):
+        try:
+            approved_dependency_review.acknowledge(status['approved_dependency_review'], args.dependency_state_file)
+            receipt_files.append(str(args.dependency_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::Approved dependency receipt failed: {type(exc).__name__}')
             return 1
     # Stage only receipts explicitly acknowledged in this run.
     if args.status_file.is_file():

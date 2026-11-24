@@ -97,7 +97,8 @@ jobs:
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
             --review-state-file data/review-notifications.json \
             --ai-review-state-file data/ai-review-notifications.json \
-            --conflict-state-file data/routing-conflicts.json
+            --conflict-state-file data/routing-conflicts.json \
+            --dependency-state-file data/approved-dependency-notifications.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: python scripts/persist_receipts.py --status-file "$RUNNER_TEMP/dual-status.json"

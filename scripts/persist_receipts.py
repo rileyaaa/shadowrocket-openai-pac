@@ -9,7 +9,7 @@ import sys
 from publish_dual import git, remote_head
 
 ALLOWED = {'data/review-notifications.json', 'data/ai-review-notifications.json',
-           'data/routing-conflicts.json'}
+           'data/routing-conflicts.json', 'data/approved-dependency-notifications.json'}
 
 
 def persist(status_path):
