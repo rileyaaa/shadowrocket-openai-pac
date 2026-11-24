@@ -155,7 +155,9 @@ def johnshall_entries(source: str, rulesets: dict[str, list[str]], inline_rulese
     # The threshold leaves room for natural upstream aliases and duplicates.
     if ads >= 20000 and len(set(blocked)) < ads * .90:
         raise ValueError('Johnshall ad unique coverage collapsed')
-    if proxy >= 10000 and len(set(ordinary)) < len(ordinary) * .90:
+    if proxy >= 10000 and (
+            len({entry for entry in ordinary if entry[2] == 'proxy'}) < proxy * .90
+            or len(set(ordinary)) < len(ordinary) * .90):
         raise ValueError('Johnshall proxy unique coverage collapsed')
     if finals == 1 and final_line != last_active_line:
         raise ValueError('Johnshall FINAL must be the last effective routing rule')
@@ -177,6 +179,7 @@ def load_bitbrowser_domains(text: str) -> list[tuple[str, str, str]]:
         if len(fields) != 4:
             raise ValueError(f'BitBrowser data line {line_number}: expected domain|class|purpose|url')
         name, confidence, purpose, url = fields
+        name = name.lower()  # DNS names are case-insensitive, including duplicate checks.
         if confidence not in ('official', 'community', 'user', 'unverified'):
             raise ValueError(f'BitBrowser confidence invalid at line {line_number}')
         if not purpose or not url.startswith('https://') or not DOMAIN_NAME.fullmatch(name) or '*' in name or '?' in name:
@@ -201,18 +204,20 @@ def load_processes(text: str) -> list[str]:
         if not value or value.startswith('#'):
             continue
         if value.lower() == 'bitbrowser.exe':
-            if value not in results:
-                results.append(value)
+            if 'BitBrowser.exe' not in results:
+                results.append('BitBrowser.exe')
             continue
         if ('/' not in value and '\\' not in value) or not value.lower().endswith('.exe'):
             raise ValueError('BitBrowser process must be BitBrowser.exe or a verified absolute .exe path')
         if not re.match(r'^[A-Za-z]:\\', value):
             raise ValueError('BitBrowser process path must be absolute Windows path')
         parts = PureWindowsPath(value).parts
+        if '..' in parts:
+            raise ValueError('BitBrowser process path must not contain parent-directory traversal')
         if parts[-1].lower() != 'bitbrowser.exe' or not any(
                 'bitbrowser' in part.lower() for part in parts[1:-1]):
             raise ValueError('Only a dedicated BitBrowser installation executable may be routed')
-        if value not in results:
+        if not any(PureWindowsPath(value) == PureWindowsPath(old) for old in results):
             results.append(value)
     return results
 

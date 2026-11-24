@@ -112,6 +112,32 @@ def atomically_write(path: Path, content: bytes) -> None:
             os.unlink(name)
 
 
+def validate_published_voice(output: bytes, state: dict) -> None:
+    """Bind the historical Voice ranges and counters to the published routes."""
+    voice = state['voice_rules']
+    if any(rule.count(',') != 1 for rule in voice):
+        raise ValueError('Malformed published v2rayN Voice baseline rule')
+    counts = {**legacy.voice_address_counts(voice), 'voice_prefixes': len(voice)}
+    for key, expected in counts.items():
+        if type(state['statistics'].get(key)) is not int or state['statistics'][key] != expected:
+            raise ValueError('Published v2rayN Voice statistic mismatch: ' + key)
+    expected = {core.as_match(*rule.split(',', 1))[1] for rule in voice}
+    rows = json.loads(output)
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        raise ValueError('Invalid published v2rayN routing list')
+    actual = []
+    from route_semantics import require_route_shape
+    for row in rows:
+        label = row.get('remarks', '')
+        if isinstance(label, str) and label.startswith('OpenAI official Voice IPs / '):
+            require_route_shape(row, 'ip')
+            if row.get('enabled') is not True or row.get('outboundTag') != 'proxy':
+                raise ValueError('Published v2rayN Voice layer is disabled or has wrong policy')
+            actual.extend(row['ip'])
+    if set(actual) != expected or len(actual) != len(voice):
+        raise ValueError('Published v2rayN Voice layer does not match historical baseline')
+
+
 def load_published_baseline() -> tuple[bytes | None, dict | None]:
     """Only an intact existing v1/v2 release may be used for the next baseline."""
     has_output, has_state = CONFIG.is_file(), STATE.is_file()
@@ -121,7 +147,7 @@ def load_published_baseline() -> tuple[bytes | None, dict | None]:
         raise ValueError('Incomplete published v2rayN baseline: output/state file missing')
     before = CONFIG.read_bytes()
     old = json.loads(STATE.read_text(encoding='utf-8'))
-    if not isinstance(old, dict) or old.get('schema_version') not in (1, 2):
+    if not isinstance(old, dict) or type(old.get('schema_version')) is not int or old['schema_version'] not in (1, 2):
         raise ValueError('Unknown published v2rayN state version')
     for key in ('statistics', 'sources', 'ai_counts', 'inputs_sha256'):
         if not isinstance(old.get(key), dict) or not old[key]:
@@ -149,6 +175,7 @@ def load_published_baseline() -> tuple[bytes | None, dict | None]:
             raise ValueError('Unrecognized v2rayN v1 BitBrowser baseline; manual review required')
     elif type(old['statistics'].get('bitbrowser_effective_domains')) is not int:
         raise ValueError('Missing published v2rayN effective BitBrowser baseline')
+    validate_published_voice(before, old)
     return before, old
 
 

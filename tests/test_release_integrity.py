@@ -77,6 +77,30 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertNotIn('Shadowrocket_Johnshall_AI.conf', staged)
         self.assertEqual(publish.check(status), 1)
 
+    def test_malformed_client_report_does_not_prevent_other_client_publication(self):
+        status = self.write('malformed.json', json.dumps({
+            'shadowrocket_ai': {'exit_code': 0}, 'v2rayn': {'exit_code': 0}}).encode())
+        calls = []
+        def git(*args):
+            calls.append(args)
+            return SimpleNamespace(stdout='')
+        def validate(key, _status):
+            if key == 'v2rayn':
+                raise AttributeError('malformed report field')
+            return {}
+        with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \
+                patch.object(publish, 'remote_head', return_value=''), \
+                patch.object(publish, 'git', side_effect=git), \
+                patch.object(publish, 'validate_release', side_effect=validate):
+            publish.publish(status)
+        result = json.loads(status.read_text())
+        self.assertEqual(result['shadowrocket_ai']['exit_code'], 0)
+        self.assertEqual(result['v2rayn']['exit_code'], 1)
+        staged = next(args for args in calls if args[0] == 'add')
+        self.assertIn('Shadowrocket_Johnshall_AI.conf', staged)
+        self.assertNotIn('v2rayN_Johnshall_AI.json', staged)
+        self.assertEqual(publish.check(status), 1)
+
     def test_stale_checkout_rejected_before_staging(self):
         status = self.write('stale.json', b'{"shadowrocket_ai":{"exit_code":0},"v2rayn":{"exit_code":0}}')
         with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \

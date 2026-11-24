@@ -87,6 +87,18 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(objects[-1]['ip'], ['8.8.8.8'])
         self.assertTrue(all(o['enabled'] for o in objects))
 
+    def test_direct_rules_cannot_mask_collapsed_proxy_uniqueness(self):
+        # 8,800 distinct proxy matches plus 1,200 duplicates. A large
+        # legitimate DIRECT list must not dilute the proxy-specific guard.
+        source = '\n'.join(
+            [f'DOMAIN,p{i}.example,Proxy' for i in range(8800)] +
+            ['DOMAIN,p0.example,Proxy'] * 1200 +
+            [f'DOMAIN,d{i}.example,DIRECT' for i in range(4000)] +
+            [f'DOMAIN,ad{i}.example,REJECT' for i in range(20000)] +
+            ['FINAL,direct'])
+        with self.assertRaisesRegex(ValueError, 'proxy unique coverage collapsed'):
+            core.johnshall_entries(source, {}, lambda line, _: [line], minimum_lines=1)
+
     def test_unsupported_and_missing_upstream_guard(self):
         with self.assertRaises(ValueError):
             core.johnshall_entries('DOMAIN,site.com,PROXY\nFINAL,direct\n', {}, lambda x, _: [x])
@@ -132,6 +144,22 @@ class ConversionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             core.load_processes('nonexistent')
         self.assertEqual(core.load_processes('# only a comment'), [])
+
+    def test_bitbrowser_dns_case_and_process_path_normalization(self):
+        data = builder.BITBROWSER.read_text(encoding='utf-8')
+        rows = core.load_bitbrowser_domains(data)
+        first = next(line for line in data.splitlines() if line.strip() and not line.lstrip().startswith('#'))
+        name = first.split('|', 1)[0]
+        upper = name.upper() + '|' + first.split('|', 1)[1]
+        changed = data.replace(first, upper, 1)
+        self.assertEqual(core.load_bitbrowser_domains(changed), rows)
+        with self.assertRaisesRegex(ValueError, 'Duplicate BitBrowser domain'):
+            core.load_bitbrowser_domains(data + '\n' + upper)
+        self.assertEqual(core.load_processes('bitbrowser.exe\nBitBrowser.exe\n'), ['BitBrowser.exe'])
+        path = r'C:\BitBrowser\resources\BitBrowser.exe'
+        self.assertEqual(core.load_processes(path + '\n' + path.lower()), [path])
+        with self.assertRaisesRegex(ValueError, 'parent-directory'):
+            core.load_processes(r'C:\BitBrowser\..\OtherApp\BitBrowser.exe')
 
     def test_bitbrowser_list_status_provenance(self):
         entries = core.load_bitbrowser_domains(builder.BITBROWSER.read_text(encoding='utf-8'))
