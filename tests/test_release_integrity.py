@@ -63,6 +63,7 @@ class ReleaseIntegrityTests(unittest.TestCase):
                 raise ValueError('invalid manifest')
             return {}
         with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \
+                patch.object(publish, 'remote_head', return_value=''), \
                 patch.object(publish, 'git', side_effect=git), \
                 patch.object(publish, 'validate_release', side_effect=validate):
             publish.publish(status)
@@ -73,6 +74,24 @@ class ReleaseIntegrityTests(unittest.TestCase):
         self.assertIn('v2rayN_Johnshall_AI.json', staged)
         self.assertNotIn('Shadowrocket_Johnshall_AI.conf', staged)
         self.assertEqual(publish.check(status), 1)
+
+    def test_stale_checkout_rejected_before_staging(self):
+        status = self.write('stale.json', b'{"shadowrocket_ai":{"exit_code":0},"v2rayn":{"exit_code":0}}')
+        with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \
+                patch.object(publish, 'git', return_value=SimpleNamespace(stdout='old')) as git, \
+                patch.object(publish, 'remote_head', return_value='new'):
+            publish.publish(status)
+        self.assertEqual(json.loads(status.read_text())['publish']['state'], 'stale')
+        git.assert_called_once_with('rev-parse', 'HEAD')
+
+    def test_remote_advanced_before_unchanged_report(self):
+        status = self.write('stale2.json', b'{"shadowrocket_ai":{"exit_code":0},"v2rayn":{"exit_code":0}}')
+        with patch.dict('os.environ', {'GITHUB_REF': 'refs/heads/main'}), \
+                patch.object(publish, 'git', side_effect=lambda *a: SimpleNamespace(stdout='old' if a[0]=='rev-parse' else '')), \
+                patch.object(publish, 'validate_release', return_value={}), \
+                patch.object(publish, 'remote_head', side_effect=['old','new']):
+            publish.publish(status)
+        self.assertEqual(json.loads(status.read_text())['publish']['state'], 'stale')
 
 if __name__ == '__main__':
     unittest.main()

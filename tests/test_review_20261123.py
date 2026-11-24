@@ -52,10 +52,14 @@ class ReviewedSnapshotTests(unittest.TestCase):
         self.assertTrue(all(r['status'] == 'due' for r in at_due))
 
     def test_live_policies_valid_without_fixed_counts_or_dates(self):
-        openai = json.loads((ROOT / 'config/review-decisions.json').read_text(encoding='utf-8'))
         ai = json.loads((ROOT / 'config/ai-review-decisions.json').read_text(encoding='utf-8'))
         on = review_queue.today()
-        review_queue.validate_policy(openai, on)
+        # A malformed optional OpenAI rejection ledger must still warn and
+        # degrade to pending review without freezing the route builders.
+        policy, warnings = review_queue.load_policy(ROOT / 'config/review-decisions.json', on)
+        review_queue.validate_policy(policy, on)
+        if not warnings:
+            self.assertEqual(policy, json.loads((ROOT / 'config/review-decisions.json').read_text(encoding='utf-8')))
         ai_services.evaluate_review_policy([], ai, on=on)
         manual = ai_services.load_manual((ROOT / 'config/ai-services.rules').read_text(encoding='utf-8'))
         ai_services.check_rejection_conflicts({k: set(v) for k, v in manual.items()}, ai)

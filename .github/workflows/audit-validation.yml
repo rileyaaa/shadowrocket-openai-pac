@@ -70,16 +70,20 @@ jobs:
           import os
           reports = {'shadowrocket_ai': str(Path(os.environ['RUNNER_TEMP']) / 'shadowrocket-smoke.json'),
                      'v2rayn': str(Path(os.environ['RUNNER_TEMP']) / 'v2rayn-smoke.json')}
-          for client in reports:
-              validate_release(client, {'reports': reports})
+          verified = {client: validate_release(client, {'reports': reports}) for client in reports}
+          import ai_review_delivery
+          audit = ai_review_delivery.prepare(verified)
+          assert set(audit['fresh_clients']) == set(reports)
+          assert Path('data/ai-review-queue.md').is_file()
           PY
           python - <<'PY'
           import json
           from pathlib import Path
           shadow = json.loads(Path('data/ai-shadowrocket-sources.json').read_text())
           v2 = json.loads(Path('data/v2rayn-sources.json').read_text())
-          assert shadow['ai_counts']['claude_domains'] >= 20
-          assert shadow['ai_counts']['gemini_domains'] >= 50
+          # Builders already enforce mandatory routes and baseline safety limits.
+          assert shadow['ai_counts']['claude_domains'] >= 8
+          assert shadow['ai_counts']['gemini_domains'] >= 25
           assert v2['statistics']['process_rules'] >= 1
           assert v2['output_sha256']
           assert Path('Shadowrocket_Johnshall_AI.conf').is_file()

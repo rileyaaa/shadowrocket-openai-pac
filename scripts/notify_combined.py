@@ -254,12 +254,14 @@ def main() -> int:
         print(f'::error::Telegram delivery failed: {type(exc).__name__}; receipts unchanged')
         return 1
     print('Unified Telegram report sent.')
+    receipt_files = []
     if (args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
             and status.get('publish', {}).get('success')
             and run_url and summary_path):
         try:
             review_queue.acknowledge(shadow_ai, args.review_state_file)
+            receipt_files.append(str(args.review_state_file))
         except (OSError, ValueError, TypeError) as exc:
             print(f'::error::Telegram delivered, but review acknowledgement failed: {type(exc).__name__}')
             return 1
@@ -268,9 +270,14 @@ def main() -> int:
             and run_url and summary_path):
         try:
             ai_review_delivery.acknowledge(status['ai_review'], args.ai_review_state_file)
+            receipt_files.append(str(args.ai_review_state_file))
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f'::error::AI review receipt acknowledgement failed: {type(exc).__name__}')
             return 1
+    # Stage only receipts explicitly acknowledged in this run.
+    if args.status_file.is_file():
+        status['receipt_files'] = receipt_files
+        args.status_file.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     return 0
 
 

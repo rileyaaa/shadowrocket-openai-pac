@@ -25,11 +25,23 @@ def write(path: Path, status: dict) -> None:
     path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
+def remote_head() -> str:
+    rows = git('ls-remote', '--exit-code', 'origin', 'refs/heads/main').stdout.split()
+    if not rows:
+        raise RuntimeError('Remote main not found')
+    return rows[0]
+
+
 def publish(path: Path) -> None:
     status = json.loads(path.read_text(encoding='utf-8'))
     try:
         if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_REF') != 'refs/heads/main':
             raise RuntimeError('Refusing publish outside refs/heads/main')
+        build_head = git('rev-parse', 'HEAD').stdout.strip()
+        if remote_head() != build_head:
+            status['publish'] = {'success': False, 'state': 'stale',
+                                 'error': 'main advanced before publication; rebuild from the current remote main'}
+            return
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
@@ -66,6 +78,11 @@ def publish(path: Path) -> None:
         unexpected = sorted(set(changed_files) - allowed)
         if unexpected:
             raise RuntimeError('Unexpected staged publish paths: ' + ', '.join(unexpected))
+        # Do not claim an unchanged release against a superseded checkout.
+        if remote_head() != build_head:
+            status['publish'] = {'success': False, 'state': 'stale',
+                                 'error': 'main advanced during release verification; rebuild required'}
+            return
         if not changed_files:
             status['publish'] = {'success': True, 'state': 'unchanged',
                                  'changed_files': [], 'commit': None}
@@ -76,8 +93,23 @@ def publish(path: Path) -> None:
         git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
         git('commit', '-m', 'chore: sync two verified AI subscriptions')
         commit = git('rev-parse', 'HEAD').stdout.strip()
-        git('push', 'origin', 'HEAD:main')
-        remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
+        try:
+            git('push', 'origin', 'HEAD:main')
+        except RuntimeError as exc:
+            # Retry only a clearly rejected non-fast-forward, not an
+            # uncertain push that may already have reached the server.
+            if ('non-fast-forward' in str(exc) or 'fetch first' in str(exc)) and remote_head() not in (build_head, commit):
+                status['publish'] = {'success': False, 'state': 'stale',
+                                     'error': 'main advanced during push; rebuild required'}
+                return
+            raise
+        try:
+            remote = remote_head()
+        except (RuntimeError, OSError, IndexError) as exc:
+            status['publish'] = {'success': False, 'state': 'pushed_unverified',
+                                 'commit': commit, 'changed_files': changed_files,
+                                 'error': 'Push succeeded but remote head could not be read: ' + str(exc)}
+            return
         if remote != commit:
             # A concurrent fast-forward can move remote main immediately after
             # our successful push. The new SHA is usually NOT locally present
@@ -89,7 +121,7 @@ def publish(path: Path) -> None:
                         'origin', 'refs/heads/main')
                     fetched = git('rev-parse', 'FETCH_HEAD').stdout.strip()
                     if fetched != remote:
-                        remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
+                        remote = remote_head()
                         continue
                     ancestor = subprocess.run(
                         ['git', 'merge-base', '--is-ancestor', commit, 'FETCH_HEAD'],
