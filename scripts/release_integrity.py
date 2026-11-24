@@ -15,6 +15,7 @@ V2_FILES = ('v2rayN_Johnshall_AI.json', 'data/v2rayn-sources.json')
 RELEASE_FILES = {'shadowrocket_ai': SHADOW_AI_FILES, 'v2rayn': V2_FILES}
 COMMON_INPUTS = ('scripts/build.py', 'scripts/v2rayn_core.py',
                  'scripts/ai_services.py', 'scripts/release_integrity.py',
+                 'scripts/upstream_integrity.py', 'scripts/route_semantics.py',
                  'config/manual-openai.rules', 'config/ai-services.rules',
                  'config/ai-review-decisions.json')
 CLIENT_INPUTS = {
@@ -23,7 +24,8 @@ CLIENT_INPUTS = {
                         'config/review-decisions.json',
                         'config/reviewed-johnshall-ad-decrease.json',
                         'config/reviewed-voice-expansion.json'),
-    'v2rayn': ('scripts/build_v2rayn.py', 'scripts/routing_conflicts.py', 'config/v2rayn/openai-extra.rules',
+    'v2rayn': ('scripts/build_v2rayn.py', 'scripts/routing_conflicts.py',
+               'config/reviewed-johnshall-ad-decrease.json', 'config/reviewed-voice-expansion.json', 'config/v2rayn/openai-extra.rules',
                'config/v2rayn/verified-processes.txt', 'data/bitbrowser_domains.txt'),
 }
 
@@ -83,4 +85,6 @@ def validate_release(client: str, status: dict, root: Path = ROOT) -> dict:
                           ('legacy_state_sha256', 'data/sources.json')):
             if state.get(key) != manifest[name]:
                 raise ValueError('Auxiliary state digest mismatch: ' + name)
+    from route_semantics import verify_release_routes
+    verify_release_routes(client, root, state)
     return report

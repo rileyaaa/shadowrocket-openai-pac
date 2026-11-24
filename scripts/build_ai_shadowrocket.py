@@ -18,6 +18,7 @@ import sys
 import build as legacy  # read-only, never invoke build.run()
 import build_v2rayn as v2helpers  # only atomic writer, independent data fetch is below
 import release_integrity
+import upstream_integrity
 import ai_services
 import review_queue
 
@@ -105,8 +106,7 @@ def prepare_openai_review(voice, auto, emitted_auto, emitted_manual,
             'decisions_sha256': hashlib.sha256(decisions).hexdigest(),
         },
     }
-    for name, (url, _) in legacy.RULESET_SOURCES.items():
-        source_state['sources'][name]['rule_count'] = len(rulesets[url])
+    upstream_integrity.record_counts(source_state['sources'], source_lists, rulesets, legacy.RULESET_SOURCES)
     old_report = legacy.make_sync_report(
         old_state, source_state, old_auto, auto_text, changed,
         excluded_sources=excluded,
@@ -251,6 +251,8 @@ def run(argv: list[str] | None = None) -> dict:
             raise ValueError(f'Mandatory Gemini/Claude rule missing in output: {core}')
     outputs = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                for name, (url, raw) in fetched.items()}
+    upstream_integrity.record_counts(outputs, source_lists, rulesets, legacy.RULESET_SOURCES)
+    upstream_integrity.validate_counts(outputs, old, legacy.DOMAIN_SOURCES, legacy.RULESET_SOURCES)
     outputs.update(ai['records'])
     state = {'schema_version': 2, 'sources': outputs, 'ai_counts': ai['counts'],
              'statistics': stats,

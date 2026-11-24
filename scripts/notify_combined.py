@@ -136,7 +136,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
                          f'到期 {counts.get("due", "?")}')
             if counts.get('due'):
-                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 7)} 天提醒一次。')
+                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 30)} 天提醒一次。')
         for warning in shadow_ai.get('review_warnings', [])[:2]:
             lines.append('⚠️ ' + str(warning)[:140])
     else:

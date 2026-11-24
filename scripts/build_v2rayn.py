@@ -23,6 +23,7 @@ import urllib.request
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
 import release_integrity
+import upstream_integrity
 import routing_conflicts
 import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
@@ -159,7 +160,7 @@ def selected_bitbrowser_domains(entries: list[tuple[str, str, str]]) -> list[str
             if confidence in ('official', 'user')]
 
 
-def safety_check(stats: dict, old: dict | None) -> None:
+def safety_check(stats: dict, old: dict | None, *, reviewed_voice=False, reviewed_ads=False) -> None:
     if old is None:
         return
     previous = old.get('statistics')
@@ -176,6 +177,14 @@ def safety_check(stats: dict, old: dict | None) -> None:
         before = (previous.get('bitbrowser_domains') if key == 'bitbrowser_effective_domains'
                   and old.get('schema_version') == 1 else previous.get(key))
         now = stats.get(key)
+        if reviewed_voice and key in ('voice_prefixes', 'voice_ipv4_addresses'):
+            continue
+        if reviewed_ads and key in ('johnshall_block_rules', 'block_rules'):
+            continue
+        if reviewed_voice and key == 'ip_rules' and type(before) is int:
+            # Subtract only the exactly authorized new Voice entries; preserve
+            # the independent guard for every other IP rule.
+            before += stats['voice_prefixes'] - previous['voice_prefixes']
         if type(before) is not int or type(now) is not int or before < 0 or now < 0:
             raise ValueError(f'Invalid v2rayN baseline statistic: {key}')
         if before == 0:
@@ -301,7 +310,25 @@ def run(argv: list[str] | None = None) -> dict:
     if json.loads(output) != rules:
         raise AssertionError('JSON serialization round-trip failed')
     stats['json_bytes'] = len(output)
-    safety_check(stats, old)
+    # Accept only the same exact, reviewed source bytes and prior baseline.
+    # The legacy authorization's count fields are adapted, not relaxed.
+    previous_voice_rows = (old or {}).get('voice_rules', [])
+    reviewed_voice = False
+    reviewed_ads = False
+    if old:
+        prev = old['statistics']
+        if (stats['voice_ipv4_addresses'] > 2 * prev['voice_ipv4_addresses']
+                or stats['voice_prefixes'] > 2 * prev['voice_prefixes']):
+            reviewed_voice = legacy.is_reviewed_voice_expansion(
+                voice, '\n'.join(previous_voice_rows), voice_raw, old)
+        if stats['johnshall_block_rules'] < .85 * prev['johnshall_block_rules']:
+            old_legacy = {**old, 'statistics': {**prev,
+                'retained_ad_rules': prev['johnshall_block_rules'],
+                'mapped_proxy_to_johnshall_node': prev['johnshall_proxy_rules']}}
+            new_legacy = {'retained_ad_rules': stats['johnshall_block_rules'],
+                          'mapped_proxy_to_johnshall_node': stats['johnshall_proxy_rules']}
+            reviewed_ads = legacy.is_reviewed_johnshall_ad_decrease(original, new_legacy, old_legacy)
+    safety_check(stats, old, reviewed_voice=reviewed_voice, reviewed_ads=reviewed_ads)
     # Independent v2rayN voice baseline (not read from Shadowrocket output).
     # Existing state without this field gets one migration baseline.
     previous_voice = set(old.get('voice_rules', [])) if old else set()
@@ -310,6 +337,8 @@ def run(argv: list[str] | None = None) -> dict:
     ai_services.validate_safety(ai['counts'], old)
     next_sources = {name: {'url': url, 'sha256': hashlib.sha256(raw).hexdigest()}
                     for name, (url, raw) in fetched.items()}
+    upstream_integrity.record_counts(next_sources, sources, rulesets, legacy.RULESET_SOURCES)
+    upstream_integrity.validate_counts(next_sources, old, legacy.DOMAIN_SOURCES, legacy.RULESET_SOURCES)
     next_sources.update(ai['records'])
     state = {'schema_version': 2, 'output_sha256': hashlib.sha256(output).hexdigest(),
              'voice_rules': sorted(current_voice),

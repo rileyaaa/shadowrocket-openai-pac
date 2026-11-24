@@ -42,7 +42,7 @@ def add_months(value: date, months: int) -> date:
 
 def default_policy() -> dict:
     return {"version": 1, "default_review_months": 6,
-            "reminder_interval_days": 7, "rejected_rules": []}
+            "reminder_interval_days": 30, "rejected_rules": []}
 
 
 def empty_delivery() -> dict:
