@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 import notify_telegram as original
 import review_queue
 import ai_review_delivery
+import openai_review_delivery
 from release_integrity import valid_build_report
 
 
@@ -118,29 +119,50 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
-    if valid['shadowrocket_ai']:
-        lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
-                  f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
-        new = shadow_ai.get('new_excluded_candidates', [])
-        due = shadow_ai.get('review_due_candidates', [])
-        for item in new[:4]:
-            lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
-                         ', '.join(item.get('sources', []))[:100] + ']')
-        for item in due[:4]:
-            lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
-                         f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
-        if len(new) > 4 or len(due) > 4:
-            lines.append('其余审核项请查看本次 Actions 完整摘要。')
-        counts = shadow_ai.get('manual_review_counts', {})
-        if isinstance(counts, dict):
-            lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
-                         f'到期 {counts.get("due", "?")}')
-            if counts.get('due'):
-                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 30)} 天提醒一次。')
-        for warning in shadow_ai.get('review_warnings', [])[:2]:
+    openai = status.get('openai_review')
+    if openai:
+        new, due = openai['new_candidates'], openai['due_candidates']
+        counts = openai['counts']
+        lines.append(f'OpenAI 合并审核：待审 {counts["pending"]} / 到期 {counts["due"]} / 暂缓 {counts["cooling"]}')
+        lines.append(f'本次提醒：待审 {len(new)} / 复审 {len(due)}；未处理每 {openai["reminder_interval_days"]} 天')
+        for item in new[:3]:
+            lines.append('· 待审 ' + item['rule'][:120] + ' [' + ', '.join(item['sources'])[:100] + ']')
+        for item in due[:3]:
+            lines.append(f'· 复审 {item["rule"][:120]}（上次 {item["reviewed_at"]}；到期 {item["review_due_on"]}）')
+        if len(new) > 3 or len(due) > 3:
+            lines.append('其余请查看本次 Actions 完整摘要。')
+        if openai['stale_clients']:
+            lines.append('⚠️ OpenAI 审核保留旧快照：' + ', '.join(openai['stale_clients']))
+        if openai['deployment_pending']:
+            lines.append(f'已批准但等待旧端更新：{len(openai["deployment_pending"])} 项')
+        for warning in openai['warnings'][:2]:
             lines.append('⚠️ ' + str(warning)[:140])
+    elif status.get('openai_review_error'):
+        lines.append('⚠️ OpenAI 合并审核失败：' + str(status['openai_review_error'])[:140])
     else:
-        lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
+        if valid['shadowrocket_ai']:
+            lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
+                      f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
+            new = shadow_ai.get('new_excluded_candidates', [])
+            due = shadow_ai.get('review_due_candidates', [])
+            for item in new[:4]:
+                lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
+                             ', '.join(item.get('sources', []))[:100] + ']')
+            for item in due[:4]:
+                lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
+                             f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
+            if len(new) > 4 or len(due) > 4:
+                lines.append('其余审核项请查看本次 Actions 完整摘要。')
+            counts = shadow_ai.get('manual_review_counts', {})
+            if isinstance(counts, dict):
+                lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
+                             f'到期 {counts.get("due", "?")}')
+                if counts.get('due'):
+                    lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 30)} 天提醒一次。')
+            for warning in shadow_ai.get('review_warnings', [])[:2]:
+                lines.append('⚠️ ' + str(warning)[:140])
+        else:
+            lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(publication.get('error', 'GitHub 未确认发布'))[:250])
     shared = status.get('ai_review')
@@ -155,6 +177,8 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + suffix)
         if len(alerts) > 4:
             lines.append('其余请查看本次 Actions 完整摘要。')
+        if shared.get('deployment_pending'):
+            lines.append(f'已审核但等待旧端更新：{len(shared["deployment_pending"])} 项')
         if shared.get('stale_clients'):
             lines.append('⚠️ 审核候选沿用上次快照：' + ', '.join(shared['stale_clients']))
     elif status.get('ai_review_error'):
@@ -213,7 +237,11 @@ def main() -> int:
         with open(summary_path, 'a', encoding='utf-8') as f:
             f.write('## Shadowrocket + v2rayN 真实构建及发布报告\n\n~~~text\n'
                     + message + '\n~~~\n')
-            if shadow_ai:
+            if status.get('openai_review'):
+                f.write('\n### OpenAI 合并审核清单\n\n')
+                for item in status['openai_review']['entries']:
+                    f.write(f'- {item["rule"]} — {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}；原因 {item.get("reason", "—")}；{item["client_coverage"]}\n')
+            elif shadow_ai:
                 for key in ('new_excluded_candidates', 'review_due_candidates'):
                     if shadow_ai.get(key):
                         f.write(f'\n### OpenAI {key}\n\n')
@@ -256,7 +284,15 @@ def main() -> int:
         return 1
     print('Unified Telegram report sent.')
     receipt_files = []
-    if (args.review_state_file and valid_build_report(shadow_ai)
+    if (args.review_state_file and status.get('openai_review')
+            and status.get('publish', {}).get('success') is True and run_url and summary_path):
+        try:
+            review_queue.acknowledge(openai_review_delivery.receipt_report(status['openai_review']), args.review_state_file)
+            receipt_files.append(str(args.review_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::OpenAI review receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    elif (not status.get('openai_review_error') and args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
             and status.get('publish', {}).get('success')
             and run_url and summary_path):

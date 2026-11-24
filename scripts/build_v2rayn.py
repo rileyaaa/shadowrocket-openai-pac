@@ -359,6 +359,11 @@ def run(argv: list[str] | None = None) -> dict:
     report = {'build_success': True, 'config_changed': changed,
               'statistics': stats, 'changed_sources': source_changes,
               'ai_review_candidates': ai['review_candidates'],
+              'ai_approved_rules': ai['rules'],
+              'openai_observation': {'excluded': legacy.excluded_auto_rule_sources(sources, auto, unparsed_sources),
+                  'common_rules': all_openai,
+                  'client_only_rules': [('DOMAIN,' + value[5:]) if value.startswith('full:') else ('DOMAIN-SUFFIX,' + value[7:])
+                                        for field, value, action in extra if value.startswith(('full:', 'domain:'))]},
               'ai_review_counts': ai['review_counts'],
               'routing_conflicts': conflicts,
               'warnings': [

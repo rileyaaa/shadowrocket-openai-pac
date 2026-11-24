@@ -9,8 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf',
                    'data/ai-shadowrocket-sources.json',
                    'rules/johnshall-apple-news.list', 'rules/openai-auto.list',
-                   'data/sources.json', 'data/review-queue.md',
-                   'data/review-notifications.json')
+                   'data/sources.json')
 V2_FILES = ('v2rayN_Johnshall_AI.json', 'data/v2rayn-sources.json')
 RELEASE_FILES = {'shadowrocket_ai': SHADOW_AI_FILES, 'v2rayn': V2_FILES}
 COMMON_INPUTS = ('scripts/build.py', 'scripts/v2rayn_core.py',

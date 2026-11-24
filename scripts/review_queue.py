@@ -115,7 +115,8 @@ def load_delivery(path: Path, on: date) -> dict:
 
 
 def evaluate(excluded: dict[str, list[str]], previous: list[str] | None,
-             active_domains: list[str], covers, root: Path, on: date | None = None) -> tuple[dict, dict]:
+             active_domains: list[str], covers, root: Path, on: date | None = None,
+             *, repeat_pending: bool = False) -> tuple[dict, dict]:
     """Classify a snapshot, persisting new alerts until Telegram acknowledges them."""
     on = on or today()
     policy, warnings = load_policy(root / "config/review-decisions.json", on)
@@ -156,13 +157,21 @@ def evaluate(excluded: dict[str, list[str]], previous: list[str] | None,
                     due_candidates.append({**item, "cycle": cycle})
         else:
             item["status"] = "pending"
-            if rule in queued:
+            if repeat_pending:
+                cycle = hashlib.sha256(json.dumps(['pending', rule], ensure_ascii=False).encode()).hexdigest()
+                last = delivery['sent'].get(rule, {})
+                if (last.get('cycle') != cycle or on >= parse_date(last['notified_at'])
+                        + timedelta(days=policy['reminder_interval_days'])):
+                    new_candidates.append({'rule': rule, 'sources': sources, 'cycle': cycle})
+            elif rule in queued:
                 new_candidates.append({"rule": rule, "sources": sources})
         counts[item["status"]] += 1
         entries.append(item)
     # A vanished candidate stops reminders; the user's rejection record is retained.
     delivery["pending_new"] = [item["rule"] for item in new_candidates]
-    delivery["sent"] = {rule: value for rule, value in delivery["sent"].items() if rule in decisions}
+    pending = {item['rule'] for item in entries if item['status'] == 'pending'} if repeat_pending else set()
+    delivery["sent"] = {rule: value for rule, value in delivery["sent"].items()
+                        if rule in decisions or rule in pending}
     return {
         "entries": entries, "counts": counts, "warnings": warnings,
         "default_review_months": policy["default_review_months"],
@@ -187,6 +196,9 @@ def acknowledge(report: dict, path: Path, on: date | None = None) -> None:
     delivery = load_delivery(path, on)
     sent_new = {item["rule"] for item in report.get("new_excluded_candidates", [])}
     delivery["pending_new"] = sorted(set(delivery["pending_new"]) - sent_new)
+    for item in report.get("new_excluded_candidates", []):
+        if "cycle" in item:
+            delivery["sent"][item["rule"]] = {"cycle": item["cycle"], "notified_at": on.isoformat()}
     for item in report.get("review_due_candidates", []):
         delivery["sent"][item["rule"]] = {"cycle": item["cycle"], "notified_at": on.isoformat()}
     write_json(path, delivery)
@@ -196,7 +208,7 @@ def render_queue(review: dict) -> str:
     def cell(value):
         return html.escape(str(value)).replace("|", "&#124;").replace("`", "&#96;").replace("\n", " ")
     rows = ["# 上游人工审核清单", "", "本文件自动生成，请修改 `config/review-decisions.json` 记录人工不通过结果。",
-            "到期仅提醒重新审核，不会自动放行；新增未审核项仅在首次送达前重试。",
+            "到期仅提醒重新审核，不会自动放行；首次送达失败会重试。",
             f"默认 {review['default_review_months']} 个日历月复审；到期后未处理，每 {review['reminder_interval_days']} 天提醒一次。",
             "已覆盖规则免重复审核；社区 IP/ASN 仅留档，Voice 目的 IP 仅采用官方 JSON。", ""]
     for warning in review["warnings"]:
@@ -213,9 +225,15 @@ def render_queue(review: dict) -> str:
 
 def current_review_candidates(path: Path) -> set[str]:
     """Only published, exact review candidates can receive a NEW rejection."""
-    snapshot = path.parent.parent / "data/sources.json"
+    root = path.parent.parent
+    snapshot = root / 'data/openai-review-snapshots.json'
     try:
-        rules = json.loads(snapshot.read_text(encoding="utf-8"))["review"]["excluded_auto_rules"]
+        if snapshot.exists():
+            from openai_review_delivery import read_state
+            rules = sorted({rule for observation in read_state(snapshot).values()
+                            for rule in observation['excluded']})
+        else:
+            rules = json.loads((root / 'data/sources.json').read_text(encoding='utf-8'))["review"]["excluded_auto_rules"]
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ValueError("无法读取已发布的待审核基线 data/sources.json；请先成功同步规则") from exc
     if (not isinstance(rules, list)

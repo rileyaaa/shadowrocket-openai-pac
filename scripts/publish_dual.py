@@ -9,6 +9,7 @@ import subprocess
 
 from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
 import ai_review_delivery
+import openai_review_delivery
 REVIEW_FILES = ('config/review-decisions.json',)
 AI_REVIEW_FILES = ('data/ai-review-queue.md', 'data/ai-review-notifications.json')
 DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
@@ -57,6 +58,15 @@ def publish(path: Path) -> None:
                 print(f'::error::{key}: {status[key]["error"]}')
             else:
                 files += owned
+        openai_reports = {k: v for k, v in verified_reports.items()
+                          if isinstance(v.get('openai_observation'), dict)}
+        if openai_reports:
+            try:
+                status['openai_review'] = openai_review_delivery.prepare(openai_reports)
+                files += openai_review_delivery.FILES
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                status['openai_review_error'] = str(exc)
+                print('::warning::OpenAI review queue not updated: ' + str(exc))
         # The shared review queue has independent ownership.
         review_reports = {k: v for k, v in verified_reports.items()
                           if isinstance(v.get('ai_review_candidates'), list)}
@@ -165,6 +175,8 @@ def check(path: Path) -> int:
         failed.append('publish')
     if status.get('ai_review_error'):
         failed.append('ai_review')
+    if status.get('openai_review_error'):
+        failed.append('openai_review')
     if failed:
         print(f'::error::Failed tasks: {", ".join(failed)}')
         return 1

@@ -337,7 +337,7 @@ def render_review_queue(data: dict) -> str:
             '到期仅提醒，不自动批准。', '',
             '| 服务 | 候选规则 | 来源 | 状态 | 上次审核 | 到期复审 |',
             '|---|---|---|---|---|---|']
-    labels = {'pending': '待审核', 'cooling': '已拒绝，复审未到期', 'due': '到期复审（未放行）'}
+    labels = {'pending': '待审核', 'cooling': '已拒绝，复审未到期', 'due': '到期复审（未放行）', 'deployment_pending': '已审核覆盖，等待旧客户端更新'}
     for item in data['review_candidates']:
         rows.append(f"| {item['service']} | `{item['rule']}` | {', '.join(item['sources'])} | "
                     f"{labels[item['status']]} | {item.get('reviewed_at') or '—'} | "

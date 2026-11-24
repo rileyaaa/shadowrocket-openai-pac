@@ -280,6 +280,10 @@ def run(argv: list[str] | None = None) -> dict:
               'changed_sources': [k for k, value in outputs.items()
                                   if value != (old or {}).get('sources', {}).get(k)],
               'ai_review_candidates': ai['review_candidates'],
+              'ai_approved_rules': ai['rules'],
+              'openai_observation': {'excluded': legacy.excluded_auto_rule_sources(source_lists, auto, unparsed),
+                                     'common_rules': emitted_auto + emitted_manual,
+                                     'client_only_rules': []},
               'ai_review_counts': ai['review_counts'],
               'auto_added': original_delta['auto_added'],
               'auto_removed': original_delta['auto_removed'],
@@ -302,9 +306,7 @@ def run(argv: list[str] | None = None) -> dict:
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
         v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
     v2helpers.atomically_write(ORIGINAL_STATE, legacy_bytes)
-    v2helpers.atomically_write(ROOT / 'data/review-queue.md',
-        review_queue.render_queue(review).encode('utf-8'))
-    review_queue.write_json(ROOT / 'data/review-notifications.json', review_meta['delivery'])
+    # The shared OpenAI queue and receipts are owned by the publisher.
     if args.report_file:
         report['artifact_sha256'] = release_integrity.artifact_manifest(release_integrity.SHADOW_AI_FILES, ROOT)
         v2helpers.atomically_write(args.report_file,
