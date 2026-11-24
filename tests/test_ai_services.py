@@ -119,6 +119,27 @@ class AIInputTests(unittest.TestCase):
         self.assertTrue(any('sentry.io' in q['rule'] for q in data['review_candidates']))
         self.assertIn('待审核',ai.render_review_queue(data))
 
+    def test_manual_approval_coverage_not_just_overlap(self):
+        self.assertTrue(ai.approved_rule_covers('DOMAIN,x.example', 'DOMAIN,x.example'))
+        self.assertFalse(ai.approved_rule_covers('DOMAIN,x.example', 'DOMAIN-SUFFIX,x.example'))
+        self.assertTrue(ai.approved_rule_covers('DOMAIN-SUFFIX,x.example', 'DOMAIN,y.x.example'))
+        self.assertFalse(ai.approved_rule_covers('DOMAIN-SUFFIX,x.example', 'DOMAIN-SUFFIX,example'))
+        gem = ['gemini.google.com', 'generativelanguage.googleapis.com', 'unknown.cloudflare.com']
+        gem += [f'test{i}.gemini.google.com' for i in range(30)]
+        cla = ['claude.ai', 'anthropic.com'] + [f'c{i}.claude.ai' for i in range(12)]
+        feeds = {'gemini_v2fly': ('\n'.join(gem)).encode(),
+                 'gemini_metacubex': ('\n'.join(gem)).encode(),
+                 'claude_v2fly': ('\n'.join(cla)).encode(),
+                 'claude_metacubex': ('\n'.join('+.' + x for x in cla)).encode()}
+        with tempfile.TemporaryDirectory() as tmp:
+            manual = Path(tmp) / 'manual.rules'
+            manual.write_text(ai.MANUAL.read_text(encoding='utf-8') +
+                              '\nGEMINI,DOMAIN,unknown.cloudflare.com\n', encoding='utf-8')
+            result = ai.collect(None, source_overrides=feeds, manual_path=manual)
+        self.assertIn('DOMAIN,unknown.cloudflare.com', result['rules']['gemini'])
+        self.assertNotIn('DOMAIN,unknown.cloudflare.com', [x['rule'] for x in result['review_candidates']])
+        self.assertIn('DOMAIN-SUFFIX,unknown.cloudflare.com', [x['rule'] for x in result['review_candidates']])
+
     def test_rejected_candidate_six_month_review_remains_rejected(self):
         candidate = {'service': 'claude', 'rule': 'DOMAIN-SUFFIX,antspace.dev',
                      'sources': ['claude_v2fly'], 'reason': 'Unverified'}

@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import notify_telegram as original
 import review_queue
+from release_integrity import valid_build_report
 
 
 def read_json(path: str | None) -> dict | None:
@@ -26,14 +27,6 @@ def read_json(path: str | None) -> dict | None:
         print(f'::warning::Unreadable report: {type(exc).__name__}')
         return None
     return doc if isinstance(doc, dict) else None
-
-
-def valid_build_report(report: dict | None) -> bool:
-    return (isinstance(report, dict)
-            and report.get('build_success') is True
-            and type(report.get('config_changed')) is bool
-            and isinstance(report.get('statistics'), dict)
-            and bool(report['statistics']))
 
 
 def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
@@ -86,8 +79,19 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         else:
             lines += [f'发布：{"✅ 已更新" if released else "✅ 已检查，内容无变化"}']
         lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
+        sources = report.get('changed_sources', [])
+        lines.append('变化来源：' + (', '.join(original.NAMES.get(s, s) for s in sources) if sources else '无'))
         stats = report.get('statistics', {})
         if key == 'shadowrocket_ai':
+            if report.get('settings_changed'):
+                lines.append('节点名称：已更新')
+            if report.get('review_decisions_changed'):
+                lines.append('人工审核记录文件已变更' + ('，分流配置无变化' if not report.get('config_changed') else ''))
+            added, removed = report.get('auto_added', []), report.get('auto_removed', [])
+            lines.append(f'OpenAI 自动规则新增 {len(added)} / 删除 {len(removed)}')
+            for values, label in ((added, '新增'), (removed, '删除')):
+                if values:
+                    lines.append(label + '：' + '；'.join(str(x)[:100] for x in values[:3]) + ('…' if len(values) > 3 else ''))
             for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
                                 ('voice_prefixes', 'OpenAI Voice IP'),
                                 ('gemini_domains', 'Gemini 审核域名'),
@@ -116,10 +120,22 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if valid['shadowrocket_ai']:
         lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
                   f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
+        new = shadow_ai.get('new_excluded_candidates', [])
+        due = shadow_ai.get('review_due_candidates', [])
+        for item in new[:4]:
+            lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
+                         ', '.join(item.get('sources', []))[:100] + ']')
+        for item in due[:4]:
+            lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
+                         f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
+        if len(new) > 4 or len(due) > 4:
+            lines.append('其余审核项请查看本次 Actions 完整摘要。')
         counts = shadow_ai.get('manual_review_counts', {})
         if isinstance(counts, dict):
             lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
                          f'到期 {counts.get("due", "?")}')
+            if counts.get('due'):
+                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 7)} 天提醒一次。')
         for warning in shadow_ai.get('review_warnings', [])[:2]:
             lines.append('⚠️ ' + str(warning)[:140])
     else:
@@ -181,7 +197,11 @@ def main() -> int:
                     if shadow_ai.get(key):
                         f.write(f'\n### OpenAI {key}\n\n')
                         for item in shadow_ai[key]:
-                            f.write('- ' + str(item.get('rule', '?')) + '\n')
+                            f.write('- ' + str(item.get('rule', '?')) + ' — ' +
+                                     ', '.join(item.get('sources', [])) + '\n')
+                            if key == 'review_due_candidates':
+                                f.write(f'  上次审核：{item.get("reviewed_at")}；到期：{item.get("review_due_on")}；'
+                                        f'此前原因：{item.get("reason")}\n')
             if official_docs and official_docs.get('changes'):
                 f.write('\n### 每周官方文件变化（未自动批准）\n\n')
                 for change in official_docs['changes']:
@@ -204,7 +224,7 @@ def main() -> int:
         print(f'::error::Telegram delivery failed: {type(exc).__name__}; receipts unchanged')
         return 1
     print('Unified Telegram report sent.')
-    if (args.review_state_file and shadow_ai
+    if (args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
             and status.get('publish', {}).get('success')):
         try:
