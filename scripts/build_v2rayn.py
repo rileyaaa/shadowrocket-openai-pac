@@ -209,6 +209,7 @@ def run(argv: list[str] | None = None) -> dict:
     p.add_argument('--voice-file', type=Path)
     p.add_argument('--domain-dir', type=Path)
     p.add_argument('--ruleset-dir', type=Path)
+    p.add_argument('--ai-dir', type=Path, help='Offline Gemini/Claude fixtures')
     args = p.parse_args(argv)
 
     before, old = load_published_baseline()
@@ -250,7 +251,9 @@ def run(argv: list[str] | None = None) -> dict:
     proc_entries = [('process', path, 'proxy') for path in processes]
     if 'BitBrowser.exe' not in processes:
         raise ValueError('Required BitBrowser.exe process proxy is absent')
-    ai = ai_services.collect(download)
+    overrides = ({key: (args.ai_dir / (key + '.txt')).read_bytes() for key in ai_services.SOURCES}
+                 if args.ai_dir else None)
+    ai = ai_services.collect(download, source_overrides=overrides)
     ai_entries = {
         service: [(*core.as_match(*rule.split(',', 1)), 'proxy')
                   for rule in ai['rules'][service]]

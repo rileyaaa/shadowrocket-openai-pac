@@ -71,7 +71,7 @@ def extract_hosts(content: str, service: str) -> list[str]:
     limit = 10 if service == 'gemini' else 3
     if not limit <= len(hosts) <= 300:
         raise ValueError(f'Official {service} doc parse incomplete or unexpectedly large: {len(hosts)}')
-    if service == 'claude' and not {'claude.ai', 'claude.com'}.issubset(hosts):
+    if service == 'claude' and not {'claude.ai', 'claude.com'}.issubset({h.removeprefix('*.') for h in hosts}):
         raise ValueError('Official Claude network document missing key first-party hostnames')
     return sorted(hosts)
 

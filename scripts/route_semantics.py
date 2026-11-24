@@ -22,7 +22,10 @@ def domain_match(value, host):
     if kind == 'keyword':
         return pattern in host
     if kind == 'regexp':
-        return bool(re.search(pattern, host))
+        try:
+            return bool(re.search(pattern, host))
+        except re.error as exc:
+            raise ValueError('Invalid explicit final route regexp') from exc
     return False  # Opaque geosite data is not statically evaluated.
 
 def first_domain(rows, host):
