@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import release_integrity as ri
 import publish_dual as publish
+import run_dual
 
 class ReleaseIntegrityTests(unittest.TestCase):
     def setUp(self):
@@ -22,6 +23,18 @@ class ReleaseIntegrityTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
         return path
+
+    def test_child_log_encoding_does_not_break_independent_execution(self):
+        # Use real subprocesses: no mocking away the decoding boundary.
+        failed = run_dual.execute('invalid diagnostic bytes', [
+            sys.executable, '-c',
+            "import sys; sys.stdout.buffer.write(b'log\\xff'); "
+            "sys.stderr.buffer.write(b'error\\xfe'); sys.exit(7)"])
+        self.assertEqual(failed['exit_code'], 7)
+        self.assertEqual(failed['error'], 'error\ufffd')
+        following = run_dual.execute('other client', [
+            sys.executable, '-c', "print('independent child')"])
+        self.assertEqual(following, {'exit_code': 0, 'error': ''})
 
     def test_fingerprint_changes_with_local_input_not_output(self):
         a = ri.build_inputs_fingerprint('shadowrocket_ai', self.root)

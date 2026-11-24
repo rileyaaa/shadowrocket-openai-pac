@@ -11,7 +11,11 @@ import sys
 def execute(label: str, command: list[str]) -> dict:
     print(f'::group::{label}', flush=True)
     try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        # Logs are diagnostic only. Invalid bytes from one child must not
+        # prevent the other client's build or publication status from running.
+        # Artifact and report decoding remains strict in the builders/publisher.
+        result = subprocess.run(command, capture_output=True, encoding='utf-8',
+                                errors='replace', check=False)
         print(result.stdout[-12000:])
         print(result.stderr[-12000:], file=sys.stderr)
         return {'exit_code': result.returncode,

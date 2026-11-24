@@ -60,8 +60,11 @@ class ReleaseEndToEndTests(unittest.TestCase):
         policy = {'version':1,'default_review_months':6,'reminder_interval_days':30,'rejected_rules':[]}
         for name in ('review-decisions.json','ai-review-decisions.json'):
             self.write_json(self.work/'config'/name, policy)
-        self.write_json(self.work/'config/user-settings.json',
-                        {'openai_node_name':'Fixture AI','johnshall_proxy_node_name':'Fixture Ordinary'})
+        settings_path = self.work/'config/user-settings.json'
+        # The builder already accepts UTF-8 BOM in the two user settings.
+        # Exercise the same real release validator, not just the loader.
+        settings_path.write_text(json.dumps({'openai_node_name':'Fixture AI',
+            'johnshall_proxy_node_name':'Fixture Ordinary'})+'\n', encoding='utf-8-sig')
         self.command('git','init','--bare',str(self.remote))
         self.command('git','init','-b','main')
         self.command('git','config','user.name','Fixture')
