@@ -7,12 +7,12 @@
     "gemini_metacubex": 49,
     "gemini_v2fly": 50
   },
-  "build_inputs_sha256": "40c294197e386f5194513aeceabc1a99ac971524c664e8ddd816c38ecc2a2781",
+  "build_inputs_sha256": "c1701d9f4c54e2160776dac161bd3e2a7475a6a7825c7dca82a285aab66ad495",
   "inputs_sha256": {
     "ai_review_decisions": "54e074dae9af804b90a9bf828617c2c874cdf409e69ab487f7765982d6bfecf7",
     "bitbrowser": "2bd9ce38ec3bffbb047332b75ea75bbd09eb857937268ffaa3da2243d19caa29",
     "extra_openai": "0be1baabe869faf0d3e928852b3913bf4ab68c5637a27d7875952c5f2858ecfd",
-    "manual_ai": "cf12f96f6baa582bc8b619e80f2732a02a58c7fce656ab9a6aea2691d1f30596",
+    "manual_ai": "cf235ecbf69984f2113c245f8ce137e679c3931fcae645bff620088836c9b60a",
     "manual_openai": "e124138afe19e5eef76aa611acdcf352edbe26eb46f2ac32b0e0e8f17b54561f",
     "verified_processes": "0c8e90d93dc0339dfe723ec971066236ba703a23b9532a5aa095ce08085c8413"
   },
