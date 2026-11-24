@@ -1,0 +1,37 @@
+{
+  "sent": {
+    "bitbrowser-user-domains": {
+      "cycle": "74d86cef60dbc181b6944ba4eb2b320eeec0d3d00366e90a6dbadc183c94679f",
+      "notified_at": "2026-11-24"
+    },
+    "claude-shared-vendors": {
+      "cycle": "fc970bed24ebbd47a4009599d18fef2f71467a99c21d72f263f0f04f72959004",
+      "notified_at": "2026-11-24"
+    },
+    "openai-dedicated-vendor-names": {
+      "cycle": "0e5164d3e2dbbef3d385f06e854db00906eb666f2a1aa42ec5059a7a0b3c67dd",
+      "notified_at": "2026-11-24"
+    },
+    "openai-livekit": {
+      "cycle": "1498f027a8445b15e9523596a3ba21551c4084c0ca3facc379abae9b925e95c1",
+      "notified_at": "2026-11-24"
+    },
+    "openai-shared-suffix": {
+      "cycle": "c63d27a7226629a4f6bd32c6f78e60b8296d72efaf497310764289839cdfe7db",
+      "notified_at": "2026-11-24"
+    },
+    "openai-telemetry": {
+      "cycle": "5356a326926f459407f1fd614ffe7d4b6b686d5c2addc5a3b676f42724e431a2",
+      "notified_at": "2026-11-24"
+    },
+    "openai-workos-frontend": {
+      "cycle": "a82140b52f54aab245853bb03b9c2c5f0bfa8ce3320e01d21b5cc8a547f020e1",
+      "notified_at": "2026-11-24"
+    },
+    "v2rayn-openai-wide-extras": {
+      "cycle": "5c9c70afc9be0fc4fdf8c7e6c7280b0288562756953907d1fdefe4a5229a76ad",
+      "notified_at": "2026-11-24"
+    }
+  },
+  "version": 1
+}
