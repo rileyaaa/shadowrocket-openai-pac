@@ -7,7 +7,7 @@
     "gemini_metacubex": 50,
     "gemini_v2fly": 50
   },
-  "build_inputs_sha256": "8c76b1db83c7bba1c327cc26a6ad8c63b2987f5adb8bd8d4cff2ac9138fb6e3b",
+  "build_inputs_sha256": "210ab43c4d5d9c10cefb3266d1d7e2d26dc9f2ba8065a76eb153743275d51564",
   "legacy_state_sha256": "c9a0f397dabb9ae56680c4bf361a26debc1e98523ad782e6b7bbd0326a7c2f21",
   "manual_ai_sha256": "cf235ecbf69984f2113c245f8ce137e679c3931fcae645bff620088836c9b60a",
   "output_sha256": "006c32e72b5d127b4e0a88ae1bfd8e519061bb3c560081998994b919fe3ec95d",
