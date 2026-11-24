@@ -96,12 +96,12 @@ class ReleaseEndToEndTests(unittest.TestCase):
               + ''.join(f'DOMAIN,ad{i}.example,Reject\n' for i in range(20001))
               + 'DOMAIN,r.openai.com,Reject\n'
               + '# preserve original fixture ordering and comments\n'*22000
-              + f'RULE-SET,{apple},Proxy\n final , DIRECT \n# FINAL,direct is the fallback\n'
+              + f'rule-set , {apple} , Proxy\n final , DIRECT \n# FINAL,direct is the fallback\n'
               + '[URL Rewrite]\n^http://example.com https://example.com 302\n'
               + '[MITM]\nhostname = example.com\n'+build.JOHNSHALL_FOOTER+'\n')
         (p/'upstream.conf').write_text(base,encoding='utf-8')
         self.write_json(p/'voice.json',{'prefixes':[{'ipv4Prefix':f'8.8.4.{i}/32'} for i in range(1,6)]})
-        (p/'apple_news.txt').write_text('# TOTAL: 2\nDOMAIN,gspe1-ssl.ls.apple.com\nDOMAIN,news-client-search.apple.com\n',encoding='utf-8')
+        (p/'apple_news.txt').write_text('\ufeff# TOTAL: 2\n domain , gspe1-ssl.ls.apple.com \nDOMAIN,news-client-search.apple.com\n',encoding='utf-8')
         domains=['openai.com','chatgpt.com','oaistatic.com','oaiusercontent.com','oaistatsig.com',
                  'sora.com','crixet.com','chat.com','chatgpt.site','openai.fm','fixture-vendor.example']
         for name,(_,fmt) in build.DOMAIN_SOURCES.items():

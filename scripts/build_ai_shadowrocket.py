@@ -113,7 +113,7 @@ def prepare_openai_review(voice, auto, emitted_auto, emitted_manual,
     )
     review, delivery = review_queue.evaluate(
         excluded, (old_state or {}).get('review', {}).get('excluded_auto_rules'),
-        emitted_auto + emitted_manual, legacy.domain_rule_covers, ROOT,
+        emitted_auto + emitted_manual, legacy.approved_openai_covers, ROOT,
     )
     return {'source_state': source_state, 'auto_text': auto_text,
             'review': review, 'delivery': delivery, 'report': old_report}
@@ -306,7 +306,7 @@ def run(argv: list[str] | None = None) -> dict:
                                                   sort_keys=True) + '\n').encode('utf-8'))
     v2helpers.atomically_write(ORIGINAL_AUTO, review_meta['auto_text'].encode('utf-8'))
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
-        v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
+        v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1])
     v2helpers.atomically_write(ORIGINAL_STATE, legacy_bytes)
     # The shared OpenAI queue and receipts are owned by the publisher.
     if args.report_file:

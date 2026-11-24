@@ -316,6 +316,15 @@ def covering_approval_for_rejection(raw: str, rules: list[str]) -> str | None:
     return None
 
 
+def approved_openai_covers(allowed: str, candidate: str) -> bool:
+    """Review coverage follows the rejection guard, not rule compaction.
+
+    An approved wildcard can cover an exact hostname without covering a
+    suffix or another wildcard. Do not use this to remove routing rules.
+    """
+    return covering_approval_for_rejection(candidate, [allowed]) is not None
+
+
 def check_openai_rejections(rules: list[str], root: Path | None = None) -> None:
     """Guard actual common approvals against exact/full-scope rejections.
 
@@ -625,12 +634,13 @@ def is_reviewed_johnshall_ad_decrease(
 def parse_embedded_ruleset(source: str) -> list[str]:
     """The reviewed Apple News list contains policy-free domain rules only."""
     rules = []
-    for raw in source.lstrip("\ufeff").splitlines():
+    source = source.lstrip("\ufeff")
+    for raw in source.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split(",")
-        if len(parts) != 2 or parts[0] not in RULE_TYPES:
+        parts = [part.strip() for part in line.split(",")]
+        if len(parts) != 2 or parts[0].upper() not in RULE_TYPES:
             raise ValueError(f"Unsupported embedded rule (policy/nested lists not allowed): {line}")
         rules.append(domain_rule(*parts))
     declared = re.findall(r"(?m)^#\s*TOTAL:\s*(\d+)\s*$", source)
@@ -645,7 +655,7 @@ def inline_ruleset(line: str, rulesets: dict[str, list[str]]) -> list[str]:
     if parts[0].upper() not in {"RULE-SET", "DOMAIN-SET"}:
         return [line]
     known_urls = {url for url, _ in RULESET_SOURCES.values()}
-    if (parts[0] != "RULE-SET" or len(parts) != 3
+    if (parts[0].upper() != "RULE-SET" or len(parts) != 3
             or parts[1] not in known_urls or parts[1] not in rulesets
             or not rulesets[parts[1]]):
         raise ValueError(f"Unreviewed or unavailable external ruleset: {line}")
@@ -1073,7 +1083,7 @@ def run():
     )
     review, delivery = review_queue.evaluate(
         excluded_candidates, (old_state or {}).get("review", {}).get("excluded_auto_rules"),
-        emitted_auto + emitted_manual, domain_rule_covers, ROOT,
+        emitted_auto + emitted_manual, approved_openai_covers, ROOT,
     )
     report.update(
         new_excluded_candidates=review["new_candidates"],
