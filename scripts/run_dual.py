@@ -29,47 +29,34 @@ def main() -> int:
     args.work_dir.mkdir(parents=True, exist_ok=True)
     v2_report = args.work_dir / 'v2rayn-report.json'
     ai_report = args.work_dir / 'shadowrocket-ai-report.json'
-    original_cases = ('test_build.py', 'test_hardening.py',
-                      'test_review_queue.py', 'test_sync_reporting.py')
-    original_results = [execute(f'Original test suite {pattern}',
-        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
-         '-p', pattern, '-v']) for pattern in original_cases]
-    # Continue testing the legacy parser that AI builders use as a library.
-    # Its tests protect Shadowrocket AI but do not prevent v2rayN publishing.
-    status = {}
-    failed_original = [result for result in original_results if result['exit_code']]
-    ai_source_tests = execute('Shared Gemini and Claude source tests',
-        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
-         '-p', 'test_ai_services.py', '-v'])
-    shadow_tests = execute('Shadowrocket-specific routing tests',
-        [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests',
-         '-p', 'test_ai_shadowrocket.py', '-v'])
-    if ai_source_tests['exit_code'] or shadow_tests['exit_code'] or failed_original:
-        failure = next(result for result in (ai_source_tests, shadow_tests, *failed_original)
-                       if result['exit_code'])
-        status['shadowrocket_ai'] = {'exit_code': failure['exit_code'],
-            'error': 'Shadowrocket legacy parser / AI rules tests failed: ' + failure['error']}
-    else:
-        status['shadowrocket_ai'] = execute('Independent AI-enhanced Shadowrocket build',
-            [sys.executable, 'scripts/build_ai_shadowrocket.py', '--report-file', str(ai_report)])
-    tests = execute('v2rayN independent unit tests',
-                    [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_v2rayn.py', '-v'])
-    if tests['exit_code'] != 0 or ai_source_tests['exit_code'] != 0:
-        status['v2rayn'] = {'exit_code': tests['exit_code'] or ai_source_tests['exit_code'],
-                            'error': 'v2rayN / shared AI rules tests failed: ' +
-                            (tests['error'] or ai_source_tests['error'])}
-    else:
-        status['v2rayn'] = execute('v2rayN independent build',
-               [sys.executable, 'scripts/build_v2rayn.py', '--report-file', str(v2_report)])
-    # Advisory weekly check runs in this SAME existing daily workflow. On
-    # other days it skips without network access. Failure never blocks routes.
     docs_report = args.work_dir / 'ai-docs-audit-report.json'
-    status['official_docs'] = execute('Weekly official Gemini / Claude doc advisory',
-        [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report)])
+    status_path = args.work_dir / 'dual-status.json'
+    for path in (v2_report, ai_report, docs_report, status_path):
+        path.unlink(missing_ok=True)
+    tests = {group: execute('Offline regression: ' + group,
+                            [sys.executable, '-B', 'scripts/test_groups.py', group])
+             for group in ('shared', 'shadowrocket', 'v2rayn', 'docs')}
+    status = {'tests': tests}
+    for key, group, script, report in (
+        ('shadowrocket_ai', 'shadowrocket', 'build_ai_shadowrocket.py', ai_report),
+        ('v2rayn', 'v2rayn', 'build_v2rayn.py', v2_report),
+    ):
+        failure = next((tests[name] for name in ('shared', group) if tests[name]['exit_code']), None)
+        if failure:
+            status[key] = {'exit_code': failure['exit_code'],
+                           'error': 'Relevant offline regression failed: ' + failure['error']}
+        else:
+            status[key] = execute('Independent build: ' + key,
+                                  [sys.executable, 'scripts/' + script, '--report-file', str(report)])
+    if tests['docs']['exit_code']:
+        status['official_docs'] = {'exit_code': tests['docs']['exit_code'],
+                                   'error': 'Official documentation regression failed: ' + tests['docs']['error']}
+    else:
+        status['official_docs'] = execute('Weekly official Gemini / Claude doc advisory',
+            [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report)])
     status['reports'] = {'shadowrocket_ai': str(ai_report),
                          'v2rayn': str(v2_report), 'official_docs': str(docs_report)}
     status['publish'] = {'success': False, 'state': 'pending'}
-    status_path = args.work_dir / 'dual-status.json'
     status_path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(f'Build status: Shadowrocket AI={status["shadowrocket_ai"]["exit_code"]}, '
           f'v2rayN={status["v2rayn"]["exit_code"]}; saved {status_path}')

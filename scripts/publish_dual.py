@@ -7,15 +7,10 @@ import os
 from pathlib import Path
 import subprocess
 
-# Only TWO published client subscriptions. The retired builder remains a pure
-# parser library; its OpenAI review metadata is maintained by Shadowrocket AI.
-SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf',
-                   'data/ai-shadowrocket-sources.json', 'data/ai-review-queue.md',
-                   'rules/johnshall-apple-news.list', 'rules/openai-auto.list',
-                   'data/sources.json', 'data/review-queue.md',
-                   'data/review-notifications.json')
-V2_FILES = ('v2rayN_Johnshall_AI.json', 'data/v2rayn-sources.json')
+from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
+import ai_review_delivery
 REVIEW_FILES = ('config/review-decisions.json',)
+AI_REVIEW_FILES = ('data/ai-review-queue.md', 'data/ai-review-notifications.json')
 DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
 
 
@@ -30,18 +25,48 @@ def write(path: Path, status: dict) -> None:
     path.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
+def remote_head() -> str:
+    rows = git('ls-remote', '--exit-code', 'origin', 'refs/heads/main').stdout.split()
+    if not rows:
+        raise RuntimeError('Remote main not found')
+    return rows[0]
+
+
 def publish(path: Path) -> None:
     status = json.loads(path.read_text(encoding='utf-8'))
     try:
         if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_REF') != 'refs/heads/main':
             raise RuntimeError('Refusing publish outside refs/heads/main')
+        build_head = git('rev-parse', 'HEAD').stdout.strip()
+        if remote_head() != build_head:
+            status['publish'] = {'success': False, 'state': 'stale',
+                                 'error': 'main advanced before publication; rebuild from the current remote main'}
+            return
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
-        if ok['shadowrocket_ai']:
-            files += SHADOW_AI_FILES
-        if ok['v2rayn']:
-            files += V2_FILES
+        verified_reports = {}
+        for key, owned in (('shadowrocket_ai', SHADOW_AI_FILES), ('v2rayn', V2_FILES)):
+            if not ok[key]:
+                continue
+            try:
+                verified_reports[key] = validate_release(key, status)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                status[key] = {'exit_code': 1, 'error': 'Release verification failed: ' + str(exc)}
+                ok[key] = False
+                print(f'::error::{key}: {status[key]["error"]}')
+            else:
+                files += owned
+        # The shared review queue has independent ownership.
+        review_reports = {k: v for k, v in verified_reports.items()
+                          if isinstance(v.get('ai_review_candidates'), list)}
+        if review_reports:
+            try:
+                status['ai_review'] = ai_review_delivery.prepare(review_reports)
+                files += AI_REVIEW_FILES
+            except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+                status['ai_review_error'] = str(exc)
+                print('::warning::AI review queue not updated: ' + str(exc))
         # Advisory docs snapshot only when both official pages were verified.
         if status.get('official_docs', {}).get('exit_code') == 0:
             files += [f for f in DOC_FILES if Path(f).is_file()]
@@ -53,6 +78,11 @@ def publish(path: Path) -> None:
         unexpected = sorted(set(changed_files) - allowed)
         if unexpected:
             raise RuntimeError('Unexpected staged publish paths: ' + ', '.join(unexpected))
+        # Do not claim an unchanged release against a superseded checkout.
+        if remote_head() != build_head:
+            status['publish'] = {'success': False, 'state': 'stale',
+                                 'error': 'main advanced during release verification; rebuild required'}
+            return
         if not changed_files:
             status['publish'] = {'success': True, 'state': 'unchanged',
                                  'changed_files': [], 'commit': None}
@@ -63,8 +93,23 @@ def publish(path: Path) -> None:
         git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
         git('commit', '-m', 'chore: sync two verified AI subscriptions')
         commit = git('rev-parse', 'HEAD').stdout.strip()
-        git('push', 'origin', 'HEAD:main')
-        remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
+        try:
+            git('push', 'origin', 'HEAD:main')
+        except RuntimeError as exc:
+            # Retry only a clearly rejected non-fast-forward, not an
+            # uncertain push that may already have reached the server.
+            if ('non-fast-forward' in str(exc) or 'fetch first' in str(exc)) and remote_head() not in (build_head, commit):
+                status['publish'] = {'success': False, 'state': 'stale',
+                                     'error': 'main advanced during push; rebuild required'}
+                return
+            raise
+        try:
+            remote = remote_head()
+        except (RuntimeError, OSError, IndexError) as exc:
+            status['publish'] = {'success': False, 'state': 'pushed_unverified',
+                                 'commit': commit, 'changed_files': changed_files,
+                                 'error': 'Push succeeded but remote head could not be read: ' + str(exc)}
+            return
         if remote != commit:
             # A concurrent fast-forward can move remote main immediately after
             # our successful push. The new SHA is usually NOT locally present
@@ -76,7 +121,7 @@ def publish(path: Path) -> None:
                         'origin', 'refs/heads/main')
                     fetched = git('rev-parse', 'FETCH_HEAD').stdout.strip()
                     if fetched != remote:
-                        remote = git('ls-remote', 'origin', 'refs/heads/main').stdout.split()[0]
+                        remote = remote_head()
                         continue
                     ancestor = subprocess.run(
                         ['git', 'merge-base', '--is-ancestor', commit, 'FETCH_HEAD'],
@@ -118,6 +163,8 @@ def check(path: Path) -> int:
               if status.get(key, {}).get('exit_code') != 0]
     if not status.get('publish', {}).get('success'):
         failed.append('publish')
+    if status.get('ai_review_error'):
+        failed.append('ai_review')
     if failed:
         print(f'::error::Failed tasks: {", ".join(failed)}')
         return 1

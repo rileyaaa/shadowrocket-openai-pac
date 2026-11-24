@@ -123,7 +123,7 @@ python scripts/build_v2rayn.py
 - OpenAI Voice 重合度按 IPv4/IPv6 实际目的地址区间比较，而不是 CIDR 文本；等价前缀拆分不会误判为新增目的地址。官方网络仍须通过原有规模、安全范围校验。
 - Johnshall 的有效代理与广告规则分别做语义校验，拒绝规则大面积重复或新增无法安全解析的活动类型；不会为了去重而修改原始规则顺序。
 - 比特浏览器报告中的正式域名数量是**实际发布的 approved（官方 + 用户确认）条数**；未经核实的候选仍记录，但不提升代理规则。额外进程路径只接受 BitBrowser 专属程序，不自动纳入公共 node.exe / chrome.exe。
-- 发布检测若遇到 GitHub main 恰好被其他提交推进，会先获取远端历史再确认本次发布可达；如果无法验证，通知应区分「推送成功但远端待核对」与「推送失败」。
+- 工作流从实际 main 最新版本开始构建，发布前两次检查远端 main；若有并发更新则基于新版本最多完整重建一次，不强推、不合并旧成品。推送后若 GitHub main 恰好被其他提交推进，会先获取远端历史再确认本次发布可达；如果无法验证，通知应区分「推送成功但远端待核对」与「推送失败」。
 
 ## 上游异常保护
 
@@ -275,7 +275,7 @@ python -m unittest discover -s tests -p 'test_v2rayn.py' -v
 
 1. 回环 / 私网地址直连；2. Johnshall 原广告、追踪、恶意域名拦截；3. 专用 BitBrowser 进程；4. 用户指定的 BitBrowser 服务与 IP 检测域名；5. 官方 Voice 目的 IP、已审核 OpenAI 和 v2rayN 显式用户例外；6. Johnshall 原始可转换规则，按原顺序首次匹配；7. 最终 direct。
 
-原 `REJECT` / `REJECT-DROP` / `REJECT-NO-DROP` 在 v2rayN 中只能统一表示 `block`，不能复制 Shadowrocket 各种拒绝时的网络行为；原 `no-resolve` 不是通用 Xray 规则字段，DNS 解析策略还需要客户端设置配合。Johnshall **URL Rewrite、MITM 不是路由规则，不会在 v2rayN 自动实现**；这些功能仍以原 Shadowrocket 为准。广告拦截被显式提至进程强制代理之前，故该处相对于 Johnshall 原始跨动作优先级属于有意调整。`DOMAIN-WILDCARD` 使用锚定正则映射，必须对实际目标版本测试。任何未知 / 不支持的 Johnshall 类型及未审核外部 RULE-SET 都会**阻止 v2rayN 发布**，并保留旧版；不悄悄丢弃。
+原 `REJECT` / `REJECT-DROP` / `REJECT-NO-DROP` 在 v2rayN 中只能统一表示 `block`，不能复制 Shadowrocket 各种拒绝时的网络行为；原 `no-resolve` 不是通用 Xray 规则字段，DNS 解析策略还需要客户端设置配合。Johnshall **URL Rewrite、MITM 不是路由规则，不会在 v2rayN 自动实现**；这些功能仍以原 Shadowrocket 为准。广告拦截被显式提至进程强制代理之前，故该处相对于 Johnshall 原始跨动作优先级属于有意调整。`DOMAIN-WILDCARD` 使用锚定正则映射，必须对实际目标版本测试。发布前另行扫描已审核 AI/BitBrowser 域名和 Voice IP 与前置拦截规则的可证明交集，仅在报告中提示，不改变用户既定优先级；不透明 geosite/geoip 和任意正则的完整交集仍需实机验证。任何未知 / 不支持的 Johnshall 类型及未审核外部 RULE-SET 都会**阻止 v2rayN 发布**，并保留旧版；不悄悄丢弃。
 
 本项目的 OpenAI 社区来源继续执行原审核逻辑，未知第三方不会从社区列表自动放行。`config/v2rayn/openai-extra.rules` 是本次用户**明确指定**的 v2rayN-only 扩展，其中包含共享的 Statsig、featuregates 等广泛后缀，可能会代理其他应用流量；这些条目**不会改变原 Shadowrocket 审核记录或原规则**。
 
@@ -335,8 +335,8 @@ Claude Code 官方网络清单中的可选错误报告精确主机 `browser-inta
 
 ### 官方文件每周复审（不阻塞每日生成）
 
-每天同一个 Actions 的 `scripts/run_dual.py` 还会调用 `scripts/audit_ai_docs.py`；仅在**台湾时间周日的定时运行**检查 Google Gemini App 防火墙与 Anthropic Claude Code 的官方网络文档。提取并比较相关主机的集合，变化时写入 `data/ai-docs-review.md`，但**绝不会直接把网页上新出现的主机自动加入代理**。如果官方网页暂时不可访问或被安全验证阻断，保留旧快照，Telegram 会记录警告，不影响任何一套已经验证成功的规则。未修改原有唯一的每天 11:00 调度。非周日的普通推送不会发起官方网页请求。
+每天同一个 Actions 的 `scripts/run_dual.py` 还会调用 `scripts/audit_ai_docs.py`；仅在**台湾时间周日的定时运行**检查 Google Gemini App 防火墙与 Anthropic Claude Code 的官方网络文档。提取并比较相关主机集合，同时单独记录未分类的可见主机（可能包含导航或正文误报，只供人工观察），变化时写入 `data/ai-docs-review.md`，但**绝不会直接把网页上新出现的主机自动加入代理**。如果官方网页暂时不可访问或被安全验证阻断，保留旧快照，Telegram 会记录警告，不影响任何一套已经验证成功的规则。未修改原有唯一的每天 11:00 调度。非周日的普通推送不会发起官方网页请求。
 
 ### Gemini / Claude 人工拒绝及六个月复审
 
-`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。现阶段 AI 待审数量纳入 Telegram 汇总，逐项复审日期保留在 GitHub 审核队列；`reminder_interval_days` 为预留配置，尚未实现像旧 OpenAI 那样的独立 7 天通知送达去重，不能当作已验收功能。
+`config/ai-review-decisions.json` 为独立的 AI 审核记录，格式为 `{"version":1,"default_review_months":6,"reminder_interval_days":7,"rejected_rules":[]}`。人工拒绝条目使用 `{"service":"claude","rule":"DOMAIN-SUFFIX,example.test","reason":"依据与拒绝原因","reviewed_at":"2026-11-23"}`（示例不会被自动加入）。建置时会计算六个月后的复审日期，在 `data/ai-review-queue.md` 标识待审、暂缓和到期；到期**不会自动批准**，而是继续由人工查证。两套客户端通过发布校验后合并候选（服务 + 规则去重，合并来源）；失败的一端保留其上次有效候选（如有）并明确标注。新待审项在 Telegram 成功送达且完整 Actions 摘要可用后记录回执，已到期且未处理的记录按 `reminder_interval_days`（默认 7 天）重复提醒。共享通知状态保存在 `data/ai-review-notifications.json`，与订阅路由解耦，不会自动放行任何候选。

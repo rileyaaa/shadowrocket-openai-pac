@@ -244,7 +244,7 @@ class PublishAndReportTests(unittest.TestCase):
                 if args[0] == 'ls-remote':
                     return SimpleNamespace(stdout='b' * 40 + '\trefs/heads/main\n')
                 return SimpleNamespace(stdout='')
-            with patch.object(publisher, 'git', side_effect=fake_git), \
+            with patch.object(publisher, 'remote_head', side_effect=['a' * 40, 'a' * 40, 'b' * 40]), patch.object(publisher, 'validate_release', return_value={}), patch.object(publisher, 'git', side_effect=fake_git), \
                     patch.object(publisher.subprocess, 'run',
                                  return_value=SimpleNamespace(returncode=0, stderr='')):
                 publisher.publish(p)
@@ -266,7 +266,7 @@ class PublishAndReportTests(unittest.TestCase):
                 if args[0] == 'fetch':
                     raise RuntimeError('network temporarily unavailable')
                 return SimpleNamespace(stdout='')
-            with patch.object(publisher, 'git', side_effect=fake_git):
+            with patch.object(publisher, 'remote_head', side_effect=['a' * 40, 'a' * 40, 'b' * 40]), patch.object(publisher, 'validate_release', return_value={}), patch.object(publisher, 'git', side_effect=fake_git):
                 publisher.publish(p)
             pub = json.loads(p.read_text())['publish']
             self.assertEqual(pub['state'], 'pushed_unverified')

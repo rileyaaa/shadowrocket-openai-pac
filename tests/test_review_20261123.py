@@ -16,11 +16,12 @@ import review_queue
 
 REVIEWED = date(2026, 11, 23)
 DUE = date(2027, 5, 23)
+SNAPSHOT = json.loads((ROOT / 'tests/fixtures/review-20261123.json').read_text(encoding='utf-8'))
 
 
 class ReviewedSnapshotTests(unittest.TestCase):
     def test_openai_20_rejected_records_revalidated_and_renewed(self):
-        policy = json.loads((ROOT / 'config/review-decisions.json').read_text(encoding='utf-8'))
+        policy = SNAPSHOT['openai']
         self.assertEqual(len(policy['rejected_rules']), 20)
         self.assertEqual(policy['default_review_months'], 6)
         review_queue.validate_policy(policy, REVIEWED)
@@ -33,7 +34,7 @@ class ReviewedSnapshotTests(unittest.TestCase):
             self.assertTrue(entry['reason'])
 
     def test_gemini_claude_10_are_cooling_until_next_review(self):
-        policy = json.loads((ROOT / 'config/ai-review-decisions.json').read_text(encoding='utf-8'))
+        policy = SNAPSHOT['ai']
         self.assertEqual(len(policy['rejected_rules']), 10)
         self.assertEqual(policy['default_review_months'], 6)
         candidates = [{'service': entry['service'], 'rule': entry['rule'],
@@ -50,23 +51,18 @@ class ReviewedSnapshotTests(unittest.TestCase):
         self.assertEqual(counts, {'pending': 0, 'cooling': 0, 'due': 10})
         self.assertTrue(all(r['status'] == 'due' for r in at_due))
 
-    def test_none_of_8_rejected_claude_suffixes_is_manually_approved(self):
-        decisions = json.loads((ROOT / 'config/ai-review-decisions.json').read_text(encoding='utf-8'))
-        rejected = {r['rule'] for r in decisions['rejected_rules'] if r['service'] == 'claude'}
-        manual = ai_services.load_manual(
-            (ROOT / 'config/ai-services.rules').read_text(encoding='utf-8'))
-        self.assertFalse(rejected.intersection(manual['claude']))
-        self.assertTrue(ai_services.MANDATORY['claude'].issubset(set(manual['claude'])))
-        ai_services.check_rejection_conflicts({k: set(v) for k, v in manual.items()}, decisions)
-
-    def test_google_shared_endpoints_remain_not_ai_approved(self):
-        decisions = json.loads((ROOT / 'config/ai-review-decisions.json').read_text(encoding='utf-8'))
-        refused = {r['rule'] for r in decisions['rejected_rules'] if r['service'] == 'gemini'}
-        self.assertEqual(refused, {'DOMAIN-SUFFIX,geller-pa.googleapis.com',
-                                   'DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com'})
-        manual = ai_services.load_manual(
-            (ROOT / 'config/ai-services.rules').read_text(encoding='utf-8'))
-        self.assertFalse(refused.intersection(manual['gemini']))
+    def test_live_policies_valid_without_fixed_counts_or_dates(self):
+        ai = json.loads((ROOT / 'config/ai-review-decisions.json').read_text(encoding='utf-8'))
+        on = review_queue.today()
+        # A malformed optional OpenAI rejection ledger must still warn and
+        # degrade to pending review without freezing the route builders.
+        policy, warnings = review_queue.load_policy(ROOT / 'config/review-decisions.json', on)
+        review_queue.validate_policy(policy, on)
+        if not warnings:
+            self.assertEqual(policy, json.loads((ROOT / 'config/review-decisions.json').read_text(encoding='utf-8')))
+        ai_services.evaluate_review_policy([], ai, on=on)
+        manual = ai_services.load_manual((ROOT / 'config/ai-services.rules').read_text(encoding='utf-8'))
+        ai_services.check_rejection_conflicts({k: set(v) for k, v in manual.items()}, ai)
 
 
 if __name__ == '__main__':

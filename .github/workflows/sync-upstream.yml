@@ -41,6 +41,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -60,9 +62,28 @@ jobs:
         run: python scripts/run_dual.py --work-dir "$RUNNER_TEMP"
       - name: Publish only validated outputs in one Git push
         if: always()
+        env:
+          REVIEW_RULE: ${{ inputs.reject_rule }}
+          REVIEW_REASON: ${{ inputs.reject_reason }}
+          REVIEW_MONTHS: ${{ inputs.review_months }}
         run: |
           if [ -f "$RUNNER_TEMP/dual-status.json" ]; then
             python scripts/publish_dual.py --status-file "$RUNNER_TEMP/dual-status.json"
+            state="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["publish"]["state"])' "$RUNNER_TEMP/dual-status.json")"
+            if [ "$state" = stale ]; then
+              echo '::warning::main changed; retrying once with a fresh checkout and complete rebuild.'
+              # Only the disposable Actions workspace is reset. Never force push.
+              git fetch --no-tags origin refs/heads/main
+              git reset --hard FETCH_HEAD
+              git clean -f -- data/ai-review-notifications.json data/ai-official-docs.json data/ai-docs-review.md
+              if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ -n "$REVIEW_RULE" ]; then
+                args=(--rule "$REVIEW_RULE" --reason "$REVIEW_REASON")
+                if [ -n "$REVIEW_MONTHS" ]; then args+=(--months "$REVIEW_MONTHS"); fi
+                python scripts/review_queue.py "${args[@]}"
+              fi
+              python scripts/run_dual.py --work-dir "$RUNNER_TEMP"
+              python scripts/publish_dual.py --status-file "$RUNNER_TEMP/dual-status.json"
+            fi
           else
             echo '::error::Build status missing; refusing publication.'
           fi
@@ -74,7 +95,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
-            --review-state-file data/review-notifications.json
+            --review-state-file data/review-notifications.json \
+            --ai-review-state-file data/ai-review-notifications.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
@@ -93,12 +115,19 @@ jobs:
             exit 1
           fi
           git reset --mixed --quiet
-          git add -- data/review-notifications.json
-          staged="$(git diff --cached --name-only)"
-          if [ -n "$staged" ] && [ "$staged" != "data/review-notifications.json" ]; then
-            echo '::error::Unexpected staged path in receipt commit.'
-            exit 1
-          fi
+          python - "$RUNNER_TEMP/dual-status.json" <<'PY'
+          import json, subprocess, sys
+          state = json.load(open(sys.argv[1], encoding='utf-8'))
+          paths = state.get('receipt_files', [])
+          allowed = {'data/review-notifications.json', 'data/ai-review-notifications.json'}
+          if not isinstance(paths, list) or not set(paths) <= allowed:
+              sys.exit('Unexpected receipt path.')
+          if paths:
+              subprocess.run(['git', 'add', '--', *paths], check=True)
+          staged = subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines()
+          if not set(staged) <= set(paths):
+              sys.exit('Unexpected staged path in receipt commit.')
+          PY
           if git diff --cached --quiet; then
             echo 'No review receipt changes.'
             exit 0

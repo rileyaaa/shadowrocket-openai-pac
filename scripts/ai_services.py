@@ -9,7 +9,8 @@ in the manually reviewed rules file. Nothing is widened to a provider ASN/IP.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 import calendar
 import hashlib
 import json
@@ -160,7 +161,7 @@ def add_months(day: date, months: int) -> date:
 def evaluate_review_policy(candidates: list[dict], policy: dict,
                            *, on: date | None = None) -> tuple[list[dict], dict]:
     """Reject/renew entries remain rejected; expiry only schedules review."""
-    on = on or date.today()
+    on = on or datetime.now(ZoneInfo('Asia/Taipei')).date()
     if (not isinstance(policy, dict) or set(policy) != {'version', 'default_review_months',
             'reminder_interval_days', 'rejected_rules'} or
             type(policy['version']) is not int or policy['version'] != 1 or
@@ -214,6 +215,15 @@ def evaluate_review_policy(candidates: list[dict], policy: dict,
                         review_due_on=due.isoformat(), reason=record['reason'])
         output.append(item)
     return output, counts
+
+
+def approved_rule_covers(allowed: str, candidate: str) -> bool:
+    """Full coverage, not mere overlap: exact approval cannot approve a suffix."""
+    ak, ah = allowed.split(',', 1)
+    ck, ch = candidate.split(',', 1)
+    return (allowed == candidate or
+            (ak == 'DOMAIN-SUFFIX' and ck in ('DOMAIN', 'DOMAIN-SUFFIX')
+             and (ch == ah or ch.endswith('.' + ah))))
 
 
 def approved_rule_overlaps(a: str, b: str) -> bool:
@@ -275,6 +285,7 @@ def collect(download, *, manual_path: Path = MANUAL,
         {'service': service, 'rule': rule, 'sources': sorted(sources),
          'reason': 'Unverified shared host or unapproved domain; not automatically routed'}
         for (service, rule), sources in sorted(candidates.items())
+        if not any(approved_rule_covers(active, rule) for active in approved[service])
     ]
     policy_bytes = review_policy_path.read_bytes()
     policy = json.loads(policy_bytes.decode('utf-8-sig'))

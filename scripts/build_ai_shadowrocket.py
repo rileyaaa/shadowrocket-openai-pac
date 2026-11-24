@@ -17,6 +17,7 @@ import sys
 
 import build as legacy  # read-only, never invoke build.run()
 import build_v2rayn as v2helpers  # only atomic writer, independent data fetch is below
+import release_integrity
 import ai_services
 import review_queue
 
@@ -252,7 +253,9 @@ def run(argv: list[str] | None = None) -> dict:
                for name, (url, raw) in fetched.items()}
     outputs.update(ai['records'])
     state = {'schema_version': 2, 'sources': outputs, 'ai_counts': ai['counts'],
-             'statistics': stats, 'manual_ai_sha256': ai['manual_sha256'],
+             'statistics': stats,
+             'build_inputs_sha256': release_integrity.build_inputs_fingerprint('shadowrocket_ai'),
+             'manual_ai_sha256': ai['manual_sha256'],
              'review_candidates': ai['review_candidates'],
              'review_counts': ai['review_counts'],
              'review_decisions_sha256': ai['review_decisions_sha256'],
@@ -284,6 +287,8 @@ def run(argv: list[str] | None = None) -> dict:
               'review_reminder_interval_days': review['reminder_interval_days'],
               'review_warnings': review['warnings'],
               'review_decisions_changed': original_delta['review_decisions_changed'],
+              'settings_changed': original_delta['settings_changed'],
+              'stat_deltas': original_delta['stat_deltas'],
               'warnings': ['Shared Google authentication/static hosts may also proxy unrelated Google traffic.',
                            'Gemini/Claude rules depend on host/SNI; genuine client routing still needs testing.']}
     # All downloads, semantic checks and safety guards pass before any writes.
@@ -291,7 +296,6 @@ def run(argv: list[str] | None = None) -> dict:
     v2helpers.atomically_write(OUTPUT, output_bytes)
     v2helpers.atomically_write(STATE, (json.dumps(state, ensure_ascii=False, indent=2,
                                                   sort_keys=True) + '\n').encode('utf-8'))
-    v2helpers.atomically_write(REVIEW_QUEUE, ai_services.render_review_queue(ai).encode('utf-8'))
     v2helpers.atomically_write(ORIGINAL_AUTO, review_meta['auto_text'].encode('utf-8'))
     for name, (_, snapshot_path) in legacy.RULESET_SOURCES.items():
         v2helpers.atomically_write(ROOT / snapshot_path, fetched[name][1].decode('utf-8').encode('utf-8'))
@@ -300,6 +304,7 @@ def run(argv: list[str] | None = None) -> dict:
         review_queue.render_queue(review).encode('utf-8'))
     review_queue.write_json(ROOT / 'data/review-notifications.json', review_meta['delivery'])
     if args.report_file:
+        report['artifact_sha256'] = release_integrity.artifact_manifest(release_integrity.SHADOW_AI_FILES, ROOT)
         v2helpers.atomically_write(args.report_file,
             (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
     print(json.dumps({'build': 'success', 'changed': changed, 'ai_counts': ai['counts'],

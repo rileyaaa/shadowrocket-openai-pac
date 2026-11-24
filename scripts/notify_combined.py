@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import notify_telegram as original
 import review_queue
+from release_integrity import valid_build_report
 
 
 def read_json(path: str | None) -> dict | None:
@@ -26,14 +27,6 @@ def read_json(path: str | None) -> dict | None:
         print(f'::warning::Unreadable report: {type(exc).__name__}')
         return None
     return doc if isinstance(doc, dict) else None
-
-
-def valid_build_report(report: dict | None) -> bool:
-    return (isinstance(report, dict)
-            and report.get('build_success') is True
-            and type(report.get('config_changed')) is bool
-            and isinstance(report.get('statistics'), dict)
-            and bool(report['statistics']))
 
 
 def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
@@ -86,8 +79,19 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         else:
             lines += [f'发布：{"✅ 已更新" if released else "✅ 已检查，内容无变化"}']
         lines += [f'配置变化：{"有更新" if report.get("config_changed") else "无变化"}']
+        sources = report.get('changed_sources', [])
+        lines.append('变化来源：' + (', '.join(original.NAMES.get(s, s) for s in sources) if sources else '无'))
         stats = report.get('statistics', {})
         if key == 'shadowrocket_ai':
+            if report.get('settings_changed'):
+                lines.append('节点名称：已更新')
+            if report.get('review_decisions_changed'):
+                lines.append('人工审核记录文件已变更' + ('，分流配置无变化' if not report.get('config_changed') else ''))
+            added, removed = report.get('auto_added', []), report.get('auto_removed', [])
+            lines.append(f'OpenAI 自动规则新增 {len(added)} / 删除 {len(removed)}')
+            for values, label in ((added, '新增'), (removed, '删除')):
+                if values:
+                    lines.append(label + '：' + '；'.join(str(x)[:100] for x in values[:3]) + ('…' if len(values) > 3 else ''))
             for prop, label in [('johnshall_lines', 'Johnshall 原规则'),
                                 ('voice_prefixes', 'OpenAI Voice IP'),
                                 ('gemini_domains', 'Gemini 审核域名'),
@@ -116,20 +120,46 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
     if valid['shadowrocket_ai']:
         lines += [f'OpenAI 新增待审核：{len(shadow_ai.get("new_excluded_candidates", []))}；'
                   f'到期复审：{len(shadow_ai.get("review_due_candidates", []))}']
+        new = shadow_ai.get('new_excluded_candidates', [])
+        due = shadow_ai.get('review_due_candidates', [])
+        for item in new[:4]:
+            lines.append('· 新增 ' + str(item.get('rule', '?'))[:120] + ' [' +
+                         ', '.join(item.get('sources', []))[:100] + ']')
+        for item in due[:4]:
+            lines.append('· 复审 ' + str(item.get('rule', '?'))[:120] +
+                         f'（上次 {item.get("reviewed_at", "?")}；到期 {item.get("review_due_on", "?")}）')
+        if len(new) > 4 or len(due) > 4:
+            lines.append('其余审核项请查看本次 Actions 完整摘要。')
         counts = shadow_ai.get('manual_review_counts', {})
         if isinstance(counts, dict):
             lines.append(f'OpenAI 审核：待审 {counts.get("pending", "?")} / '
                          f'到期 {counts.get("due", "?")}')
+            if counts.get('due'):
+                lines.append(f'未处理到期项每 {shadow_ai.get("review_reminder_interval_days", 7)} 天提醒一次。')
         for warning in shadow_ai.get('review_warnings', [])[:2]:
             lines.append('⚠️ ' + str(warning)[:140])
     else:
         lines.append('⚠️ Shadowrocket AI 审核报告缺失；不确认提醒送达状态')
     if not published:
         lines.append('⚠️ ' + str(publication.get('error', 'GitHub 未确认发布'))[:250])
-    if shadow_ai and shadow_ai.get('ai_review_candidates'):
-        counts = shadow_ai.get('ai_review_counts', {})
-        lines.append('⚠️ Gemini/Claude 未批准候选：{}，其中到期复审 {}（不会自动放行）'.format(
-            len(shadow_ai['ai_review_candidates']), counts.get('due', 0)))
+    shared = status.get('ai_review')
+    if shared:
+        counts = shared['review_counts']
+        alerts = shared['alerts']
+        lines.append(f'Gemini/Claude 合并审核：待审 {counts["pending"]} / 暂缓 {counts["cooling"]} / 到期 {counts["due"]}')
+        lines.append(f'本次需提醒：{len(alerts)} 条（到期未处理每 {shared["reminder_interval_days"]} 天）')
+        for item in alerts[:4]:
+            suffix = (f'（上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}）'
+                      if item['status'] == 'due' else '（新增待审）')
+            lines.append('· ' + item['service'] + ' ' + item['rule'][:120] + suffix)
+        if len(alerts) > 4:
+            lines.append('其余请查看本次 Actions 完整摘要。')
+        if shared.get('stale_clients'):
+            lines.append('⚠️ 审核候选沿用上次快照：' + ', '.join(shared['stale_clients']))
+    elif status.get('ai_review_error'):
+        lines.append('⚠️ 合并审核队列更新失败：' + str(status['ai_review_error'])[:140])
+    elif not any(valid.values()):
+        lines.append('⚠️ 无有效客户端报告；AI 审核快照未刷新')
     docs_status = status.get('official_docs', {})
     if docs_status.get('exit_code', 0) != 0:
         lines.append('⚠️ 本周官方网络文档检查不可用；不影响规则更新：' +
@@ -138,6 +168,11 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('🗓 官方网络文档：' +
                      ('发现变化，待人工核实' if official_docs.get('changed')
                       else '每周检查完成，域名无变化'))
+    if valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
+        conflicts = v2['routing_conflicts']
+        lines.append(f'⚠️ v2rayN：{conflicts["count"]} 条代理规则与前置拦截有交集，未修改优先级。')
+        for item in conflicts['examples'][:2]:
+            lines.append('· ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
     if v2 and v2.get('warnings'):
         lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
     if run_url:
@@ -154,6 +189,7 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument('--status-file', required=True, type=Path)
     p.add_argument('--review-state-file', type=Path)
+    p.add_argument('--ai-review-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
         'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
@@ -181,16 +217,30 @@ def main() -> int:
                     if shadow_ai.get(key):
                         f.write(f'\n### OpenAI {key}\n\n')
                         for item in shadow_ai[key]:
-                            f.write('- ' + str(item.get('rule', '?')) + '\n')
+                            f.write('- ' + str(item.get('rule', '?')) + ' — ' +
+                                     ', '.join(item.get('sources', [])) + '\n')
+                            if key == 'review_due_candidates':
+                                f.write(f'  上次审核：{item.get("reviewed_at")}；到期：{item.get("review_due_on")}；'
+                                        f'此前原因：{item.get("reason")}\n')
             if official_docs and official_docs.get('changes'):
                 f.write('\n### 每周官方文件变化（未自动批准）\n\n')
                 for change in official_docs['changes']:
-                    f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机\n')
-            if shadow_ai:
-                f.write('\n### Gemini / Claude 未批准新候选\n\n')
-                for item in shadow_ai.get('ai_review_candidates', []):
-                    f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])})\n')
+                    f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机；'
+                            f'未分类 +{len(change.get("other_added", []))} / -{len(change.get("other_removed", []))}\n')
+                    for key in ('added', 'removed', 'other_added', 'other_removed'):
+                        for host in change.get(key, []):
+                            f.write(f'  - {key}: {host}\n')
+            if status.get('ai_review'):
+                f.write('\n### Gemini / Claude 合并审核清单\n\n')
+                for item in status['ai_review']['review_candidates']:
+                    f.write(f'- {item["service"]}: {item["rule"]} ({", ".join(item["sources"])}) '
+                            f'— {item["status"]}；上次 {item.get("reviewed_at")}；到期 {item.get("review_due_on")}\n')
             if v2:
+                if v2.get('routing_conflicts', {}).get('count'):
+                    f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
+                    for item in v2['routing_conflicts']['examples']:
+                        f.write(f'- {item["proxy_rule"]} ← {item["earlier_block_rule"]}\n')
+                    f.write('\n' + v2['routing_conflicts']['limitations'] + '\n')
                 for warning in v2.get('warnings', []):
                     f.write('\n- ⚠️ ' + str(warning) + '\n')
     token, chat_id = (os.environ.get('TELEGRAM_BOT_TOKEN', '').strip(),
@@ -204,14 +254,30 @@ def main() -> int:
         print(f'::error::Telegram delivery failed: {type(exc).__name__}; receipts unchanged')
         return 1
     print('Unified Telegram report sent.')
-    if (args.review_state_file and shadow_ai
+    receipt_files = []
+    if (args.review_state_file and valid_build_report(shadow_ai)
             and status.get('shadowrocket_ai', {}).get('exit_code') == 0
-            and status.get('publish', {}).get('success')):
+            and status.get('publish', {}).get('success')
+            and run_url and summary_path):
         try:
             review_queue.acknowledge(shadow_ai, args.review_state_file)
+            receipt_files.append(str(args.review_state_file))
         except (OSError, ValueError, TypeError) as exc:
             print(f'::error::Telegram delivered, but review acknowledgement failed: {type(exc).__name__}')
             return 1
+    if (args.ai_review_state_file and status.get('ai_review')
+            and status.get('publish', {}).get('success') is True
+            and run_url and summary_path):
+        try:
+            ai_review_delivery.acknowledge(status['ai_review'], args.ai_review_state_file)
+            receipt_files.append(str(args.ai_review_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::AI review receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    # Stage only receipts explicitly acknowledged in this run.
+    if args.status_file.is_file():
+        status['receipt_files'] = receipt_files
+        args.status_file.write_text(json.dumps(status, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     return 0
 
 

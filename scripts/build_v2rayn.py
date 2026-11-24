@@ -22,6 +22,8 @@ import urllib.request
 
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
+import release_integrity
+import routing_conflicts
 import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -276,6 +278,8 @@ def run(argv: list[str] | None = None) -> dict:
              + core.compact(ordinary, 'Johnshall original order')
              + [{'remarks': 'Johnshall FINAL direct', 'outboundTag': 'direct',
                  'port': '0-65535', 'enabled': True}])
+    conflicts = routing_conflicts.detect(blocked, bit_entries + voice_entries + openai_entries + extra
+                                         + ai_entries['gemini'] + ai_entries['claude'])
     voice_counts = legacy.voice_address_counts(voice)
     original_stats = {**johnshall_stats, **voice_counts, 'voice_prefixes': len(voice),
                       'auto_domains': len(auto), 'manual_domains': len(manual),
@@ -310,6 +314,7 @@ def run(argv: list[str] | None = None) -> dict:
     state = {'schema_version': 2, 'output_sha256': hashlib.sha256(output).hexdigest(),
              'voice_rules': sorted(current_voice),
              'sources': next_sources, 'statistics': stats,
+             'build_inputs_sha256': release_integrity.build_inputs_fingerprint('v2rayn'),
              'ai_counts': ai['counts'],
              'inputs_sha256': {
                  'manual_openai': hashlib.sha256((ROOT / 'config/manual-openai.rules').read_bytes()).hexdigest(),
@@ -326,6 +331,7 @@ def run(argv: list[str] | None = None) -> dict:
               'statistics': stats, 'changed_sources': source_changes,
               'ai_review_candidates': ai['review_candidates'],
               'ai_review_counts': ai['review_counts'],
+              'routing_conflicts': conflicts,
               'warnings': [
                   'URL Rewrite and MITM are not v2rayN routing rules and cannot be carried over.',
                   'REJECT variants map to block; no-resolve is not a portable Xray routing modifier.',
@@ -339,6 +345,7 @@ def run(argv: list[str] | None = None) -> dict:
     atomically_write(CONFIG, output)
     atomically_write(STATE, (json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + '\n').encode('utf-8'))
     if args.report_file:
+        report['artifact_sha256'] = release_integrity.artifact_manifest(release_integrity.V2_FILES, ROOT)
         atomically_write(args.report_file, (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
     print(json.dumps({'build': 'success', 'changed': changed, 'statistics': stats}, ensure_ascii=False))
     return report
