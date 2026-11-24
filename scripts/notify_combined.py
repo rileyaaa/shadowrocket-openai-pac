@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 import notify_telegram as original
 import review_queue
+import ai_review_delivery
 from release_integrity import valid_build_report
 
 
