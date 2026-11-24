@@ -340,11 +340,16 @@ def main() -> int:
                             f'  - 规则：{", ".join(item["rules"])}\n'
                             f'  - 依据：{item["evidence"]}\n  - 复审重点：{item["note"]}\n')
             if status.get('v2rayn', {}).get('exit_code') == 0 and valid_build_report(v2):
-                if v2.get('routing_conflicts', {}).get('count'):
+                # Prefer the verified conflict observation. An invalid raw
+                # report must not prevent the combined alert from being sent.
+                conflicts = status.get('routing_review')
+                if conflicts is None and not status.get('routing_review_error'):
+                    conflicts = v2.get('routing_conflicts')
+                if isinstance(conflicts, dict) and conflicts.get('count'):
                     f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
-                    for item in v2['routing_conflicts'].get('pairs', v2['routing_conflicts']['examples']):
+                    for item in conflicts.get('pairs', conflicts.get('examples', [])):
                         f.write(f'- {item["proxy_rule"]} ← {item["earlier_block_rule"]}\n')
-                    f.write('\n' + v2['routing_conflicts']['limitations'] + '\n')
+                    f.write('\n' + conflicts['limitations'] + '\n')
                 for warning in v2.get('warnings', []):
                     f.write('\n- ⚠️ ' + str(warning) + '\n')
     token, chat_id = (os.environ.get('TELEGRAM_BOT_TOKEN', '').strip(),

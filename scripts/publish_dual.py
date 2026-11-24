@@ -75,19 +75,21 @@ def publish(path: Path) -> None:
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 status['openai_review_error'] = str(exc)
                 print('::warning::OpenAI review queue not updated: ' + str(exc))
-        # The shared review queue has independent ownership.
-        review_reports = {k: v for k, v in verified_reports.items()
-                          if isinstance(v.get('ai_review_candidates'), list)}
-        if review_reports:
+        # The shared review queue has independent ownership. A missing list
+        # in a verified build report is an error, not an absent client.
+        # Let the existing candidate validator reject it before writing.
+        if verified_reports:
             try:
-                status['ai_review'] = ai_review_delivery.prepare(review_reports)
+                status['ai_review'] = ai_review_delivery.prepare(verified_reports)
                 files += AI_REVIEW_FILES
             except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
                 status['ai_review_error'] = str(exc)
                 print('::warning::AI review queue not updated: ' + str(exc))
-        conflict_report = verified_reports.get('v2rayn', {}).get('routing_conflicts')
-        if isinstance(conflict_report, dict) and 'pairs' in conflict_report:
+        if 'v2rayn' in verified_reports:
             try:
+                conflict_report = verified_reports['v2rayn'].get('routing_conflicts')
+                if not isinstance(conflict_report, dict) or 'pairs' not in conflict_report:
+                    raise ValueError('Missing or invalid v2rayN routing conflict report')
                 policy, _ = review_queue.load_policy(Path('config/review-decisions.json'), review_queue.today())
                 status['routing_review'] = routing_conflicts.prepare(
                     conflict_report, Path(routing_conflicts.STATE), interval=policy['reminder_interval_days'])

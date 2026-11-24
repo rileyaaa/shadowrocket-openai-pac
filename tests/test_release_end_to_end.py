@@ -183,6 +183,37 @@ class ReleaseEndToEndTests(unittest.TestCase):
     def receipts(self,path,ok=True):
         return self.command(sys.executable,'-B','scripts/persist_receipts.py','--status-file',str(path),ok=ok)
 
+    def test_missing_review_data_warns_without_discarding_verified_subscriptions(self):
+        path = self.build_pair('missing-review-data')
+        pending = self.read_json(path)
+        shadow_report = Path(pending['reports']['shadowrocket_ai'])
+        report = self.read_json(shadow_report)
+        del report['ai_review_candidates']
+        self.write_json(shadow_report, report)
+        v2_report = Path(pending['reports']['v2rayn'])
+        report = self.read_json(v2_report)
+        report['routing_conflicts'] = None
+        self.write_json(v2_report, report)
+
+        status = self.publish(path)
+        self.assertTrue(status['publish']['success'])
+        self.assertEqual(status['shadowrocket_ai']['exit_code'], 0)
+        self.assertEqual(status['v2rayn']['exit_code'], 0)
+        for name in ('Shadowrocket_Johnshall_AI.conf', 'v2rayN_Johnshall_AI.json'):
+            self.assertIn(name, status['publish']['changed_files'])
+        self.assertIn('Invalid AI candidate list', status['ai_review_error'])
+        self.assertIn('Missing or invalid', status['routing_review_error'])
+        self.assertNotIn('data/ai-review-notifications.json', status['publish']['changed_files'])
+        self.assertNotIn('data/routing-conflicts.json', status['publish']['changed_files'])
+        message = self.notify(path)
+        self.assertIn('部分成功', message)
+        self.assertIn('合并审核队列更新失败', message)
+        self.assertIn('冲突审核状态更新失败', message)
+        self.assertIn('冲突审核状态更新失败', (self.tmp/'summary.md').read_text(encoding='utf-8'))
+        check = self.command(sys.executable, '-B', 'scripts/publish_dual.py',
+                             '--status-file', str(path), '--check', ok=False)
+        self.assertEqual(check.returncode, 1)
+
     def test_build_publish_notify_replay_partial_and_concurrent_receipt(self):
         first=self.build_pair('first',docs=True)
         status=self.publish(first)
