@@ -476,6 +476,22 @@ class PipelineHardeningTests(unittest.TestCase):
             self.run_build()
         self.assertEqual(previous, self.published_files())
 
+    def test_proxy_mapping_preserves_matches_comments_and_source_statistics(self):
+        self.sources[build.BASE_URL] = self.base.replace(
+            b'DOMAIN,before.example,Proxy\n',
+            b'DOMAIN-KEYWORD,proxy,DIRECT\nDOMAIN-KEYWORD,reject,Proxy\n'
+            b'; DOMAIN,comment.example,Proxy\n'
+            b'DOMAIN,before.example, Proxy\nDOMAIN,extra-ad.example,REJECT-DROP\n')
+        self.run_build()
+        output = build.CONFIG.read_text()
+        self.assertIn('DOMAIN-KEYWORD,proxy,DIRECT\n', output)
+        self.assertIn('DOMAIN-KEYWORD,reject,General Test\n', output)
+        self.assertIn('; DOMAIN,comment.example,Proxy\n', output)
+        self.assertIn('DOMAIN,before.example, General Test\n', output)
+        stats = json.loads((self.root / 'data/sources.json').read_text())['statistics']
+        self.assertEqual(stats['mapped_proxy_to_johnshall_node'], 10005)
+        self.assertEqual(stats['retained_ad_rules'], 20002)
+
     def test_external_ruleset_is_inlined_at_same_position_and_hashed(self):
         self.run_build()
         output = build.CONFIG.read_text()

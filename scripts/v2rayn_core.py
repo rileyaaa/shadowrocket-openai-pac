@@ -27,11 +27,15 @@ class UnsupportedRule(ValueError):
 def as_match(kind: str, value: str) -> tuple[str, str]:
     kind, value = kind.upper(), value.strip()
     if kind in DOMAIN_TYPES:
-        if not value or (kind != 'DOMAIN-WILDCARD' and not DOMAIN_NAME.fullmatch(value)):
+        if not value or not DOMAIN_NAME.fullmatch(value):
             raise UnsupportedRule(f'Invalid domain {kind},{value}')
+        if kind != 'DOMAIN-WILDCARD' and ('*' in value or '?' in value):
+            raise UnsupportedRule(f'Unexpected wildcard in {kind},{value}')
+        if kind in ('DOMAIN', 'DOMAIN-SUFFIX') and any(not label for label in value.split('.')):
+            raise UnsupportedRule(f'Empty hostname label in {kind},{value}')
+        if kind == 'GEOSITE' and not re.fullmatch(r'[a-z0-9_-]+', value, re.I):
+            raise UnsupportedRule(f'Invalid geosite tag {value}')
         if kind == 'DOMAIN-WILDCARD':
-            if not DOMAIN_NAME.fullmatch(value):
-                raise UnsupportedRule(f'Invalid wildcard {value}')
             if value.lower() == 'chatgpt-async-webps-prod-*.webpubsub.azure.com':
                 # The variable component in this known host is exactly one DNS label.
                 return 'domain', r'regexp:^chatgpt-async-webps-prod-[^.]+\.webpubsub\.azure\.com$'

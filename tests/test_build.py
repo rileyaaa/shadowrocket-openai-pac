@@ -10,6 +10,48 @@ import build
 
 
 class BuildTest(unittest.TestCase):
+    def test_only_johnshall_policy_field_is_replaced(self):
+        node = 'Ordinary node'
+        cases = (
+            ('DOMAIN-KEYWORD,proxy,DIRECT', 'DOMAIN-KEYWORD,proxy,DIRECT', 'DIRECT'),
+            ('DOMAIN-KEYWORD,reject,Proxy', 'DOMAIN-KEYWORD,reject,Ordinary node', 'PROXY'),
+            ('DOMAIN,example.com, Proxy ', 'DOMAIN,example.com, Ordinary node ', 'PROXY'),
+            ('IP-CIDR,8.8.8.0/24,proxy,no-resolve', 'IP-CIDR,8.8.8.0/24,Ordinary node,no-resolve', 'PROXY'),
+            ('; DOMAIN,example.com,Proxy', '; DOMAIN,example.com,Proxy', None),
+            ('# DOMAIN,example.com,Proxy', '# DOMAIN,example.com,Proxy', None),
+            ('FINAL,direct', 'FINAL,direct', None),
+            ('DOMAIN,ads.example,REJECT-DROP', 'DOMAIN,ads.example,REJECT-DROP', 'REJECT-DROP'),
+        )
+        for original, expected, policy in cases:
+            with self.subTest(original=original):
+                self.assertEqual(build.johnshall_policy(original), policy)
+                self.assertEqual(build.map_johnshall_proxy(original, node), expected)
+
+    def test_openai_rejection_blocks_full_scope_but_not_approved_child(self):
+        import review_queue
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            policy = review_queue.default_policy()
+            path = root / 'config/review-decisions.json'
+            def reject(rule):
+                policy['rejected_rules'] = [{'rule': rule, 'reason': 'fixture',
+                    'reviewed_at': review_queue.today().isoformat()}]
+                review_queue.write_json(path, policy)
+            reject('DOMAIN-SUFFIX,sentry.io')
+            build.check_openai_rejections(['DOMAIN,o33249.ingest.sentry.io'], root)
+            with self.assertRaisesRegex(ValueError, 'approved/rejected rule conflict'):
+                build.check_openai_rejections(['DOMAIN-SUFFIX,sentry.io'], root)
+            reject('DOMAIN,api.openai.com')
+            with self.assertRaisesRegex(ValueError, 'approved/rejected rule conflict'):
+                build.check_openai_rejections(['DOMAIN-SUFFIX,openai.com'], root)
+            build.check_openai_rejections(['DOMAIN,auth.openai.com'], root)
+            reject('DOMAIN,chatgpt-async-webps-prod-example.webpubsub.azure.com')
+            with self.assertRaisesRegex(ValueError, 'approved/rejected rule conflict'):
+                build.check_openai_rejections(
+                    ['DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com'], root)
+            reject('include:unknown-source')
+            build.check_openai_rejections(['DOMAIN-SUFFIX,openai.com'], root)
+
     def test_domains(self):
         data = "+.chatgpt.com\nopenai.com\n" + "\n".join(
             f"host{i}.example.org" for i in range(9)

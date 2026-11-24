@@ -19,16 +19,21 @@ def count_deltas(records, old):
             and row['rule_count'] != previous[key]['rule_count']}
 
 def validate_counts(records, old, domain_names, ruleset_names):
-    previous = (old or {}).get('sources', {})
+    if old is None:
+        return
+    previous = old.get('sources')
+    if not isinstance(previous, dict):
+        raise ValueError('Missing previous upstream source baselines')
     for key in (*domain_names, *ruleset_names):
         after = records[key]['rule_count']
         prior = previous.get(key)
-        if prior is None or 'rule_count' not in prior:
-            # The old schema did not store this count. Establish one baseline
-            # from a fully parsed feed; all existing aggregate guards still run.
-            if old is not None:
-                print(f'::notice::Initial independent per-source count baseline: {key}={after}')
-            continue
+        if not isinstance(prior, dict):
+            raise ValueError(f'Missing previous upstream source record: {key}')
+        if 'rule_count' not in prior:
+            if old.get('schema_version') == 1 and isinstance(prior.get('sha256'), str):
+                print(f'::notice::Migrating v1 independent per-source count baseline: {key}={after}')
+                continue
+            raise ValueError(f'Missing previous upstream rule_count baseline: {key}')
         before = prior['rule_count']
         minimum = .85 if key in ruleset_names else .75
         if type(before) is not int or before <= 0 or not minimum * before <= after <= 1.50 * before:

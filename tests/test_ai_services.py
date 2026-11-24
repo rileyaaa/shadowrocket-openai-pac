@@ -24,6 +24,17 @@ class AIInputTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ai.parse_feed('regexp:.*\n'*50,kind,'gemini')
 
+    def test_explicit_v2fly_suffix_and_metadata_preserve_scope(self):
+        rest = '\n'.join(f'ex{i}.claude.ai' for i in range(12))
+        plain = ai.parse_feed('claude.ai\nfull:api.anthropic.com\n'+rest, 'v2fly', 'claude')
+        annotated = ai.parse_feed('domain:claude.ai\t@ai # note\nfull:api.anthropic.com\t# note\n'+rest,
+                                  'v2fly', 'claude')
+        self.assertEqual(plain, annotated)
+        self.assertIn(('DOMAIN-SUFFIX','claude.ai'), annotated)
+        self.assertIn(('DOMAIN','api.anthropic.com'), annotated)
+        with self.assertRaises(ValueError):
+            ai.parse_feed('domain:claude.ai\n'+rest, 'meta', 'claude')
+
     def test_google_shared_host_only_exact(self):
         self.assertTrue(ai.is_approved('gemini','DOMAIN-SUFFIX','generativelanguage.googleapis.com'))
         self.assertEqual(ai.normalize_approved('gemini','DOMAIN-SUFFIX','generativelanguage.googleapis.com'),
@@ -76,6 +87,14 @@ class AIInputTests(unittest.TestCase):
             ai.check_rejection_conflicts(approved, policy)
         policy['rejected_rules'] = [{'service': 'claude', 'rule': 'DOMAIN,unrelated.example'}]
         ai.check_rejection_conflicts(approved, policy)
+
+    def test_rejected_parent_suffix_allows_separately_reviewed_narrow_scope(self):
+        approved = {'gemini': set(), 'claude': {'DOMAIN,o1158394.ingest.us.sentry.io'}}
+        policy = {'rejected_rules': [{'service': 'claude', 'rule': 'DOMAIN-SUFFIX,sentry.io'}]}
+        ai.check_rejection_conflicts(approved, policy)
+        policy['rejected_rules'][0]['rule'] = 'DOMAIN,o1158394.ingest.us.sentry.io'
+        with self.assertRaisesRegex(ValueError, 'approved/rejected rule conflict'):
+            ai.check_rejection_conflicts(approved, policy)
 
     def test_rejection_hostname_must_be_canonical(self):
         for host in ('API.ANTHROPIC.COM', 'api.anthropic.com.', 'api.anthropic.com '):

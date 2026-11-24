@@ -98,12 +98,21 @@ def parse_feed(text: str, fmt: str, service: str) -> list[tuple[str, str]]:
         row = line.strip()
         if not row or row.startswith('#'):
             continue
-        row = row.split(' #', 1)[0].split(' @', 1)[0].strip()
-        if row.startswith('include:') or row.startswith('regexp:') or ':' in row and not row.startswith('full:'):
-            raise ValueError(f'Unexpected AI feed syntax (review before publishing): {row}')
+        row = re.split(r'\s+(?:@|#)', row, maxsplit=1)[0].strip()
+        if not row:
+            continue
         if fmt == 'v2fly':
-            kind, name = ('DOMAIN', row[5:]) if row.startswith('full:') else ('DOMAIN-SUFFIX', row)
+            if row.startswith('full:'):
+                kind, name = 'DOMAIN', row[5:]
+            elif row.startswith('domain:'):
+                kind, name = 'DOMAIN-SUFFIX', row[7:]
+            elif ':' not in row:
+                kind, name = 'DOMAIN-SUFFIX', row
+            else:
+                raise ValueError(f'Unexpected AI feed syntax (review before publishing): {row}')
         else:
+            if ':' in row:
+                raise ValueError(f'Unexpected AI feed syntax (review before publishing): {row}')
             kind, name = ('DOMAIN-SUFFIX', row[2:]) if row.startswith('+.') else ('DOMAIN', row)
         rows.append((kind, check_hostname(name)))
     minimum = 30 if service == 'gemini' else 12
@@ -243,11 +252,11 @@ def approved_rule_overlaps(a: str, b: str) -> bool:
 
 
 def check_rejection_conflicts(approved: dict[str, set[str]], policy: dict) -> None:
-    """Human rejection may never silently lose to a manual/automatic allow."""
+    """Reject full coverage of a denied scope, not separately approved children."""
     for item in policy['rejected_rules']:
         service, rejected = item['service'], item['rule']
         for allowed in approved[service]:
-            if approved_rule_overlaps(allowed, rejected):
+            if approved_rule_covers(allowed, rejected):
                 raise ValueError(f'AI approved/rejected rule conflict: {service}: {allowed} vs {rejected}')
 
 
