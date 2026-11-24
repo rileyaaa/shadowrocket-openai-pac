@@ -1,0 +1,42 @@
+name: One-time merged branch cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-branch-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Remove only verified merged branch heads
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          expected = {"refs/heads/audit-followup-2026-11-23":"cb153220f9a8156da5b87ec59fcb87361618243f","refs/heads/audit-hardening-2026-11-23":"cebd3655c4c212ef36ec56684e0ee7732451a129","refs/heads/audit-remediation-round3-2026-11-23":"2644e58016225a00ddb45fc108802e1cba24c8c1","refs/heads/fix/live-evidence-recovery-check":"67a4b289e0950a6f94abba77f73b55271149cafd","refs/heads/maintenance/audit-hardening-20261124":"63114371299d61e38c5dacb151fc75cca10c46c7","refs/heads/maintenance/baseline-validation-20261124":"fb39b37b5e8e05fed02e618aac42439323633052","refs/heads/maintenance/common-review-final-validation-20261124":"42bfd0e93cadd40d3605c769e70225b3ea204e6f","refs/heads/maintenance/compact-telegram-final-20261124":"3e2ade886450afb8cbea45c25d32d9aff99e78fb","refs/heads/maintenance/consistent-coverage-and-ruleset-parser-20261124":"af8d32ed626cde142877ab8deef441c7c8c9433f","refs/heads/maintenance/consistent-manual-review-20261124":"008a716455db6cd4fed5eac874438440fc437dc7","refs/heads/maintenance/consistent-settings-and-log-decoding-20261124":"eb9a682edfc37bb1051d86e09fd4331b222a3e18","refs/heads/maintenance/final-review-report-consistency-20261124":"309f73f9f2924fd1f0c6e8c62bd3667794767e4e","refs/heads/maintenance/fix-review-receipt-20261124":"9f01e7459711d7fd305c3df70ee06549078b27eb","refs/heads/maintenance/optimize-existing-20261124":"e020feb910bfa3df76ec54d2a1e01a4374c8ade6","refs/heads/maintenance/precise-existing-guards-20261124":"0ef063abf4ce13b2f9fb2bee0332108ed35cf585","refs/heads/maintenance/precision-coverage-20261124":"a33c9d6ee0c0ab83814fd9187ac3614c5a4d0162","refs/heads/maintenance/review-report-integrity-20261124":"9ca5b355077138445de3788d1b62ced3f30bf276","refs/heads/maintenance/second-audit-20261124":"5cc2ee68126ce4bceb735bb620437b024bbf623c","refs/heads/maintenance/shared-download-voice-validation-20261124":"1ab23ccc409aeb974985d07aef7b2eb3201e4d66","refs/heads/review-renewal-2026-11-23":"c51c2b7ab595ecd134bf5a43eb77acf47bed4c11"}
+          def remote_heads():
+              result = subprocess.check_output(['git','ls-remote','--heads','origin'], text=True)
+              return {ref: sha for sha, ref in (line.split() for line in result.splitlines())}
+          main = 'refs/heads/main'
+          actual = remote_heads()
+          assert main in actual and main not in expected, 'Main branch must remain'
+          others = {ref: sha for ref, sha in actual.items() if ref != main}
+          assert others == expected, 'Branch list changed since merged-head verification; no deletion'
+          # Each ref is individually protected by its inspected merged PR head.
+          for ref, sha in expected.items():
+              assert ref.startswith('refs/heads/') and ref != main
+              subprocess.run(['git','push','--force-with-lease='+ref+':'+sha,'origin',':'+ref],check=True)
+              print('Removed merged branch '+ref,flush=True)
+          remaining = remote_heads()
+          assert set(remaining) == {main}, 'Unexpected remaining branch'
+          print('Verified exactly one remaining branch: main')
+          PY
