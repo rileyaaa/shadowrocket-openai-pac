@@ -46,7 +46,7 @@ def publish(path: Path) -> None:
             status['publish'] = {'success': False, 'state': 'stale',
                                  'error': 'main advanced before publication; rebuild from the current remote main'}
             return
-        files = list(REVIEW_FILES)
+        files = []
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
         verified_reports = {}
@@ -61,6 +61,11 @@ def publish(path: Path) -> None:
                 print(f'::error::{key}: {status[key]["error"]}')
             else:
                 files += owned
+        # A workflow_dispatch rejection is a pending local edit until at least
+        # one client has actually passed release verification. If neither
+        # passed, keep the published policy and both subscriptions untouched.
+        if verified_reports:
+            files += REVIEW_FILES
         openai_reports = {k: v for k, v in verified_reports.items()
                           if isinstance(v.get('openai_observation'), dict)}
         if openai_reports:
@@ -109,7 +114,8 @@ def publish(path: Path) -> None:
                 print('::warning::Official docs advisory not published: ' + str(exc))
         # A previous failed commit or user-staged file must not be carried over.
         git('reset', '--mixed', '--quiet')
-        git('add', '-A', '--', *files)
+        if files:
+            git('add', '-A', '--', *files)
         changed_files = git('diff', '--cached', '--name-only').stdout.splitlines()
         allowed = set(files)
         unexpected = sorted(set(changed_files) - allowed)
@@ -119,6 +125,11 @@ def publish(path: Path) -> None:
         if remote_head() != build_head:
             status['publish'] = {'success': False, 'state': 'stale',
                                  'error': 'main advanced during release verification; rebuild required'}
+            return
+        if not verified_reports and not changed_files:
+            status['publish'] = {'success': False, 'state': 'not-published',
+                                 'changed_files': [], 'commit': None,
+                                 'error': 'Neither client passed release verification; existing subscriptions and pending manual policy retained on remote'}
             return
         if not changed_files:
             status['publish'] = {'success': True, 'state': 'unchanged',

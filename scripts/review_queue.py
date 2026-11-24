@@ -227,19 +227,31 @@ def current_review_candidates(path: Path) -> set[str]:
     """Only published, exact review candidates can receive a NEW rejection."""
     root = path.parent.parent
     snapshot = root / 'data/openai-review-snapshots.json'
+    common = []
     try:
         if snapshot.exists():
             from openai_review_delivery import read_state
-            rules = sorted({rule for observation in read_state(snapshot).values()
+            observations = read_state(snapshot).values()
+            rules = sorted({rule for observation in observations
                             for rule in observation['excluded']})
+            common = [rule for observation in observations
+                      for rule in observation['common_rules']]
         else:
             rules = json.loads((root / 'data/sources.json').read_text(encoding='utf-8'))["review"]["excluded_auto_rules"]
+        # Also check the currently reviewed manual fallback, when available.
+        # The older snapshot format has no per-client coverage fields.
+        from build import covering_approval_for_rejection, parse_manual
+        manual_path = root / 'config/manual-openai.rules'
+        if manual_path.is_file():
+            common.extend(parse_manual(manual_path))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ValueError("无法读取已发布的待审核基线 data/sources.json；请先成功同步规则") from exc
     if (not isinstance(rules, list)
             or any(not isinstance(item, str) or not item for item in rules)):
         raise ValueError("已发布待审核基线格式无效；拒绝写入未经核实的新规则")
-    return set(rules)
+    return {rule for rule in rules
+            if rule.partition(',')[0].strip().upper() not in IP_TYPES
+            and covering_approval_for_rejection(rule, common) is None}
 
 
 def record_rejection(path: Path, rule: str, reason: str, months: int | None = None,
@@ -252,7 +264,7 @@ def record_rejection(path: Path, rule: str, reason: str, months: int | None = No
     if not existing and rule not in current_review_candidates(path):
         raise ValueError(
             "规则不在当前已发布的待审核列表："
-            + rule + "；请从 data/review-queue.md 复制完整规则，或先运行一次正常同步"
+            + rule + "；仅可拒绝未被共用规则完整覆盖的非 IP 待审项，请核对 data/review-queue.md 或先运行一次正常同步"
         )
     # A recorded rejection can still be renewed after its upstream candidate vanishes.
     item = {**existing, "rule": rule, "reason": reason, "reviewed_at": on.isoformat()}
