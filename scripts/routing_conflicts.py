@@ -44,30 +44,103 @@ def domain_overlap(a, b):
     return False
 
 def detect(blocked, reviewed, *, limit=100):
-    """Report provable overlaps (one witness per reviewed rule).
-    
-    Inputs are ordered converted entries (field, value, action).
-    For suffixes a collision can cover just a child, not the whole suffix.
-    """
-    domains = [value for field, value, action in blocked if field == 'domain' and action == 'block']
-    ips = []
-    for field, value, action in blocked:
-        if field == 'ip' and action == 'block' and not value.startswith('geoip:'):
-            ips.append((value, ipaddress.ip_network(value, strict=False)))
-    hits, total = [], 0
+    """All distinct provable pairs; the preview limit never truncates state."""
+    domains = list(dict.fromkeys(value for field, value, action in blocked
+                                 if field == 'domain' and action == 'block'))
+    ips = [(value, ipaddress.ip_network(value, strict=False))
+           for field, value, action in dict.fromkeys(blocked)
+           if field == 'ip' and action == 'block' and not value.startswith('geoip:')]
+    pairs = []
     for field, value, action in dict.fromkeys(reviewed):
         if action != 'proxy':
             continue
-        witness = None
         if field == 'domain':
-            witness = next((d for d in domains if domain_overlap(value, d)), None)
+            witnesses = (d for d in domains if domain_overlap(value, d))
         elif field == 'ip' and not value.startswith('geoip:'):
             network = ipaddress.ip_network(value, strict=False)
-            witness = next((d for d, other in ips if other.version == network.version
-                            and other.overlaps(network)), None)
-        if witness:
-            total += 1
-            if len(hits) < limit:
-                hits.append({'field': field, 'proxy_rule': value, 'earlier_block_rule': witness})
-    return {'count': total, 'examples': hits,
+            witnesses = (d for d, other in ips if other.version == network.version and other.overlaps(network))
+        else:
+            continue
+        pairs.extend({'field': field, 'proxy_rule': value, 'earlier_block_rule': witness}
+                     for witness in witnesses)
+    return {'count': len(pairs), 'pairs': pairs, 'examples': pairs[:limit],
+            'proxy_rule_count': len({(x['field'], x['proxy_rule']) for x in pairs}),
             'limitations': 'Static overlaps only; opaque geosite/geoip, arbitrary regex intersections, DNS and client capture need runtime checks.'}
+
+
+STATE = 'data/routing-conflicts.json'
+
+
+def keys(rows):
+    if not isinstance(rows, list):
+        raise ValueError('Invalid routing conflict observations')
+    result = set()
+    for row in rows:
+        if (not isinstance(row, dict) or set(row) != {'field', 'proxy_rule', 'earlier_block_rule'}
+                or row['field'] not in ('domain', 'ip')
+                or not all(isinstance(v, str) and v for v in row.values())):
+            raise ValueError('Invalid routing conflict pair')
+        result.add((row['field'], row['proxy_rule'], row['earlier_block_rule']))
+    return result
+
+
+def rows(values):
+    return [dict(zip(('field', 'proxy_rule', 'earlier_block_rule'), v)) for v in sorted(values)]
+
+
+def read_state(path):
+    import json
+    if not path.exists():
+        return {'version': 1, 'current': [], 'delivered': [], 'notified_at': None}
+    old = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(old, dict) or old.get('version') != 1:
+        raise ValueError('Invalid routing conflict state')
+    keys(old['current'])
+    keys(old['delivered'])
+    return old
+
+
+def evaluate(conflicts, state, *, on, interval=30):
+    from datetime import date, timedelta
+    current = keys(conflicts['pairs'])
+    if len(current) != conflicts['count']:
+        raise ValueError('Routing conflict pair count mismatch')
+    delivered = keys(state['delivered'])
+    added, removed = current - delivered, delivered - current
+    stamp = state.get('notified_at')
+    last = date.fromisoformat(stamp) if stamp else None
+    if last is not None and last > on:
+        raise ValueError('Future routing conflict receipt date')
+    due = bool(current and last and on >= last + timedelta(days=interval))
+    alert = bool(added or removed or (current and last is None) or due)
+    updated = {**state, 'current': rows(current)}
+    return updated, {'count': len(current), 'pairs': rows(current),
+        'added': rows(added), 'removed': rows(removed),
+        'alert': alert, 'due': due, 'interval': interval,
+        'limitations': conflicts['limitations']}
+
+
+def prepare(conflicts, path, *, on=None, interval=30):
+    import review_queue
+    on = on or review_queue.today()
+    try:
+        old = read_state(path)
+        state, report = evaluate(conflicts, old, on=on, interval=interval)
+    except (OSError, ValueError, KeyError, TypeError):
+        print('::warning::Invalid conflict receipt state; restart notification cycle')
+        state, report = evaluate(conflicts, {'version': 1, 'current': [],
+                         'delivered': [], 'notified_at': None}, on=on, interval=interval)
+    review_queue.write_json(path, state)
+    return report
+
+
+def acknowledge(report, path, *, on=None):
+    import review_queue
+    if not report.get('alert'):
+        return
+    state = read_state(path)
+    if keys(report['pairs']) != keys(state['current']):
+        raise ValueError('Conflict observations changed before acknowledgement')
+    state['delivered'] = rows(keys(report['pairs']))
+    state['notified_at'] = (on or review_queue.today()).isoformat()
+    review_queue.write_json(path, state)

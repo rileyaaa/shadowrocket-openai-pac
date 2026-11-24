@@ -277,6 +277,7 @@ def run(argv: list[str] | None = None) -> dict:
     original_delta = review_meta['report']
     report = {'build_success': True, 'config_changed': changed,
               'statistics': {**stats, **ai['counts'], 'conf_bytes': len(output_bytes)},
+              'source_count_deltas': upstream_integrity.count_deltas(outputs, old),
               'changed_sources': [k for k, value in outputs.items()
                                   if value != (old or {}).get('sources', {}).get(k)],
               'ai_review_candidates': ai['review_candidates'],

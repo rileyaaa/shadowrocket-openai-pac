@@ -358,6 +358,9 @@ def run(argv: list[str] | None = None) -> dict:
                       if value != (old or {}).get('sources', {}).get(name)]
     report = {'build_success': True, 'config_changed': changed,
               'statistics': stats, 'changed_sources': source_changes,
+              'source_count_deltas': upstream_integrity.count_deltas(next_sources, old),
+              'stat_deltas': {k: val - old['statistics'][k] for k,val in stats.items()
+                              if old and type(val) is int and type(old['statistics'].get(k)) is int},
               'ai_review_candidates': ai['review_candidates'],
               'ai_approved_rules': ai['rules'],
               'openai_observation': {'excluded': legacy.excluded_auto_rule_sources(sources, auto, unparsed_sources),

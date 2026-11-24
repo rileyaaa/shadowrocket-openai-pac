@@ -53,7 +53,8 @@ def main() -> int:
                                    'error': 'Official documentation regression failed: ' + tests['docs']['error']}
     else:
         status['official_docs'] = execute('Weekly official Gemini / Claude doc advisory',
-            [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report)])
+            [sys.executable, 'scripts/audit_ai_docs.py', '--report-file', str(docs_report),
+             '--shadow-report', str(ai_report), '--v2-report', str(v2_report)])
     status['reports'] = {'shadowrocket_ai': str(ai_report),
                          'v2rayn': str(v2_report), 'official_docs': str(docs_report)}
     status['publish'] = {'success': False, 'state': 'pending'}

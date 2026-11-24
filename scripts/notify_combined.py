@@ -17,6 +17,7 @@ import notify_telegram as original
 import review_queue
 import ai_review_delivery
 import openai_review_delivery
+import routing_conflicts
 from release_integrity import valid_build_report
 
 
@@ -43,11 +44,15 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         changed_files = []
     valid = {'shadowrocket_ai': builds['shadowrocket_ai'] and valid_build_report(shadow_ai),
              'v2rayn': builds['v2rayn'] and valid_build_report(v2)}
-    complete = all(valid.values()) and published
+    review_errors = any(status.get(k) for k in ('openai_review_error', 'ai_review_error', 'routing_review_error'))
+    docs_error = status.get('official_docs', {}).get('exit_code', 0) != 0
+    complete = all(valid.values()) and published and not review_errors
     partial = published and any(valid.values())
     overall = ('成功' if complete else '部分成功' if partial else
                '待核对' if publication.get('state') == 'pushed_unverified'
                or (published and changed_files) else '失败')
+    if complete and docs_error:
+        overall = '订阅成功（文档检查告警）'
     lines = [f'📡 每日代理规则更新报告', f'🕚 时间：{when}（台北时间）',
              f'🔄 触发：{original.EVENTS.get(event, event)}',
              f'📦 总体状态：{overall}',
@@ -84,6 +89,9 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         sources = report.get('changed_sources', [])
         lines.append('变化来源：' + (', '.join(original.NAMES.get(s, s) for s in sources) if sources else '无'))
         stats = report.get('statistics', {})
+        deltas = report.get('source_count_deltas', {})
+        if deltas:
+            lines.append('来源规则增减：' + '；'.join(f'{original.NAMES.get(k, k)} {v:+d}' for k,v in sorted(deltas.items())))
         if key == 'shadowrocket_ai':
             if report.get('settings_changed'):
                 lines.append('节点名称：已更新')
@@ -101,7 +109,8 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                                 ('retained_ad_rules', '广告拦截'),
                                 ('conf_bytes', '订阅字节数')]:
                 if type(stats.get(prop)) is int:
-                    lines.append(f'{label}：{stats[prop]}')
+                    diff = report.get('stat_deltas', {}).get(prop)
+                    lines.append(f'{label}：{stats[prop]}' + (f' ({diff:+d})' if type(diff) is int and diff else ''))
             review_counts = report.get('ai_review_counts', {})
             lines.append('AI 审核：待审 {pending} / 暂缓 {cooling} / 到期 {due}'.format(
                 pending=review_counts.get('pending', '?'), cooling=review_counts.get('cooling', '?'),
@@ -115,7 +124,8 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                                 ('gemini_domains', 'Gemini 审核域名'),
                                 ('claude_domains', 'Claude 审核域名')]:
                 if type(stats.get(prop)) is int:
-                    lines.append(f'{label}：{stats[prop]}')
+                    diff = report.get('stat_deltas', {}).get(prop)
+                    lines.append(f'{label}：{stats[prop]}' + (f' ({diff:+d})' if type(diff) is int and diff else ''))
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
@@ -193,13 +203,21 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
         lines.append('🗓 官方网络文档：' +
                      ('发现变化，待人工核实' if official_docs.get('changed')
                       else '每周检查完成，域名无变化'))
-    if valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
-        conflicts = v2['routing_conflicts']
-        lines.append(f'⚠️ v2rayN：{conflicts["count"]} 条代理规则与前置拦截有交集，未修改优先级。')
-        for item in conflicts['examples'][:2]:
-            lines.append('· ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
-    if v2 and v2.get('warnings'):
-        lines.append('⚠️ BitBrowser 进程与 DNS/WebRTC 需 Windows TUN 实测')
+    routing = status.get('routing_review')
+    if status.get('routing_review_error'):
+        lines.append('⚠️ 冲突审核状态更新失败：' + str(status['routing_review_error'])[:140])
+    elif routing:
+        if routing['count'] or routing['alert']:
+            lines.append(f'v2rayN 前置拦截冲突：{routing["count"]} 对（不改变分流）')
+        if routing['alert']:
+            lines.append(f'新增 {len(routing["added"])} / 消失 {len(routing["removed"])}' +
+                         ('；到期复查' if routing['due'] else ''))
+            for label, items in (('新增', routing['added']), ('消失', routing['removed']),
+                                 ('复查', routing['pairs'] if routing['due'] and not routing['added'] and not routing['removed'] else [])):
+                for item in items[:2]:
+                    lines.append('· ' + label + ' ' + item['proxy_rule'][:100] + ' ← ' + item['earlier_block_rule'][:100])
+    elif valid['v2rayn'] and v2.get('routing_conflicts', {}).get('count'):
+        lines.append(f'⚠️ v2rayN：{v2["routing_conflicts"]["count"]} 对前置拦截交集；完整结果见摘要。')
     if run_url:
         lines += ['', '🔗 GitHub Actions：' + run_url]
     message = '\n'.join(lines)
@@ -215,6 +233,7 @@ def main() -> int:
     p.add_argument('--status-file', required=True, type=Path)
     p.add_argument('--review-state-file', type=Path)
     p.add_argument('--ai-review-state-file', type=Path)
+    p.add_argument('--conflict-state-file', type=Path)
     args = p.parse_args()
     status = read_json(str(args.status_file)) or {
         'shadowrocket_ai': {'exit_code': -1, 'error': 'Build status file missing'},
@@ -256,6 +275,10 @@ def main() -> int:
                 for change in official_docs['changes']:
                     f.write(f'- {change["service"]}: +{len(change["added"])} / -{len(change["removed"])} 主机；'
                             f'未分类 +{len(change.get("other_added", []))} / -{len(change.get("other_removed", []))}\n')
+                    for client, hosts in change.get('uncovered_by_client', {}).items():
+                        f.write(f'  - {client} 未完整覆盖：{len(hosts)} 项（仅供人工审核）\n')
+                        for host in hosts:
+                            f.write(f'    - {host}\n')
                     for key in ('added', 'removed', 'other_added', 'other_removed'):
                         for host in change.get(key, []):
                             f.write(f'  - {key}: {host}\n')
@@ -267,7 +290,7 @@ def main() -> int:
             if v2:
                 if v2.get('routing_conflicts', {}).get('count'):
                     f.write('\n### v2rayN 前置拦截冲突（仅报告，未改变路由）\n\n')
-                    for item in v2['routing_conflicts']['examples']:
+                    for item in v2['routing_conflicts'].get('pairs', v2['routing_conflicts']['examples']):
                         f.write(f'- {item["proxy_rule"]} ← {item["earlier_block_rule"]}\n')
                     f.write('\n' + v2['routing_conflicts']['limitations'] + '\n')
                 for warning in v2.get('warnings', []):
@@ -310,6 +333,14 @@ def main() -> int:
             receipt_files.append(str(args.ai_review_state_file))
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f'::error::AI review receipt acknowledgement failed: {type(exc).__name__}')
+            return 1
+    if (args.conflict_state_file and status.get('routing_review', {}).get('alert')
+            and status.get('publish', {}).get('success') is True and run_url and summary_path):
+        try:
+            routing_conflicts.acknowledge(status['routing_review'], args.conflict_state_file)
+            receipt_files.append(str(args.conflict_state_file))
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f'::error::Conflict receipt acknowledgement failed: {type(exc).__name__}')
             return 1
     # Stage only receipts explicitly acknowledged in this run.
     if args.status_file.is_file():

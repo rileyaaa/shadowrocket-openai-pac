@@ -75,7 +75,7 @@ jobs:
               # Only the disposable Actions workspace is reset. Never force push.
               git fetch --no-tags origin refs/heads/main
               git reset --hard FETCH_HEAD
-              git clean -f -- data/openai-review-snapshots.json data/ai-review-notifications.json data/ai-official-docs.json data/ai-docs-review.md
+              git clean -f -- data/routing-conflicts.json data/openai-review-snapshots.json data/ai-review-notifications.json data/ai-official-docs.json data/ai-docs-review.md
               if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ -n "$REVIEW_RULE" ]; then
                 args=(--rule "$REVIEW_RULE" --reason "$REVIEW_REASON")
                 if [ -n "$REVIEW_MONTHS" ]; then args+=(--months "$REVIEW_MONTHS"); fi
@@ -96,7 +96,8 @@ jobs:
         run: |
           python scripts/notify_combined.py --status-file "$RUNNER_TEMP/dual-status.json" \
             --review-state-file data/review-notifications.json \
-            --ai-review-state-file data/ai-review-notifications.json
+            --ai-review-state-file data/ai-review-notifications.json \
+            --conflict-state-file data/routing-conflicts.json
       - name: Persist delivered review reminders
         if: steps.telegram.outcome == 'success' && github.ref == 'refs/heads/main'
         run: |
@@ -119,7 +120,7 @@ jobs:
           import json, subprocess, sys
           state = json.load(open(sys.argv[1], encoding='utf-8'))
           paths = state.get('receipt_files', [])
-          allowed = {'data/review-notifications.json', 'data/ai-review-notifications.json'}
+          allowed = {'data/review-notifications.json', 'data/ai-review-notifications.json', 'data/routing-conflicts.json'}
           if not isinstance(paths, list) or not set(paths) <= allowed:
               sys.exit('Unexpected receipt path.')
           if paths:
