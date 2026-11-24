@@ -1,5 +1,10 @@
 {
-  "sent": {},
+  "sent": {
+    "gemini|DOMAIN-SUFFIX,gemma.ai": {
+      "cycle": "982921d07a2b84d2c6300f6e4835590d7e3006b8d3f43590090184d557baa25c",
+      "notified_at": "2026-11-24"
+    }
+  },
   "snapshots": {
     "shadowrocket_ai": [
       {
