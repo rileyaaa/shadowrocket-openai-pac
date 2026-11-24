@@ -8,9 +8,9 @@
         "DOMAIN-SUFFIX,host.livekit.cloud",
         "DOMAIN-SUFFIX,turn.livekit.cloud"
       ],
-      "reviewed_at": null,
-      "evidence": "README.md — prior user-approved LiveKit TURN exception; https://docs.livekit.io/home/cloud/firewall/",
-      "note": "共享语音/视频基础设施。保留已有批准，优先结合 Voice 与其他实时通信软件的连接日志，核实是否可收窄；不可把官方 Voice IP 等同于全 LiveKit。"
+      "reviewed_at": "2026-11-24",
+      "evidence": "https://docs.livekit.io/deploy/admin/firewall/ ; config/manual-openai.rules",
+      "note": "本轮官方 LiveKit 防火墙表仍确认两个 TURN 后缀为共享通信基础设施。保留原用户批准的 Voice 兼容例外，不扩大到 livekit.cloud；尚未验证所有租户需同出口，下一次结合语音和其他通信应用日志复核收窄。"
     },
     {
       "id": "openai-shared-suffix",
@@ -20,9 +20,9 @@
         "DOMAIN-SUFFIX,intercom.io",
         "DOMAIN-SUFFIX,intercomcdn.com"
       ],
-      "reviewed_at": null,
+      "reviewed_at": "2026-11-24",
       "evidence": "https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
-      "note": "2026-11-24 核对官方允许清单仍含这些通配项；允许访问不等于所有租户必须强制同出口。按真实登录、支持组件和邮件链接验证必要范围。"
+      "note": "可获取的官方指南仍列三个通配范围。作为既有覆盖优先例外保留，不把网络放行要求等同于所有租户必须同出口；以后结合实际登录、支持及邮件连接核实是否可收窄。"
     },
     {
       "id": "openai-shared-exact",
@@ -37,9 +37,9 @@
         "DOMAIN,setup.workos.com",
         "DOMAIN,workos.imgix.net"
       ],
-      "reviewed_at": "2026-10-12",
+      "reviewed_at": "2026-11-24",
       "evidence": "https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
-      "note": "历史审核日期来自 README；本轮可访问的 OpenAI 官方网络指南仍列出本组精确主机。登录、验证、设备检测和支付等共享依赖，继续精确匹配，不扩展供应商整域；后续核对是否需同出口。"
+      "note": "可获取的官方指南仍列出本组 8 个精确主机。保留登录、验证、设备检测及支付等原共享依赖，不扩大到父域；同出口必要性仍须实机验证。"
     },
     {
       "id": "openai-workos-frontend",
@@ -47,9 +47,9 @@
       "rules": [
         "DOMAIN,frontend-apps-multi-region.workos.com"
       ],
-      "reviewed_at": null,
+      "reviewed_at": "2026-11-24",
       "evidence": "config/manual-openai.rules ; scripts/build.py OFFICIAL_CHATGPT_SHARED_RULES ; https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
-      "note": "历史规则已启用；本轮可获取的官方指南版本未找到该精确主机。不能仅据此认定已废弃，优先查证新旧登录链路及连接日志；未复核前保持现状。"
+      "note": "本轮指南未找到该精确主机；不能证明已废弃。复核决定保留历史精确规则，不新增范围；下一次优先用登录链路日志核实是否可删。"
     },
     {
       "id": "openai-telemetry",
@@ -60,9 +60,9 @@
         "DOMAIN,o33249.ingest.us.sentry.io",
         "DOMAIN,rum.browser-intake-datadoghq.com"
       ],
-      "reviewed_at": null,
+      "reviewed_at": "2026-11-24",
       "evidence": "https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps ; https://github.com/openai/codex/blob/main/codex-rs/feedback/src/lib.rs",
-      "note": "现有精确监控/反馈主机；Codex 反馈并非聊天 API 本身。复核可选性、功能影响及实际流量，不能因此扩大 Sentry/Datadog 范围。"
+      "note": "官方网络指南继续列出两个 Sentry 主机和 RUM 主机，Codex 反馈源码确认第三个 Sentry 主机。保留原精确匹配；反馈/遥测不是全部核心业务必需，未取得同出口必要性或删除安全性的实机证据，不扩展供应商后缀。"
     },
     {
       "id": "openai-dedicated-vendor-names",
@@ -83,9 +83,9 @@
         "DOMAIN,openai-photobooth-demo.vercel.app",
         "DOMAIN,openai-realtime-solar-system-demo.vercel.app"
       ],
-      "reviewed_at": null,
-      "evidence": "config/manual-openai.rules ; scripts/build.py OPENAI_SPECIFIC_HOSTS / SUFFIXES / WILDCARDS",
-      "note": "共享平台中的历史专属主机/模式。重点复核自动层 openai.com.cdn.cloudflare.net 后缀与手工精确主机的范围差异；未经证据及业务验收不直接改变。"
+      "reviewed_at": "2026-11-24",
+      "evidence": "config/manual-openai.rules ; scripts/build.py OPENAI_SPECIFIC_HOSTS / SUFFIXES / WILDCARDS ; data/openai-review-snapshots.json",
+      "note": "依据已有审核、精确租户名称及两端发布观察复查保留范围，不把共享 CDN、Azure、Vercel 父域加入规则。未逐个验证在线服务用途或所有子域；自动层 openai.com.cdn.cloudflare.net 后缀、WebPubSub 通配与历史 demo 主机仍是优先实机复核项；本轮不变。"
     },
     {
       "id": "gemini-shared-google",
@@ -128,9 +128,9 @@
         "DOMAIN,ai.google",
         "DOMAIN,ai.google.com"
       ],
-      "reviewed_at": "2026-11-23",
-      "evidence": "README.md (2026-11-23 Gemini review); https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings ; https://docs.cloud.google.com/gemini/docs/codeassist/set-up-gemini",
-      "note": "既有产品级精确主机。官方防火墙列表不是 AI 专用代理列表；特别复核 Workspace 内嵌助手、通用 IDE 辅助 API 与其他 Google 业务的共享情况。"
+      "reviewed_at": "2026-11-24",
+      "evidence": "https://knowledge.workspace.google.com/admin/generative-ai/gemini-app/gemini-app-firewall-settings ; https://docs.cloud.google.com/gemini/docs/codeassist/set-up-gemini ; https://docs.cloud.google.com/gemini/enterprise/docs/release-notes ; config/ai-services.rules",
+      "note": "官方 Code Assist 说明确认 cloudaicompanion/cloudcode 相关 API；Gemini Notebook Enterprise 2026-11 的主机迁移要求新旧四个域名并存，现有规则已覆盖。保留历史产品级精确匹配，不扩大 Google 通用父域；并非所有历史主机均有逐项官方/同出口证明，继续结合 Workspace、Antigravity 和其他 Google 业务实机复核。"
     },
     {
       "id": "claude-shared-vendors",
@@ -141,9 +141,9 @@
         "DOMAIN,o1158394.ingest.us.sentry.io",
         "DOMAIN,browser-intake-us5-datadoghq.com"
       ],
-      "reviewed_at": null,
+      "reviewed_at": "2026-11-24",
       "evidence": "https://code.claude.com/docs/en/network-config ; config/ai-services.rules ; scripts/ai_services.py",
-      "note": "保留 CDN 和可选错误/遥测主机的原批准；复核是否需同出口及是否会影响其他服务，不能扩展供应商父域。"
+      "note": "官方 Claude Code 说明明确两项 Datadog intake 属可选遥测。CDN、Sentry 另两项按已有精确批准保留，未取得删除无影响的实际日志。四项均不扩大到共享供应商父域；可选性与同出口必要性后续继续复核。"
     },
     {
       "id": "v2rayn-openai-wide-extras",
@@ -156,9 +156,9 @@
         "domain:prodregistryv2.org",
         "full:browser-intake-datadoghq.com"
       ],
-      "reviewed_at": null,
-      "evidence": "config/v2rayn/openai-extra.rules — 2026-11-23 explicit user exceptions; data/review-queue.md records common-policy rejections",
-      "note": "优先复审的历史宽范围例外。现行 OpenAI 官方清单未证明整域强制代理必要性；但不在无日志证据下直接删除。分别核对产品必要主机及普通业务影响，决定收窄、保留或回归 Johnshall。"
+      "reviewed_at": "2026-11-24",
+      "evidence": "config/v2rayn/openai-extra.rules ; https://docs.statsig.com/infrastructure/statsig_domains ; https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
+      "note": "Statsig 官方确认共享 SDK 相关域名；无整个五个后缀及 Datadog 裸域均为 OpenAI 必需的证据。本轮复核决定保留用户显式 v2rayN 特批，不视为共用批准；下次优先按连接日志判断收窄或回归 Johnshall，不改变本次路由。"
     },
     {
       "id": "bitbrowser-user-domains",
@@ -173,9 +173,9 @@
         "lumtest.com",
         "brdtest.com"
       ],
-      "reviewed_at": null,
-      "evidence": "data/bitbrowser_domains.txt — user-selected IP/fingerprint test services",
-      "note": "用户指定的共享检测网站，不等于 BitBrowser 专属。检查普通应用访问这些域名的出口需求及能否仅依靠专属进程路由；当前不改。"
+      "reviewed_at": "2026-11-24",
+      "evidence": "data/bitbrowser_domains.txt ; https://ip-api.com/docs ; config/v2rayn/verified-processes.txt",
+      "note": "八个明确用户指定域名仍按既有特批保留；IP 查询服务并非 BitBrowser 独占，不新增域名。缺少真实进程和普通应用出口日志，未验证是否可仅依赖专属进程匹配，下一次继续复核。"
     }
   ]
 }

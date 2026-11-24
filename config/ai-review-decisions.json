@@ -7,61 +7,67 @@
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,ant.dev",
       "reason": "可能用于 Anthropic 内部预览或测试（社区客户端记录出现 *.ant.dev），但现行官方 Claude Code 生产网络必需端点未列该后缀；不能把所有子域一概认作用户必需流量。保留观察，暂不进入 Claude 专用节点。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,anthropic.team",
       "reason": "社区来源与部分 Anthropic 自有网络解析信息提示关联，但共享地址不等于整个域及所有子域均为 Claude 正式业务入口。官方必需端点清单未列此后缀，暂不自动放行。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,antspace.dev",
       "reason": "当前部分解析记录指向 Anthropic 自有地址范围，但不能仅据 IP/名称推断所有子域是正式 Claude 服务。缺少必要功能与官方域名级证据，暂不放行后缀。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,chatbotclaude.com",
       "reason": "虽见 Anthropic 网络地址关联，也存在域名迁移演示用途的网页记录；未核实当前为 Claude 正式应用或所需 API 域名，暂不把整个后缀加入代理。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,claudeacademy.com",
       "reason": "Anthropic 当前官方学院入口为 academy.claude.com，已由 claude.com 后缀规则覆盖。claudeacademy.com 曾有无关金融培训内容记录，且未有官方必需网络证明，暂不代理所有子域。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,claudemcpclient.com",
       "reason": "社区来源中出现此域，但官方 Claude Code 连接器入口为 mcp-proxy.anthropic.com，尚无可信证据表明此后缀整体是生产 MCP 必需目标。暂不放行，等待实际连接或官方说明。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,claudepages.dev",
       "reason": "社区列表及 Anthropic 网络共享地址记录不能证明各子域的归属和必要用途；官方 Claude 网络表未列整个后缀，避免误收用户/第三方站点，暂不放行。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "claude",
       "rule": "DOMAIN-SUFFIX,claudestudio.com",
       "reason": "域名与 Anthropic 网络有解析关联，但未见官方产品文档证明所有子域均为 Claude 必需生产入口。保留人工复核，暂不扩大至后缀代理。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "gemini",
       "rule": "DOMAIN-SUFFIX,geller-pa.googleapis.com",
-      "reason": "共享 Google Search 等非专属 AI 后端；按 2026-11-23 分流审查决定保留 Johnshall 原有路由，六个月后复审。",
-      "reviewed_at": "2026-11-23"
+      "reason": "Gemini 防火墙说明允许访问的共享 Google 基础设施不等于 AI 专属代理范围；当前没有证明 Geller 后端为 Gemini 独占的新增证据。保留 Johnshall 原路由并六个月复审。",
+      "reviewed_at": "2026-11-24"
+    },
+    {
+      "service": "gemini",
+      "rule": "DOMAIN-SUFFIX,gemma.ai",
+      "reason": "2026-11-24 首次复核：Google 官方资料说明 Gemma 是独立的开放模型系列；公开 DNS/站点索引提示 gemma.ai 与其文档有关，但本站及官方仓库入口未能直接核实。未取得整个后缀属于 Gemini 生产必需流量的证据，暂不纳入 Gemini 专用节点，仍按原 Johnshall 路由；如有真实连接或官方证据提前复审。",
+      "reviewed_at": "2026-11-24"
     },
     {
       "service": "gemini",
       "rule": "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com",
       "reason": "普通 Google 产品与 AI 共享的辅助后端；不纳入 AI 专用节点，按原有 Johnshall 路由并定期复审。",
-      "reviewed_at": "2026-11-23"
+      "reviewed_at": "2026-11-24"
     }
   ]
 }
