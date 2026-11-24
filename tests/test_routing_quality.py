@@ -76,12 +76,61 @@ class RoutingQualityTests(unittest.TestCase):
                             'DOMAIN-SUFFIX,openai.com.cdn.cloudflare.net'}) <= tracked['openai'])
         for service in ('gemini','claude'):
             self.assertTrue({'DOMAIN,'+h for h in ai.APPROVED_HOSTS[service]} <= tracked[service])
+        # Future manually approved exact hosts outside an already reviewed
+        # product namespace must be registered in the advisory ledger too.
+        for service, rules in ai.load_manual(ai.MANUAL.read_text(encoding='utf-8')).items():
+            for rule in rules:
+                kind, host = rule.split(',', 1)
+                if kind == 'DOMAIN' and not any(
+                        host == suffix or host.endswith('.' + suffix)
+                        for suffix in ai.APPROVED_SUFFIXES[service]):
+                    self.assertIn(rule, tracked[service])
+        from v2rayn_core import load_bitbrowser_domains
+        for host, confidence, _ in load_bitbrowser_domains(
+                (ROOT / 'data/bitbrowser_domains.txt').read_text(encoding='utf-8')):
+            if confidence == 'user':
+                self.assertIn(host, tracked['bitbrowser'])
         # All extra user-specified rules NOT covered by the common OpenAI
         # allowlist must be tracked separately. Intentional duplicate regex
         # for the already reviewed Azure host is not a separate vendor scope.
         from build_v2rayn import parse_user_extra
         for field, value, action in parse_user_extra((ROOT/'config/v2rayn/openai-extra.rules').read_text(encoding='utf-8')):
             if value.startswith('regexp:'):
+                # The existing one-label Azure WebPubSub pattern has a
+                # separately documented common rule; any new regex needs
+                # its own tracked review, not a silent exemption.
+                if value != 'regexp:^chatgpt-async-webps-prod-[^.]+[.]webpubsub[.]azure[.]com
+            rule = ('DOMAIN,' if kind=='full' else 'DOMAIN-SUFFIX,')+host
+            if not (build.is_openai_specific_rule(rule) or rule in build.OFFICIAL_CHATGPT_SHARED_RULES
+                    or rule in build.OFFICIAL_CODEX_SHARED_RULES):
+                self.assertIn(value,tracked['v2rayn_openai'])
+
+    def test_due_calendar_and_delivery_cycle(self):
+        row = {'id':'shared-test','scope':'openai','rules':['DOMAIN,shared.example'],
+               'reviewed_at':'2026-01-31','evidence':'fixture','note':'fixture'}
+        policy = {'version':1,'groups':[row]}
+        state = {'version':1,'sent':{}}
+        due = date(2026,7,31)
+        self.assertFalse(dep.evaluate(policy,state,on=due-timedelta(days=1))['alerts'])
+        result = dep.evaluate(policy,state,on=due)
+        self.assertEqual(result['alerts'][0]['due_on'],'2026-07-31')
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/'receipts.json'
+            self.assertEqual(dep.evaluate(policy,state,on=due)['alerts'],result['alerts'])
+            dep.acknowledge(result,path,on=due)
+            state=dep.read_state(path,due)
+            self.assertEqual(dep.evaluate(policy,state,on=due+timedelta(days=29))['alerts'],[])
+            self.assertEqual(len(dep.evaluate(policy,state,on=due+timedelta(days=30))['alerts']),1)
+            row['reviewed_at']='2026-08-01'
+            self.assertFalse(dep.evaluate(policy,state,on=date(2026,8,1))['alerts'])
+            row['reviewed_at']=None
+            self.assertEqual(dep.evaluate(policy,state,on=date(2026,8,1))['alerts'][0]['status'],'initial_review')
+
+
+if __name__ == '__main__':
+    unittest.main()
+:
+                    self.assertIn(value, tracked['v2rayn_openai'])
                 continue
             kind,host = value.split(':',1)
             rule = ('DOMAIN,' if kind=='full' else 'DOMAIN-SUFFIX,')+host

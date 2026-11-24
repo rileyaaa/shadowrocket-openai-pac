@@ -31,7 +31,6 @@
         "DOMAIN,cdn.workos.com",
         "DOMAIN,challenges.cloudflare.com",
         "DOMAIN,forwarder.workos.com",
-        "DOMAIN,frontend-apps-multi-region.workos.com",
         "DOMAIN,humb.apple.com",
         "DOMAIN,images.workoscdn.com",
         "DOMAIN,js.stripe.com",
@@ -40,7 +39,17 @@
       ],
       "reviewed_at": "2026-10-12",
       "evidence": "https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
-      "note": "历史审核日期来自 README；2026-11-24 再核对官方仍列出这些主机。登录、验证、设备检测和支付等共享依赖，继续精确匹配，不扩展供应商整域；后续核对是否需同出口。"
+      "note": "历史审核日期来自 README；本轮可访问的 OpenAI 官方网络指南仍列出本组精确主机。登录、验证、设备检测和支付等共享依赖，继续精确匹配，不扩展供应商整域；后续核对是否需同出口。"
+    },
+    {
+      "id": "openai-workos-frontend",
+      "scope": "openai",
+      "rules": [
+        "DOMAIN,frontend-apps-multi-region.workos.com"
+      ],
+      "reviewed_at": null,
+      "evidence": "config/manual-openai.rules ; scripts/build.py OFFICIAL_CHATGPT_SHARED_RULES ; https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps",
+      "note": "历史规则已启用；本轮可获取的官方指南版本未找到该精确主机。不能仅据此认定已废弃，优先查证新旧登录链路及连接日志；未复核前保持现状。"
     },
     {
       "id": "openai-telemetry",

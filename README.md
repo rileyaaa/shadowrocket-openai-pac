@@ -353,4 +353,4 @@ Claude Code 官方网络清单中的可选错误报告精确主机 `browser-inta
 
 - 两套订阅的发布前语义检查现在同时核对核心业务入口、实际域名层与审核输入的集合一致性，以及普通 Google、邮件、云服务、支付、监控和其他租户的反向隔离样本。即使 v2rayN 普通层也使用 proxy 标签，核心入口误落普通层或非目标流量误入专用层仍会被检测。此为静态明确域名规则验证，不声称覆盖所有真实设备行为。
 - Gemini 六个已有社区入口以相同匹配范围加入人工兜底并列入必需集合；不新开父域或扩大现有分流。
-- 已批准共享依赖分组清单按原有半年/30 天机制提醒。旧宽范围例外（LiveKit、Intercom、SendGrid、v2rayN Statsig 等）优先复核，未取得必要性和实际副作用证据前保持原配置。Actions 摘要提供完整清单；通知成功后单独保存 data/approved-dependency-notifications.json 回执。
+- 已批准共享依赖分组清单按原有半年/30 天机制提醒。旧宽范围例外（LiveKit、Intercom、SendGrid、v2rayN Statsig 等）优先复核，未取得必要性和实际副作用证据前保持原配置。Actions 摘要提供完整清单；通知成功后单独保存 data/approved-dependency-notifications.json 回执。 新增人工共享精确主机、用户指定检测域名或非既有模式的 v2rayN 正则时，需要同步登记复审记录并通过测试；本轮无法重新核实的旧主机单独标为待首次复核，不将历史批准冒充当前官方证据。
