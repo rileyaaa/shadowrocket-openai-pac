@@ -21,7 +21,7 @@ class RoutingConflictTests(unittest.TestCase):
                          ['full:api.example.com', 'domain:claude.ai', '8.8.8.8/32'])
 
     def test_regex_and_keyword_witnesses(self):
-        self.assertTrue(rc.domain_overlap('full:api.example.com', 'regexp:^api\.example\.com$'))
+        self.assertTrue(rc.domain_overlap('full:api.example.com', r'regexp:^api\.example\.com$'))
         self.assertTrue(rc.domain_overlap('full:api.example.com', 'keyword:example'))
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'full:other.example.com'))
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'geosite:ads'))

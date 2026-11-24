@@ -6,9 +6,10 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import uuid
 
 
-def execute(label: str, command: list[str]) -> dict:
+def execute(label: str, command: list[str], *, regression: bool = False) -> dict:
     print(f'::group::{label}', flush=True)
     try:
         # Logs are diagnostic only. Invalid bytes from one child must not
@@ -16,8 +17,23 @@ def execute(label: str, command: list[str]) -> dict:
         # Artifact and report decoding remains strict in the builders/publisher.
         result = subprocess.run(command, capture_output=True, encoding='utf-8',
                                 errors='replace', check=False)
-        print(result.stdout[-12000:])
-        print(result.stderr[-12000:], file=sys.stderr)
+        if regression:
+            # Keep simulated workflow commands as plain diagnostics. Both
+            # streams use stdout so the stop/resume markers stay ordered.
+            token = uuid.uuid4().hex
+            print(f'::stop-commands::{token}', flush=True)
+            try:
+                print(result.stdout[-12000:], flush=True)
+                print(result.stderr[-12000:], flush=True)
+            finally:
+                print(f'::{token}::', flush=True)
+            if result.returncode:
+                print(f'::error::{label} failed (exit code {result.returncode})', flush=True)
+            else:
+                print(f'{label}: passed', flush=True)
+        else:
+            print(result.stdout[-12000:])
+            print(result.stderr[-12000:], file=sys.stderr)
         return {'exit_code': result.returncode,
                 'error': result.stderr.strip()[-1500:] if result.returncode else ''}
     except OSError as exc:
@@ -38,7 +54,8 @@ def main() -> int:
     for path in (v2_report, ai_report, docs_report, status_path):
         path.unlink(missing_ok=True)
     tests = {group: execute('Offline regression: ' + group,
-                            [sys.executable, '-B', 'scripts/test_groups.py', group])
+                            [sys.executable, '-B', 'scripts/test_groups.py', group],
+                            regression=True)
              for group in ('shared', 'shadowrocket', 'v2rayn', 'docs')}
     status = {'tests': tests}
     for key, group, script, report in (

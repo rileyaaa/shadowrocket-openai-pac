@@ -1,4 +1,6 @@
 """Release proof and provenance regression tests."""
+import contextlib
+import io
 import json
 from pathlib import Path
 import sys
@@ -26,15 +28,33 @@ class ReleaseIntegrityTests(unittest.TestCase):
 
     def test_child_log_encoding_does_not_break_independent_execution(self):
         # Use real subprocesses: no mocking away the decoding boundary.
-        failed = run_dual.execute('invalid diagnostic bytes', [
-            sys.executable, '-c',
-            "import sys; sys.stdout.buffer.write(b'log\\xff'); "
-            "sys.stderr.buffer.write(b'error\\xfe'); sys.exit(7)"])
+        output, errors = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            failed = run_dual.execute('invalid diagnostic bytes', [
+                sys.executable, '-c',
+                "import sys; sys.stdout.buffer.write(b'::error::expected mock\\nlog\\xff'); "
+                "sys.stderr.buffer.write(b'::warning::expected mock\\nerror\\xfe'); sys.exit(7)"],
+                regression=True)
         self.assertEqual(failed['exit_code'], 7)
-        self.assertEqual(failed['error'], 'error\ufffd')
-        following = run_dual.execute('other client', [
-            sys.executable, '-c', "print('independent child')"])
+        self.assertEqual(failed['error'], '::warning::expected mock\nerror\ufffd')
+        lines = output.getvalue().splitlines()
+        token = lines[1].removeprefix('::stop-commands::')
+        self.assertTrue(lines[1].startswith('::stop-commands::'))
+        self.assertTrue(token)
+        resume = lines.index(f'::{token}::')
+        for diagnostic in ('::error::expected mock', 'log\ufffd',
+                           '::warning::expected mock', 'error\ufffd'):
+            self.assertIn(diagnostic, lines[2:resume])
+        self.assertIn('::error::invalid diagnostic bytes failed (exit code 7)',
+                      lines[resume + 1:])
+        self.assertEqual(errors.getvalue(), '')
+        output, errors = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+            following = run_dual.execute('other client', [
+                sys.executable, '-c', "print('::warning::independent child')"])
         self.assertEqual(following, {'exit_code': 0, 'error': ''})
+        self.assertIn('::warning::independent child', output.getvalue().splitlines())
+        self.assertNotIn('::stop-commands::', output.getvalue())
 
     def test_fingerprint_changes_with_local_input_not_output(self):
         a = ri.build_inputs_fingerprint('shadowrocket_ai', self.root)
