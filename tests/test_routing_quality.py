@@ -99,37 +99,7 @@ class RoutingQualityTests(unittest.TestCase):
                 # The existing one-label Azure WebPubSub pattern has a
                 # separately documented common rule; any new regex needs
                 # its own tracked review, not a silent exemption.
-                if value != 'regexp:^chatgpt-async-webps-prod-[^.]+[.]webpubsub[.]azure[.]com
-            rule = ('DOMAIN,' if kind=='full' else 'DOMAIN-SUFFIX,')+host
-            if not (build.is_openai_specific_rule(rule) or rule in build.OFFICIAL_CHATGPT_SHARED_RULES
-                    or rule in build.OFFICIAL_CODEX_SHARED_RULES):
-                self.assertIn(value,tracked['v2rayn_openai'])
-
-    def test_due_calendar_and_delivery_cycle(self):
-        row = {'id':'shared-test','scope':'openai','rules':['DOMAIN,shared.example'],
-               'reviewed_at':'2026-01-31','evidence':'fixture','note':'fixture'}
-        policy = {'version':1,'groups':[row]}
-        state = {'version':1,'sent':{}}
-        due = date(2026,7,31)
-        self.assertFalse(dep.evaluate(policy,state,on=due-timedelta(days=1))['alerts'])
-        result = dep.evaluate(policy,state,on=due)
-        self.assertEqual(result['alerts'][0]['due_on'],'2026-07-31')
-        with tempfile.TemporaryDirectory() as temp:
-            path = Path(temp)/'receipts.json'
-            self.assertEqual(dep.evaluate(policy,state,on=due)['alerts'],result['alerts'])
-            dep.acknowledge(result,path,on=due)
-            state=dep.read_state(path,due)
-            self.assertEqual(dep.evaluate(policy,state,on=due+timedelta(days=29))['alerts'],[])
-            self.assertEqual(len(dep.evaluate(policy,state,on=due+timedelta(days=30))['alerts']),1)
-            row['reviewed_at']='2026-08-01'
-            self.assertFalse(dep.evaluate(policy,state,on=date(2026,8,1))['alerts'])
-            row['reviewed_at']=None
-            self.assertEqual(dep.evaluate(policy,state,on=date(2026,8,1))['alerts'][0]['status'],'initial_review')
-
-
-if __name__ == '__main__':
-    unittest.main()
-:
+                if value != 'regexp:^chatgpt-async-webps-prod-[^.]+[.]webpubsub[.]azure[.]com$':
                     self.assertIn(value, tracked['v2rayn_openai'])
                 continue
             kind,host = value.split(':',1)
