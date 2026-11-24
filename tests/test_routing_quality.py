@@ -67,7 +67,8 @@ class RoutingQualityTests(unittest.TestCase):
 
     def test_current_known_shared_scopes_have_review_records(self):
         policy = json.loads((ROOT / dep.POLICY).read_text(encoding='utf-8'))
-        dep.validate_policy(policy, date(2026,11,24))
+        # The live ledger is maintained over time; never freeze it to a historical test date.
+        dep.validate_policy(policy, dep.review.today())
         tracked = {}
         for item in policy['groups']:
             tracked.setdefault(item['scope'],set()).update(item['rules'])
