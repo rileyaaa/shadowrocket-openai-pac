@@ -1,0 +1,224 @@
+# Gemini / Claude 官方網路文件變更待審
+
+此處保留歷次尚未清理的觀察紀錄；任何候選都不會自動加入代理。
+
+## 2026-11-24 — 官方文件變更
+
+### gemini — gemini_app_firewall
+- 新增：`apis.google.com`
+- 新增：`content-autofill.googleapis.com`
+- 新增：`csp.withgoogle.com`
+- 新增：`encrypted-tbn0.gstatic.com`
+- 新增：`encrypted-tbn1.gstatic.com`
+- 新增：`encrypted-tbn2.gstatic.com`
+- 新增：`encrypted-tbn3.gstatic.com`
+- 新增：`fonts.googleapis.com`
+- 新增：`fonts.gstatic.com`
+- 新增：`gemini.google.com`
+- 新增：`jnn-pa.googleapis.com`
+- 新增：`lh3.google.com`
+- 新增：`lh3.googleusercontent.com`
+- 新增：`lh5.googleusercontent.com`
+- 新增：`maps.googleapis.com`
+- 新增：`maps.gstatic.com`
+- 新增：`ogads-pa.clients6.google.com`
+- 新增：`ogs.google.com`
+- 新增：`optimizationguide-pa.googleapis.com`
+- 新增：`play.google.com`
+- 新增：`ssl.gstatic.com`
+- 新增：`streetviewpixels-pa.googleapis.com`
+- 新增：`waa-pa.clients6.google.com`
+- 新增：`www.google.com`
+- 新增：`www.googleapis.com`
+- 新增：`www.gstatic.com`
+- 未分类主机新增（仅观察）：`googleads.g.doubleclick.net`
+- 未分类主机新增（仅观察）：`i.ytimg.com`
+- 未分类主机新增（仅观察）：`static.doubleclick.net`
+- 未分类主机新增（仅观察）：`td.doubleclick.net`
+- 未分类主机新增（仅观察）：`www.google-analytics.com`
+- 未分类主机新增（仅观察）：`www.googletagmanager.com`
+- 未分类主机新增（仅观察）：`www.youtube.com`
+- 未分类主机新增（仅观察）：`yt3.ggpht.com`
+- shadowrocket_ai：25 项未由当前审核规则完整覆盖，仅供人工确认
+  - apis.google.com
+  - content-autofill.googleapis.com
+  - csp.withgoogle.com
+  - encrypted-tbn0.gstatic.com
+  - encrypted-tbn1.gstatic.com
+  - encrypted-tbn2.gstatic.com
+  - encrypted-tbn3.gstatic.com
+  - fonts.googleapis.com
+  - fonts.gstatic.com
+  - jnn-pa.googleapis.com
+  - lh3.google.com
+  - lh3.googleusercontent.com
+  - lh5.googleusercontent.com
+  - maps.googleapis.com
+  - maps.gstatic.com
+  - ogads-pa.clients6.google.com
+  - ogs.google.com
+  - optimizationguide-pa.googleapis.com
+  - play.google.com
+  - ssl.gstatic.com
+  - streetviewpixels-pa.googleapis.com
+  - waa-pa.clients6.google.com
+  - www.google.com
+  - www.googleapis.com
+  - www.gstatic.com
+- v2rayn：25 项未由当前审核规则完整覆盖，仅供人工确认
+  - apis.google.com
+  - content-autofill.googleapis.com
+  - csp.withgoogle.com
+  - encrypted-tbn0.gstatic.com
+  - encrypted-tbn1.gstatic.com
+  - encrypted-tbn2.gstatic.com
+  - encrypted-tbn3.gstatic.com
+  - fonts.googleapis.com
+  - fonts.gstatic.com
+  - jnn-pa.googleapis.com
+  - lh3.google.com
+  - lh3.googleusercontent.com
+  - lh5.googleusercontent.com
+  - maps.googleapis.com
+  - maps.gstatic.com
+  - ogads-pa.clients6.google.com
+  - ogs.google.com
+  - optimizationguide-pa.googleapis.com
+  - play.google.com
+  - ssl.gstatic.com
+  - streetviewpixels-pa.googleapis.com
+  - waa-pa.clients6.google.com
+  - www.google.com
+  - www.googleapis.com
+  - www.gstatic.com
+### claude — claude_code_network
+- 新增：`*.claudemcpcontent.com`
+- 新增：`*.claudeusercontent.com`
+- 新增：`*.frame.claudeusercontent.com`
+- 新增：`academy.claude.com`
+- 新增：`api.anthropic.com`
+- 新增：`assets-proxy.anthropic.com`
+- 新增：`assets.claude.ai`
+- 新增：`bridge.claudeusercontent.com`
+- 新增：`browser-intake-us5-datadoghq.com`
+- 新增：`claude.ai`
+- 新增：`claude.com`
+- 新增：`claudemcpcontent.com`
+- 新增：`code.claude.com`
+- 新增：`downloads.claude.ai`
+- 新增：`fonts.googleapis.com`
+- 新增：`http-intake.logs.us5.datadoghq.com`
+- 新增：`mcp-proxy.anthropic.com`
+- 新增：`mintlify.b-cdn.net`
+- 新增：`platform.claude.com`
+- 新增：`sso.claude.com`
+- 新增：`status.anthropic.com`
+- 新增：`storage.googleapis.com`
+- 新增：`support.claude.com`
+- 新增：`trust.anthropic.com`
+- 新增：`www.anthropic.com`
+- 新增：`www.claude.com`
+- 未分类主机新增（仅观察）：`-review.googlesource.com`
+- 未分类主机新增（仅观察）：`android-chrome-192x192.png`
+- 未分类主机新增（仅观察）：`antalytics-loader.js`
+- 未分类主机新增（仅观察）：`anthropicsans-text-bold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-bolditalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-medium-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-mediumitalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-regular-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-regularitalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-semibold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicsans-text-semibolditalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-display-bold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-display-medium-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-display-regular-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-display-regularitalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-display-semibold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-bold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-bolditalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-medium-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-mediumitalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-regular-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-regularitalic-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-semibold-static.otf`
+- 未分类主机新增（仅观察）：`anthropicserif-text-semibolditalic-static.otf`
+- 未分类主机新增（仅观察）：`apple-touch-icon.png`
+- 未分类主机新增（仅观察）：`browserconfig.xml`
+- 未分类主机新增（仅观察）：`button.css`
+- 未分类主机新增（仅观察）：`caret-down.svg`
+- 未分类主机新增（仅观察）：`cdn.jsdelivr.net`
+- 未分类主机新增（仅观察）：`cdn.tailwindcss.com`
+- 未分类主机新增（仅观察）：`cdnjs.cloudflare.com`
+- 未分类主机新增（仅观察）：`check.svg`
+- 未分类主机新增（仅观察）：`claude-code.mintlify.site`
+- 未分类主机新增（仅观察）：`code.jquery.com`
+- 未分类主机新增（仅观察）：`components.code`
+- 未分类主机新增（仅观察）：`components.li`
+- 未分类主机新增（仅观察）：`components.pre`
+- 未分类主机新增（仅观察）：`components.span`
+- 未分类主机新增（仅观察）：`components.strong`
+- 未分类主机新增（仅观察）：`components.tbody`
+- 未分类主机新增（仅观察）：`components.td`
+- 未分类主机新增（仅观察）：`components.th`
+- 未分类主机新增（仅观察）：`components.thead`
+- 未分类主机新增（仅观察）：`components.tr`
+- 未分类主机新增（仅观察）：`components.ul`
+- 未分类主机新增（仅观察）：`consent-loader.js`
+- 未分类主机新增（仅观察）：`corp-ca.pem`
+- 未分类主机新增（仅观察）：`d.classlist.add`
+- 未分类主机新增（仅观察）：`d.classlist.remove`
+- 未分类主机新增（仅观察）：`d.setattribute`
+- 未分类主机新增（仅观察）：`dark.svg`
+- 未分类主机新增（仅观察）：`docs.github.com`
+- 未分类主机新增（仅观察）：`docs.json`
+- 未分类主机新增（仅观察）：`document.documentelement`
+- 未分类主机新增（仅观察）：`example.com`
+- 未分类主机新增（仅观察）：`favicon-16x16.png`
+- 未分类主机新增（仅观察）：`favicon-32x32.png`
+- 未分类主机新增（仅观察）：`favicon.ico`
+- 未分类主机新增（仅观察）：`fonts.gstatic.com`
+- 未分类主机新增（仅观察）：`formulae.brew.sh`
+- 未分类主机新增（仅观察）：`github.com`
+- 未分类主机新增（仅观察）：`googlesource.com`
+- 未分类主机新增（仅观察）：`light.svg`
+- 未分类主机新增（仅观察）：`llms.txt`
+- 未分类主机新增（仅观察）：`localstorage.getitem`
+- 未分类主机新增（仅观察）：`magnifying-glass.svg`
+- 未分类主机新增（仅观察）：`mintcdn.com`
+- 未分类主机新增（仅观察）：`mintlify.com`
+- 未分类主机新增（仅观察）：`nav-tab-click.js`
+- 未分类主机新增（仅观察）：`network-config.md`
+- 未分类主机新增（仅观察）：`network-config.mdx`
+- 未分类主机新增（仅观察）：`node.js`
+- 未分类主机新增（仅观察）：`plugins-anchor-redirect.js`
+- 未分类主机新增（仅观察）：`props.components`
+- 未分类主机新增（仅观察）：`proxy.example.com`
+- 未分类主机新增（仅观察）：`raw.githubusercontent.com`
+- 未分类主机新增（仅观察）：`registry.npmjs.org`
+- 未分类主机新增（仅观察）：`root.dark`
+- 未分类主机新增（仅观察）：`schema.org`
+- 未分类主机新增（仅观察）：`settings-anchor-redirect.js`
+- 未分类主机新增（仅观察）：`settings.json`
+- 未分类主机新增（仅观察）：`sitemap.xml`
+- 未分类主机新增（仅观察）：`style.css`
+- 未分类主机新增（仅观察）：`tls.getcacertificates`
+- 未分类主机新增（仅观察）：`toc-collapse.js`
+- 未分类主机新增（仅观察）：`u0026.danger`
+- 未分类主机新增（仅观察）：`u0026.flat`
+- 未分类主机新增（仅观察）：`u0026.ghost`
+- 未分类主机新增（仅观察）：`u0026.outline`
+- 未分类主机新增（仅观察）：`u0026.primary`
+- 未分类主机新增（仅观察）：`u0026.secondary`
+- 未分类主机新增（仅观察）：`u0026.underline`
+- 未分类主机新增（仅观察）：`unpkg.com`
+- 未分类主机新增（仅观察）：`vnd.amazon.eventstream`
+- 未分类主机新增（仅观察）：`www.linkedin.com`
+- 未分类主机新增（仅观察）：`x.com`
+- shadowrocket_ai：3 项未由当前审核规则完整覆盖，仅供人工确认
+  - fonts.googleapis.com
+  - mintlify.b-cdn.net
+  - storage.googleapis.com
+- v2rayn：3 项未由当前审核规则完整覆盖，仅供人工确认
+  - fonts.googleapis.com
+  - mintlify.b-cdn.net
+  - storage.googleapis.com
