@@ -7,14 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 
-# Only TWO published client subscriptions. The retired builder remains a pure
-# parser library; its OpenAI review metadata is maintained by Shadowrocket AI.
-SHADOW_AI_FILES = ('Shadowrocket_Johnshall_AI.conf',
-                   'data/ai-shadowrocket-sources.json', 'data/ai-review-queue.md',
-                   'rules/johnshall-apple-news.list', 'rules/openai-auto.list',
-                   'data/sources.json', 'data/review-queue.md',
-                   'data/review-notifications.json')
-V2_FILES = ('v2rayN_Johnshall_AI.json', 'data/v2rayn-sources.json')
+from release_integrity import SHADOW_AI_FILES, V2_FILES, validate_release
 REVIEW_FILES = ('config/review-decisions.json',)
 DOC_FILES = ('data/ai-official-docs.json', 'data/ai-docs-review.md')
 
@@ -38,10 +31,17 @@ def publish(path: Path) -> None:
         files = list(REVIEW_FILES)
         ok = {key: (status.get(key, {}).get('exit_code') == 0)
               for key in ('shadowrocket_ai', 'v2rayn')}
-        if ok['shadowrocket_ai']:
-            files += SHADOW_AI_FILES
-        if ok['v2rayn']:
-            files += V2_FILES
+        for key, owned in (('shadowrocket_ai', SHADOW_AI_FILES), ('v2rayn', V2_FILES)):
+            if not ok[key]:
+                continue
+            try:
+                validate_release(key, status)
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                status[key] = {'exit_code': 1, 'error': 'Release verification failed: ' + str(exc)}
+                ok[key] = False
+                print(f'::error::{key}: {status[key]["error"]}')
+            else:
+                files += owned
         # Advisory docs snapshot only when both official pages were verified.
         if status.get('official_docs', {}).get('exit_code') == 0:
             files += [f for f in DOC_FILES if Path(f).is_file()]

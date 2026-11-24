@@ -43,8 +43,8 @@ jobs:
           print(json.dumps({
               'shadow': snapshot('Shadowrocket_Johnshall_AI.conf'),
               'v2rayn': snapshot('v2rayN_Johnshall_AI.json'),
-              'shadow_sources': json.loads(Path('data/ai-shadowrocket-sources.json').read_text())['sources'],
-              'v2rayn_sources': json.loads(Path('data/v2rayn-sources.json').read_text())['sources'],
+              'shadow_state': json.loads(Path('data/ai-shadowrocket-sources.json').read_text()),
+              'v2rayn_state': json.loads(Path('data/v2rayn-sources.json').read_text()),
           }, sort_keys=True))
           PY
           python scripts/build_ai_shadowrocket.py --report-file "$RUNNER_TEMP/shadowrocket-smoke.json"
@@ -57,10 +57,21 @@ jobs:
               return hashlib.sha256(Path(path).read_bytes()).hexdigest()
           sr = json.loads(Path('data/ai-shadowrocket-sources.json').read_text())
           v2 = json.loads(Path('data/v2rayn-sources.json').read_text())
-          if sr['sources'] == before['shadow_sources']:
-              assert digest('Shadowrocket_Johnshall_AI.conf') == before['shadow'], 'Healthy Shadowrocket output unexpectedly changed'
-          if v2['sources'] == before['v2rayn_sources']:
-              assert digest('v2rayN_Johnshall_AI.json') == before['v2rayn'], 'Healthy v2rayN output unexpectedly changed'
+          def same_inputs(old, new):
+              return (bool(old.get('build_inputs_sha256'))
+                      and old['build_inputs_sha256'] == new.get('build_inputs_sha256')
+                      and old['sources'] == new['sources'])
+          if same_inputs(before['shadow_state'], sr):
+              assert digest('Shadowrocket_Johnshall_AI.conf') == before['shadow'], 'Identical Shadowrocket inputs produced different output'
+          if same_inputs(before['v2rayn_state'], v2):
+              assert digest('v2rayN_Johnshall_AI.json') == before['v2rayn'], 'Identical v2rayN inputs produced different output'
+          sys.path.insert(0, 'scripts')
+          from release_integrity import validate_release
+          import os
+          reports = {'shadowrocket_ai': str(Path(os.environ['RUNNER_TEMP']) / 'shadowrocket-smoke.json'),
+                     'v2rayn': str(Path(os.environ['RUNNER_TEMP']) / 'v2rayn-smoke.json')}
+          for client in reports:
+              validate_release(client, {'reports': reports})
           PY
           python - <<'PY'
           import json

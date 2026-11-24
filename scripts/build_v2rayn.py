@@ -22,6 +22,7 @@ import urllib.request
 
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
+import release_integrity
 import ai_services  # reviewed Gemini/Claude feeds; no node binding
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -310,6 +311,7 @@ def run(argv: list[str] | None = None) -> dict:
     state = {'schema_version': 2, 'output_sha256': hashlib.sha256(output).hexdigest(),
              'voice_rules': sorted(current_voice),
              'sources': next_sources, 'statistics': stats,
+             'build_inputs_sha256': release_integrity.build_inputs_fingerprint('v2rayn'),
              'ai_counts': ai['counts'],
              'inputs_sha256': {
                  'manual_openai': hashlib.sha256((ROOT / 'config/manual-openai.rules').read_bytes()).hexdigest(),
@@ -339,6 +341,7 @@ def run(argv: list[str] | None = None) -> dict:
     atomically_write(CONFIG, output)
     atomically_write(STATE, (json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + '\n').encode('utf-8'))
     if args.report_file:
+        report['artifact_sha256'] = release_integrity.artifact_manifest(release_integrity.V2_FILES, ROOT)
         atomically_write(args.report_file, (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
     print(json.dumps({'build': 'success', 'changed': changed, 'statistics': stats}, ensure_ascii=False))
     return report

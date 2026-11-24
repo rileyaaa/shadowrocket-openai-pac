@@ -254,7 +254,7 @@ class SafetyTests(unittest.TestCase):
             def fake_git(*args):
                 calls.append(args)
                 return type('R', (), {'stdout': ''})()
-            with patch.object(publish, 'git', side_effect=fake_git):
+            with patch.object(publish, 'validate_release', return_value={}), patch.object(publish, 'git', side_effect=fake_git):
                 publish.publish(path)
             self.assertTrue(json.loads(path.read_text())['publish']['success'])
             self.assertFalse(any(call[0] == 'commit' for call in calls))
@@ -268,7 +268,7 @@ class SafetyTests(unittest.TestCase):
                 if args[0] == 'push':
                     raise RuntimeError('remote rejected push')
                 return type('R', (), {'stdout': 'Shadowrocket_Johnshall_AI.conf\n' if args[0] == 'diff' else '1234\n'})()
-            with patch.object(publish, 'git', side_effect=fake_git):
+            with patch.object(publish, 'validate_release', return_value={}), patch.object(publish, 'git', side_effect=fake_git):
                 publish.publish(path)
             status = json.loads(path.read_text())
             self.assertFalse(status['publish']['success'])
@@ -281,7 +281,7 @@ class SafetyTests(unittest.TestCase):
                                         'v2rayn': {'exit_code': 0}}))
             def fake_git(*args):
                 return type('R', (), {'stdout': 'README.md\n' if args[0] == 'diff' else ''})()
-            with patch.object(publish, 'git', side_effect=fake_git):
+            with patch.object(publish, 'validate_release', return_value={}), patch.object(publish, 'git', side_effect=fake_git):
                 publish.publish(path)
             result = json.loads(path.read_text())['publish']
             self.assertFalse(result['success'])
