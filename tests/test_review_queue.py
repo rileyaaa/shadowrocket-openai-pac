@@ -51,6 +51,16 @@ class ManualReviewTests(unittest.TestCase):
                             "review_due_candidates": result["due_candidates"]},
                            self.state_path, on or self.on)
 
+    def test_common_coverage_and_calendar_use_one_implementation(self):
+        import ai_services
+        import build
+        self.assertIs(build.domain_rule_covers, review.domain_rule_covers)
+        self.assertIs(ai_services.approved_rule_covers, review.domain_rule_covers)
+        self.assertIs(ai_services.add_months, review.add_months)
+        self.assertTrue(review.domain_rule_covers('DOMAIN-SUFFIX,example.com', 'DOMAIN,api.example.com'))
+        self.assertFalse(review.domain_rule_covers('DOMAIN-SUFFIX,example.com', 'DOMAIN,notexample.com'))
+        self.assertFalse(review.domain_rule_covers('DOMAIN,example.com', 'DOMAIN-SUFFIX,example.com'))
+
     def test_calendar_month_end_and_leap_year(self):
         self.assertEqual(review.add_months(date(2026, 8, 31), 6), date(2027, 2, 28))
         self.assertEqual(review.add_months(date(2027, 8, 31), 6), date(2028, 2, 29))

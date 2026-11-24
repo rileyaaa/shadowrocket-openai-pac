@@ -34,6 +34,24 @@ def parse_date(value) -> date:
     return date.fromisoformat(value)
 
 
+def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
+    """Whether a same-policy rule makes the narrow domain rule redundant.
+
+    DOMAIN-SUFFIX,example.com covers example.com and sub.example.com;
+    DOMAIN,example.com does NOT cover sub.example.com.
+    Wildcards are only deduplicated when the rule is exactly identical.
+    """
+    if broad_rule == narrow_rule:
+        return True
+    broad_type, broad_host = broad_rule.split(",", 1)
+    narrow_type, narrow_host = narrow_rule.split(",", 1)
+    return (
+        broad_type == "DOMAIN-SUFFIX"
+        and narrow_type in {"DOMAIN", "DOMAIN-SUFFIX"}
+        and (narrow_host == broad_host or narrow_host.endswith("." + broad_host))
+    )
+
+
 def add_months(value: date, months: int) -> date:
     year, month = divmod(value.year * 12 + value.month - 1 + months, 12)
     month += 1

@@ -18,6 +18,7 @@ import time
 import urllib.request
 from urllib.parse import quote
 import review_queue
+from review_queue import domain_rule_covers
 import v2rayn_core as johnshall_semantics
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -291,24 +292,6 @@ def filter_auto_domains(rules: list[str]) -> list[str]:
     if len(kept) < 10:
         raise ValueError(f"Too few OpenAI-only automatic domains: {len(kept)}")
     return kept
-
-
-def domain_rule_covers(broad_rule: str, narrow_rule: str) -> bool:
-    """Whether a same-policy rule makes the narrow domain rule redundant.
-
-    DOMAIN-SUFFIX,example.com covers example.com and sub.example.com;
-    DOMAIN,example.com does NOT cover sub.example.com.
-    Wildcards are only deduplicated when the rule is exactly identical.
-    """
-    if broad_rule == narrow_rule:
-        return True
-    broad_type, broad_host = broad_rule.split(",", 1)
-    narrow_type, narrow_host = narrow_rule.split(",", 1)
-    return (
-        broad_type == "DOMAIN-SUFFIX"
-        and narrow_type in {"DOMAIN", "DOMAIN-SUFFIX"}
-        and (narrow_host == broad_host or narrow_host.endswith("." + broad_host))
-    )
 
 
 def covering_approval_for_rejection(raw: str, rules: list[str]) -> str | None:
@@ -729,6 +712,27 @@ def map_johnshall_proxy(line: str, node: str) -> str:
     return ','.join(parts)
 
 
+def validate_shadow_final(lines) -> None:
+    """Check only active FINAL rules, preserving the original serialized text.
+
+    Ordinary mapped node names are not valid source policies, so do not
+    reparse them as upstream rules. FINAL itself retains the shared parser's
+    case/whitespace handling; mentions in comments are not routing rules.
+    """
+    last_kind = None
+    finals = 0
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith(('#', ';')):
+            continue
+        last_kind = line.partition(',')[0].strip().upper()
+        if last_kind == 'FINAL':
+            if johnshall_semantics.parse_rule(line) != ('FINAL', '', 'direct'):
+                raise ValueError('Invalid final Shadowrocket fallback')
+            finals += 1
+    if finals != 1 or last_kind != 'FINAL':
+        raise ValueError('Invalid final Shadowrocket fallback: exactly one FINAL DIRECT must be last')
+
+
 def generate(base: str, ips: list[str], domains: list[str], manual: list[str], settings: dict[str, str] | None = None,
              rulesets: dict[str, list[str]] | None = None):
     settings = settings if settings is not None else load_settings()
@@ -772,12 +776,7 @@ def generate(base: str, ips: list[str], domains: list[str], manual: list[str], s
                 if johnshall_policy(line) in johnshall_semantics.REJECTIONS]
     if len(set(rejected)) < before_ads * .90:
         raise ValueError('Johnshall ad unique coverage collapsed')
-    active_rules = [line.strip() for line in changed
-                    if line.strip() and not line.lstrip().startswith(('#', ';'))]
-    if active_rules[-1].lower() != 'final,direct':
-        raise ValueError('Johnshall FINAL must be the last effective routing rule')
-    if sum(line.lower() == 'final,direct' for line in active_rules) != 1:
-        raise ValueError("Missing/duplicate Johnshall final DIRECT")
+    validate_shadow_final(changed)
     if any(johnshall_policy(line) == 'PROXY' for line in changed):
         raise ValueError("Unconverted original Proxy rule found")
     # IP rule priority first. This only covers official Voice IPs, NOT all OpenAI.

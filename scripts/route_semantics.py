@@ -172,11 +172,8 @@ def verify_shadow(text, settings, voice_rules, *, expected_domains=None, expecte
     if len(sections) != 5:
         raise ValueError('Invalid final Shadowrocket section layout')
     body = sections[2]
-    active = [x.strip() for x in body.splitlines()
-              if x.strip() and not x.lstrip().startswith(('#', ';'))]
-    if not active or active[-1].lower() != 'final,direct' or sum(
-            x.upper().startswith('FINAL,') for x in active) != 1:
-        raise ValueError('Invalid final Shadowrocket fallback')
+    from build import validate_shadow_final
+    validate_shadow_final(body.splitlines())
     marker = '# [3] Johnshall full original rules, Proxy mapped to exact configured node'
     if body.count(marker) != 1:
         raise ValueError('Invalid final Shadowrocket AI layer boundary')

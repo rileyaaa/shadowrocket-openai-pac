@@ -10,6 +10,23 @@ import build
 
 
 class BuildTest(unittest.TestCase):
+    def test_shadow_final_validation(self):
+        build.validate_shadow_final([
+            'DOMAIN,ordinary.example,Exact Node',
+            ' final , DIRECT ',
+            '# FINAL,direct is the fallback',
+            '; FINAL,Proxy is not active',
+        ])
+        for rows in (
+            ['FINAL,direct', 'final , direct'],
+            ['FINAL,Proxy'],
+            ['FINAL,direct,no-resolve'],
+            ['FINAL,direct', 'DOMAIN,example.com,DIRECT'],
+            ['# FINAL,direct'],
+        ):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                build.validate_shadow_final(rows)
+
     def test_only_johnshall_policy_field_is_replaced(self):
         node = 'Ordinary node'
         cases = (
