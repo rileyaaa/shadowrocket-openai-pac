@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import build
+import build_v2rayn
 import notify_telegram
 import review_queue
 
@@ -29,6 +30,23 @@ def http_response(body, headers):
 
 
 class DownloadCompletenessTests(unittest.TestCase):
+    def test_shared_transport_preserves_independent_requests_and_client_identity(self):
+        bodies = [b'a' * 100, b'b' * 100]
+        with patch("build.urllib.request.urlopen", side_effect=[
+                http_response(body, b"Content-Length: 100\r\n") for body in bodies]) as opened:
+            self.assertEqual(build.fetch("https://upstream.example/file"), bodies[0])
+            self.assertEqual(build_v2rayn.download("https://upstream.example/file"), bodies[1])
+        self.assertEqual(opened.call_count, 2)
+        self.assertEqual([call.args[0].get_header("User-agent") for call in opened.call_args_list],
+                         ["shadowrocket-openai-pac/1.0", "v2rayn-johnshall-openai/1.0"])
+
+    def test_both_clients_reject_plain_http_before_request(self):
+        with patch("build.urllib.request.urlopen") as opened:
+            for fetch in (build.fetch, build_v2rayn.download):
+                with self.subTest(fetch=fetch.__name__), self.assertRaisesRegex(ValueError, "HTTPS"):
+                    fetch("http://upstream.example/file")
+        opened.assert_not_called()
+
     def test_short_content_length_retries_and_fails(self):
         # This is a real HTTPResponse: read(amt) alone does NOT raise here.
         with patch("build.urllib.request.urlopen", side_effect=lambda *a, **kw:

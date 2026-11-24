@@ -276,6 +276,16 @@ class BuildTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             build.parse_voice(b'{"prefixes":[{"ipv4Prefix":"0.0.0.0/0"}]}')
 
+    def test_voice_rejects_multicast_and_site_local_even_when_globally_classified(self):
+        valid = [{"ipv4Prefix": f"8.8.4.{i}/32"} for i in range(1, 6)]
+        for key, value in (("ipv4Prefix", "224.0.0.1/32"),
+                           ("ipv4Prefix", "239.1.2.3/32"),
+                           ("ipv6Prefix", "ff02::1/128"),
+                           ("ipv6Prefix", "fec0::1/128")):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "Unsafe voice network"):
+                build.parse_voice(json.dumps({"prefixes": valid + [{key: value}]}).encode())
+        self.assertEqual(len(build.parse_voice(json.dumps({"prefixes": valid}).encode())), 5)
+
     def test_voice_dual_ipv4_and_ipv6(self):
         items = [{"ipv4Prefix": f"1.1.1.{i}/32"} for i in range(1, 5)]
         items.append({

@@ -9,16 +9,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import http.client
 import json
 import os
 from pathlib import Path
 import re
 import sys
 import tempfile
-import time
-import urllib.error
-import urllib.request
 
 import build as legacy  # read-only reviewed upstream parsing and allowlist
 import v2rayn_core as core
@@ -33,38 +29,11 @@ STATE = ROOT / 'data/v2rayn-sources.json'
 BITBROWSER = ROOT / 'data/bitbrowser_domains.txt'
 OPENAI_EXTRA = ROOT / 'config/v2rayn/openai-extra.rules'
 PROCESSES = ROOT / 'config/v2rayn/verified-processes.txt'
-LIMIT_BYTES = 13_000_000
 
 
 def download(url: str, minimum: int = 50) -> bytes:
-    """Independent downloader: retries once, checks length/status and size."""
-    if not url.startswith('https://'):
-        raise ValueError('Only secure HTTPS upstream URLs permitted')
-    request = urllib.request.Request(url, headers={
-        'User-Agent': 'v2rayn-johnshall-openai/1.0',
-        'Accept': '*/*', 'Accept-Encoding': 'identity'})
-    for attempt in range(2):
-        try:
-            with urllib.request.urlopen(request, timeout=75) as response:
-                if response.status != 200 or response.headers.get('Content-Range'):
-                    raise ValueError(f'Unexpected HTTP status / partial response {response.status} for {url}')
-                length = response.headers.get('Content-Length')
-                if length is not None and not re.fullmatch(r'[0-9]+', length.strip()):
-                    raise ValueError('Invalid Content-Length')
-                if length is not None and not minimum <= int(length) < LIMIT_BYTES:
-                    raise ValueError('Unexpected Content-Length')
-                body = response.read(LIMIT_BYTES)
-                if not minimum <= len(body) < LIMIT_BYTES:
-                    raise ValueError(f'Truncated or oversized upstream {url}')
-                if length is not None and len(body) != int(length):
-                    raise ValueError(f'HTTP response truncated {url}')
-                return body
-        except (OSError, ValueError, http.client.HTTPException):
-            if attempt:
-                raise
-            print(f'Upstream retrieval failed; retrying once: {url}', file=sys.stderr)
-            time.sleep(2)
-    raise AssertionError('Unreachable downloader state')
+    """Fetch independently, sharing the same transport validation as Shadowrocket."""
+    return legacy.fetch(url, minimum=minimum, user_agent='v2rayn-johnshall-openai/1.0')
 
 
 def parse_user_extra(text: str) -> list[tuple[str, str, str]]:
