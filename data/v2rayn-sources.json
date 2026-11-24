@@ -5,8 +5,9 @@
     "claude_v2fly": 21,
     "gemini_domains": 61,
     "gemini_metacubex": 49,
-    "gemini_v2fly": 49
+    "gemini_v2fly": 50
   },
+  "build_inputs_sha256": "fd17e1fe400a9af5768b98796e1f50bd2df7a0af2ff5eaf1b9a68620dfe5518a",
   "inputs_sha256": {
     "ai_review_decisions": "bae6af0675afddf6df11944f6747082b458249431582e90e265722cf3dae89af",
     "bitbrowser": "2bd9ce38ec3bffbb047332b75ea75bbd09eb857937268ffaa3da2243d19caa29",
@@ -15,7 +16,7 @@
     "manual_openai": "e124138afe19e5eef76aa611acdcf352edbe26eb46f2ac32b0e0e8f17b54561f",
     "verified_processes": "0c8e90d93dc0339dfe723ec971066236ba703a23b9532a5aa095ce08085c8413"
   },
-  "output_sha256": "363eeb6f71c4586b6e7c1622c5bbe819a47c914b5e39164cffc0415ae6c35b4d",
+  "output_sha256": "2a106537b5c94ca3bbe8d61c9b09302f51b50043615f23b1cd318feb34e25120",
   "schema_version": 2,
   "sources": {
     "acl4ssr": {
@@ -46,12 +47,12 @@
       "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google-gemini.list"
     },
     "gemini_v2fly": {
-      "rule_count": 49,
-      "sha256": "6f768291aa81a8d88fa48fc20613f55be646674cfa24a3b3c152a97e859c33a8",
+      "rule_count": 50,
+      "sha256": "fa60e3f80e1487e38c04c92973102ff481c961e620b9bb11fb8585451f5ff2db",
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google-deepmind"
     },
     "johnshall": {
-      "sha256": "7f52705edcee2bcff68f7be7e48301fc56c49da5dddf9ba39026ebd3135670da",
+      "sha256": "b778e66f7a3ee47be0e03b17e5079d59630c9a441fb0218f4f9210c44e28470f",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -68,27 +69,27 @@
     }
   },
   "statistics": {
-    "ai_review_candidates": 10,
+    "ai_review_candidates": 11,
     "auto_domains": 23,
     "bitbrowser_candidate_domains": 0,
     "bitbrowser_domains": 11,
     "bitbrowser_effective_domains": 11,
     "bitbrowser_input_domains": 11,
-    "block_rules": 52684,
+    "block_rules": 52915,
     "claude_domains": 20,
     "claude_metacubex": 21,
     "claude_v2fly": 21,
     "direct_rules": 6,
-    "domain_rules": 82972,
+    "domain_rules": 83203,
     "external_lists_embedded": 1,
     "gemini_domains": 61,
     "gemini_metacubex": 49,
-    "gemini_v2fly": 49,
+    "gemini_v2fly": 50,
     "ip_rules": 573,
-    "johnshall_block_rules": 52684,
-    "johnshall_lines": 83035,
+    "johnshall_block_rules": 52915,
+    "johnshall_lines": 83266,
     "johnshall_proxy_rules": 30265,
-    "json_bytes": 2204801,
+    "json_bytes": 2211343,
     "manual_domains": 44,
     "official_bitbrowser_domains": 3,
     "openai_user_extras": 43,

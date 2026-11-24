@@ -1,0 +1,184 @@
+{
+  "sent": {},
+  "snapshots": {
+    "shadowrocket_ai": [
+      {
+        "rule": "DOMAIN-SUFFIX,ant.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,anthropic.team",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,antspace.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,chatbotclaude.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudeacademy.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudemcpclient.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudepages.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudestudio.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,geller-pa.googleapis.com",
+        "service": "gemini",
+        "sources": [
+          "gemini_metacubex",
+          "gemini_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,gemma.ai",
+        "service": "gemini",
+        "sources": [
+          "gemini_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com",
+        "service": "gemini",
+        "sources": [
+          "gemini_metacubex",
+          "gemini_v2fly"
+        ]
+      }
+    ],
+    "v2rayn": [
+      {
+        "rule": "DOMAIN-SUFFIX,ant.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,anthropic.team",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,antspace.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,chatbotclaude.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudeacademy.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudemcpclient.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudepages.dev",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,claudestudio.com",
+        "service": "claude",
+        "sources": [
+          "claude_metacubex",
+          "claude_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,geller-pa.googleapis.com",
+        "service": "gemini",
+        "sources": [
+          "gemini_metacubex",
+          "gemini_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,gemma.ai",
+        "service": "gemini",
+        "sources": [
+          "gemini_v2fly"
+        ]
+      },
+      {
+        "rule": "DOMAIN-SUFFIX,proactivebackend-pa.googleapis.com",
+        "service": "gemini",
+        "sources": [
+          "gemini_metacubex",
+          "gemini_v2fly"
+        ]
+      }
+    ]
+  },
+  "version": 1
+}
