@@ -60,6 +60,16 @@ class ReleaseEndToEndTests(unittest.TestCase):
         policy = {'version':1,'default_review_months':6,'reminder_interval_days':30,'rejected_rules':[]}
         for name in ('review-decisions.json','ai-review-decisions.json'):
             self.write_json(self.work/'config'/name, policy)
+        # Exercise reminder delivery independently of real review dates.
+        # A completed production review must not make the fixture lose its alert.
+        self.write_json(self.work/'config/approved-dependency-review.json', {
+            'version': 1, 'groups': [{
+                'id': 'fixture-shared-dependency', 'scope': 'openai',
+                'rules': ['DOMAIN,challenges.cloudflare.com'],
+                'reviewed_at': None, 'evidence': 'fixture',
+                'note': 'Independent initial-review fixture for delivery and receipt tests.',
+            }],
+        })
         settings_path = self.work/'config/user-settings.json'
         # The builder already accepts UTF-8 BOM in the two user settings.
         # Exercise the same real release validator, not just the loader.
