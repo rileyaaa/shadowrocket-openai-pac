@@ -74,29 +74,43 @@ def require_hosts(rows, action):
             raise ValueError('Final routing semantic check failed for ' + host)
 
 def require_isolation(overlay, baseline, hosts):
-    """Check both the matched layer and the effective explicit domain action."""
+    """Prove that protected hosts cannot enter the added domain overlay."""
+    # If no overlay rule matches, the baseline is necessarily unchanged for
+    # these explicit-domain witnesses. Scanning all ~83k baseline rules twice
+    # per host cannot add information. Keep the existing call interface.
     for host in hosts:
-        # Merely comparing actions is insufficient: v2rayN uses the same
-        # 'proxy' tag for ordinary and AI traffic, but the layer still matters.
         if any(domain_match(value, host) for values, _ in overlay for value in values):
             raise ValueError('Non-target host intercepted by dedicated layer: ' + host)
-        if first_domain(overlay + baseline, host) != first_domain(baseline, host):
-            raise ValueError('Non-target explicit domain action changed: ' + host)
 
 
-def shadow_domain_rows(lines):
-    mapping = {'DOMAIN': 'full:', 'DOMAIN-SUFFIX': 'domain:', 'DOMAIN-KEYWORD': 'keyword:'}
-    result = []
-    for line in lines.splitlines():
-        row = line.strip().split(',')
-        if len(row) < 3:
-            continue
-        kind, value, policy = row[:3]
-        if kind in mapping:
-            result.append(([mapping[kind] + value], policy))
-        elif kind == 'DOMAIN-WILDCARD':
-            result.append((['regexp:' + fnmatch.translate(value)], policy))
-    return result
+SHADOW_LAYERS = (
+    '# [1a] OpenAI automatic rules - official Voice destination IPs',
+    '# [1b] OpenAI automatic rules - public domain rules',
+    '# [2] Independent manual OpenAI fallback (no cross-layer dedup)',
+    '# GEMINI first-party and exact shared dependencies',
+    '# CLAUDE first-party and exact shared dependencies',
+)
+
+
+def verify_shadow_layers(dedicated_body, expected_layers):
+    """Keep the two OpenAI layers independently complete, in original order."""
+    observed = []
+    for line in dedicated_body.splitlines():
+        line = line.strip()
+        if line in SHADOW_LAYERS:
+            observed.append((line, []))
+        elif line and not line.startswith(('#', ';')):
+            if not observed:
+                raise ValueError('Shadowrocket rule before dedicated layer marker')
+            parts = line.split(',')
+            if len(parts) < 3:
+                raise ValueError('Malformed Shadowrocket dedicated layer rule')
+            observed[-1][1].append(','.join(parts[:2]))
+    if [marker for marker, _ in observed] != list(SHADOW_LAYERS):
+        raise ValueError('Shadowrocket dedicated layer order or boundary changed')
+    for (marker, actual), expected in zip(observed, expected_layers, strict=True):
+        if actual != list(expected):
+            raise ValueError('Shadowrocket dedicated layer differs from reviewed inputs: ' + marker)
 
 
 def reviewed_domain_sets(client, root, report):
@@ -146,7 +160,7 @@ def reviewed_domain_sets(client, root, report):
     }
 
 
-def verify_shadow(text, settings, voice_rules, *, expected_domains=None):
+def verify_shadow(text, settings, voice_rules, *, expected_domains=None, expected_layers=None):
     node = settings['openai_node_name']
     sections = re.split(r'(?m)^\[(Rule|URL Rewrite)\]\s*$', text)
     if len(sections) != 5:
@@ -160,7 +174,10 @@ def verify_shadow(text, settings, voice_rules, *, expected_domains=None):
     marker = '# [3] Johnshall full original rules, Proxy mapped to exact configured node'
     if body.count(marker) != 1:
         raise ValueError('Invalid final Shadowrocket AI layer boundary')
-    dedicated = [x.strip().split(',') for x in body.split(marker, 1)[0].splitlines()
+    dedicated_body = body.split(marker, 1)[0]
+    if expected_layers is not None:
+        verify_shadow_layers(dedicated_body, expected_layers)
+    dedicated = [x.strip().split(',') for x in dedicated_body.splitlines()
                  if x.strip() and not x.lstrip().startswith(('#', ';'))]
     expected_voice = {tuple(rule.split(',', 1)) for rule in voice_rules}
     actual_voice = set()
@@ -192,13 +209,28 @@ def verify_shadow(text, settings, voice_rules, *, expected_domains=None):
     require_hosts(domains, node)
     if expected_domains is not None and actual_domains != expected_domains:
         raise ValueError('Final Shadowrocket domains differ from reviewed inputs')
-    baseline = shadow_domain_rows(body.split(marker, 1)[1])
-    require_isolation(domains, baseline, PROTECTED_HOSTS + SHADOW_ONLY_PROTECTED)
+    require_isolation(domains, [], PROTECTED_HOSTS + SHADOW_ONLY_PROTECTED)
+
+
+def require_route_shape(row, field):
+    # Conditions in a v2rayN routing object are combined, not alternative.
+    # A stray port/network/domain predicate can silently narrow an otherwise
+    # correct Voice, local-network, process or fallback match.
+    if (not isinstance(row, dict) or
+            set(row) - {'remarks', 'outboundTag', 'enabled', field} or
+            not {'outboundTag', 'enabled', field} <= set(row)):
+        raise ValueError('Unexpected condition in final v2rayN ' + field + ' rule')
+    if field != 'port' and (not isinstance(row[field], list) or not row[field] or
+                            not all(isinstance(value, str) and value for value in row[field])):
+        raise ValueError('Invalid matching values in final v2rayN ' + field + ' rule')
 
 
 def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
     if not isinstance(rules, list) or len(rules) < 3:
         raise ValueError('Invalid final v2rayN routing list')
+    require_route_shape(rules[0], 'ip')
+    require_route_shape(rules[1], 'domain')
+    require_route_shape(rules[-1], 'port')
     if rules[0].get('ip') != ['127.0.0.0/8', '::1/128', 'geoip:private'] or rules[0].get('outboundTag') != 'direct':
         raise ValueError('Final v2rayN private network protection changed')
     if rules[1].get('domain') != ['full:localhost', 'domain:localhost.localdomain'] or rules[1].get('outboundTag') != 'direct':
@@ -214,7 +246,7 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
     actual_voice = set()
     actual_processes = set()
     domain_rows = []
-    overlay, baseline = [], []
+    overlay = []
     actual_domains = {2: set(), 4: set(), 5: set(), 6: set()}
     explicit_blocks = []
     for i, row in enumerate(rules):
@@ -224,8 +256,6 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
         if 'domain' in row:
             domain_rows.append((row['domain'], action))
         if i < 2 or i == len(rules) - 1:
-            if 'domain' in row:
-                baseline.append((row['domain'], action))
             continue
         remark = row.get('remarks', '')
         rank = next((j for j, name in enumerate(ranks) if remark.startswith(name + ' / ')), -1)
@@ -233,15 +263,18 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
             raise ValueError('Unexpected final v2rayN routing layer order')
         last_rank = rank
         found.add(rank)
-        if 'domain' in row:
-            if rank in actual_domains:
-                overlay.append((row['domain'], action))
-                actual_domains[rank].update(row['domain'])
-            else:
-                baseline.append((row['domain'], action))
-        # Domain layers must not hide extra IP/process/port predicates.
-        if rank in actual_domains and set(row) != {'remarks', 'outboundTag', 'domain', 'enabled'}:
-            raise ValueError('Unexpected condition in final v2rayN domain overlay')
+        if rank in actual_domains:
+            require_route_shape(row, 'domain')
+            overlay.append((row['domain'], action))
+            actual_domains[rank].update(row['domain'])
+        elif rank == 1:
+            require_route_shape(row, 'process')
+        elif rank == 3:
+            require_route_shape(row, 'ip')
+        else:
+            require_route_shape(row, 'domain' if 'domain' in row else 'ip')
+            if rank == 7 and action not in ('proxy', 'direct'):
+                raise ValueError('Unexpected policy in final v2rayN ordinary layer')
         if rank == 0:
             if action != 'block':
                 raise ValueError('Unexpected final v2rayN ad policy')
@@ -270,18 +303,26 @@ def verify_v2(rules, voice_rules, processes, *, expected_domains=None):
     require_hosts(domain_rows, 'proxy')
     if expected_domains is not None and actual_domains != expected_domains:
         raise ValueError('Final v2rayN domains differ from reviewed inputs')
-    require_isolation(overlay, baseline, PROTECTED_HOSTS)
+    require_isolation(overlay, [], PROTECTED_HOSTS)
 
 
 def verify_release_routes(client, root, state, report):
     expected = reviewed_domain_sets(client, root, report)
     if client == 'shadowrocket_ai':
         settings = json.loads((root / 'config/user-settings.json').read_text(encoding='utf-8'))
-        voice = [','.join(x.split(',')[:2]) for x in
-                 (root / 'rules/openai-auto.list').read_text(encoding='utf-8').splitlines()
+        import build as legacy
+        auto_rows = [x.strip() for x in
+                     (root / 'rules/openai-auto.list').read_text(encoding='utf-8').splitlines()
+                     if x.strip() and not x.lstrip().startswith(('#', ';'))]
+        voice = [','.join(x.split(',')[:2]) for x in auto_rows
                  if x.startswith(('IP-CIDR,', 'IP-CIDR6,'))]
+        auto = [x for x in auto_rows if not x.startswith(('IP-CIDR,', 'IP-CIDR6,'))]
+        manual = legacy.compact_rules_within_layer(
+            legacy.parse_manual(root / 'config/manual-openai.rules'))
+        layers = [voice, auto, manual, report['ai_approved_rules']['gemini'],
+                  report['ai_approved_rules']['claude']]
         verify_shadow((root / 'Shadowrocket_Johnshall_AI.conf').read_text(encoding='utf-8'), settings, voice,
-                      expected_domains=expected)
+                      expected_domains=expected, expected_layers=layers)
     else:
         from v2rayn_core import load_processes
         processes = load_processes((root / 'config/v2rayn/verified-processes.txt').read_text(encoding='utf-8'))
