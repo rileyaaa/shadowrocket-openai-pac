@@ -1,6 +1,6 @@
 {
   "review": {
-    "decisions_sha256": "8b8fb722c4244967058a1251aecc29fb0717b4b9268d7b04eff2b26463182455",
+    "decisions_sha256": "bfe3a0cb9e4d02858c7fdb43ee236eaed8bb57144fe0ec26c3dc23d7cd4dda89",
     "excluded_auto_rules": [
       "DOMAIN,browser-intake-datadoghq.com",
       "DOMAIN,o33249.ingest.sentry.io",
