@@ -228,7 +228,9 @@ def parse_domain_list(source: str, fmt: str, *, unparsed: list[str] | None = Non
         elif fmt == "v2fly":
             # geosite syntax: bare domain=domain plus subdomains, full:=one
             # exact hostname, regexp:=regex. Never treat metadata as a host.
-            entry = line.split(" @", 1)[0].strip()
+            entry = re.split(r"\s+(?:@|#)", line, maxsplit=1)[0].strip()
+            if not entry:
+                continue
             if entry.startswith("full:"):
                 rules.append(domain_rule("DOMAIN", entry[5:]))
             elif entry.startswith("domain:"):

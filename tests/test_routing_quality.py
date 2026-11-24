@@ -65,6 +65,35 @@ class RoutingQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Non-target host'):
             sem.verify_v2(rows,['IP-CIDR,8.8.8.8/32'],['BitBrowser.exe'])
 
+    def test_shadow_fallback_cannot_disappear_or_move_between_layers(self):
+        expected = [
+            ['IP-CIDR,8.8.8.8/32'], ['DOMAIN-SUFFIX,openai.com'],
+            ['DOMAIN-SUFFIX,openai.com'], ['DOMAIN,gemini.google.com'],
+            ['DOMAIN,claude.ai'],
+        ]
+        body = '\n'.join(marker + '\n' + '\n'.join(rule + ',AI' for rule in rows)
+                         for marker, rows in zip(sem.SHADOW_LAYERS, expected))
+        sem.verify_shadow_layers(body, expected)
+        # The same OpenAI domain still exists in auto; the independent manual
+        # fallback nevertheless must not vanish or change its position.
+        missing = body.replace(sem.SHADOW_LAYERS[2] + '\nDOMAIN-SUFFIX,openai.com,AI',
+                               sem.SHADOW_LAYERS[2])
+        with self.assertRaisesRegex(ValueError, 'differs from reviewed inputs'):
+            sem.verify_shadow_layers(missing, expected)
+        with self.assertRaisesRegex(ValueError, 'order or boundary'):
+            sem.verify_shadow_layers(body.replace(sem.SHADOW_LAYERS[2], '# lost'), expected)
+
+    def test_v2_extra_predicate_cannot_narrow_existing_route(self):
+        for field, value in (('ip', ['8.8.8.8/32']), ('process', ['BitBrowser.exe']),
+                             ('domain', ['full:localhost']), ('port', '0-65535')):
+            row = {'outboundTag':'proxy','enabled':True,field:value}
+            sem.require_route_shape(row,field)
+            other = 'network' if field == 'port' else 'port'
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'Unexpected condition'):
+                sem.require_route_shape({**row,other:'443'},field)
+        with self.assertRaisesRegex(ValueError, 'Invalid matching values'):
+            sem.require_route_shape({'outboundTag':'proxy','enabled':True,'ip':[]},'ip')
+
     def test_current_known_shared_scopes_have_review_records(self):
         policy = json.loads((ROOT / dep.POLICY).read_text(encoding='utf-8'))
         # The live ledger is maintained over time; never freeze it to a historical test date.

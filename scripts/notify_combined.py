@@ -129,6 +129,7 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
                     lines.append(f'{label}：{stats[prop]}' + (f' ({diff:+d})' if type(diff) is int and diff else ''))
             if stats.get('process_rules', 0) == 0:
                 lines.append('⚠️ 未配置经确认的进程路径')
+    alert_start = len(lines)
     lines += ['', '━━━━━━━━━━━━━━', '🔔 异常与人工审核']
     openai = status.get('openai_review')
     if openai:
@@ -228,14 +229,37 @@ def emit_message(status: dict, shadow_ai: dict | None, v2: dict | None,
             lines.append(f'本次复审提醒：{len(dependencies["alerts"])} 组（不自动改规则；完整范围见 Actions 摘要）')
             for item in dependencies['alerts'][:2]:
                 lines.append('· ' + item['id'])
-    if run_url:
-        lines += ['', '🔗 GitHub Actions：' + run_url]
-    message = '\n'.join(lines)
-    if len(message) > 3900:
-        message = message[:3550] + '\n…详见 GitHub Actions 执行摘要。'
-        if run_url:
-            message += '\n' + run_url
-    return message
+    return fit_message(lines[:alert_start], lines[alert_start:], run_url)
+
+
+def fit_message(details, alerts, run_url, limit=3900):
+    """Keep review counts and warnings visible when the daily report is long."""
+    footer = ['', '🔗 GitHub Actions：' + run_url] if run_url else []
+    full = '\n'.join(details + alerts + footer)
+    if len(full) <= limit:
+        return full
+    omitted = '…部分详情省略，完整内容见 GitHub Actions 执行摘要。'
+    # Preserve the header and every alert-category summary first. Examples
+    # are already present in the full Actions summary.
+    header = details[:5]
+    remaining = details[5:]
+    alert_lines = list(alerts)
+    def render(body, notices):
+        return '\n'.join(header + body + [omitted] + notices + footer)
+    if len(render([], alert_lines)) > limit:
+        alert_lines = [line for line in alert_lines
+                       if not line.startswith(('· ', '其余'))]
+    if len(render([], alert_lines)) > limit:
+        # Each alert line is bounded by its formatter; this final guard
+        # protects the transport even against unusually long input.
+        budget = limit - len(render([], [])) - 1
+        alert_lines = ['\n'.join(alert_lines)[:max(0, budget)]]
+    chosen = []
+    for line in remaining:
+        if len(render(chosen + [line], alert_lines)) > limit:
+            break
+        chosen.append(line)
+    return render(chosen, alert_lines)
 
 
 def main() -> int:

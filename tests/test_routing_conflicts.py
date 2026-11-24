@@ -26,6 +26,26 @@ class RoutingConflictTests(unittest.TestCase):
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'full:other.example.com'))
         self.assertFalse(rc.domain_overlap('full:api.example.com', 'geosite:ads'))
 
+    def test_index_preserves_original_conflict_pairs_and_order(self):
+        domains = ['domain:example.com', 'full:api.example.com',
+                   'domain:deep.api.example.com', 'full:example.com',
+                   'full:notexample.com', 'domain:example.com.evil',
+                   'keyword:api', 'regexp:^api[.]example[.]com$',
+                   'geosite:ads', 'bare-keyword', 'full:api.example.com']
+        blocked = [('domain', value, 'block') for value in domains]
+        reviewed = [('domain', value, 'proxy') for value in
+                    ('full:api.example.com', 'domain:example.com',
+                     'domain:api.example.com', 'full:example.com',
+                     'keyword:example', 'regexp:^api[.]example[.]com$',
+                     'domain:notexample.com', 'full:unrelated.test')]
+        expected = [{'field':'domain','proxy_rule':value,'earlier_block_rule':other}
+                    for _,value,_ in reviewed
+                    for other in dict.fromkeys(domains) if rc.domain_overlap(value,other)]
+        result = rc.detect(blocked,reviewed,limit=3)
+        self.assertEqual(result['pairs'],expected)
+        self.assertEqual(result['examples'],expected[:3])
+        self.assertEqual(result['count'],len(expected))
+
     def test_all_pairs_and_change_or_monthly_receipts(self):
         result = rc.detect([('domain','domain:r.openai.com','block'),
                             ('domain','full:ads.openai.com','block')],

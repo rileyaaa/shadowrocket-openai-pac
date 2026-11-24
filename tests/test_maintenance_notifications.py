@@ -25,6 +25,24 @@ class MaintenanceNotificationTests(unittest.TestCase):
                       '8.8.8.8/32', 'OpenAI Voice'):
             self.assertIn(value, msg)
 
+    def test_long_report_does_not_hide_review_alerts_behind_statistics(self):
+        header = ['header','time','event','overall','publication']
+        details = header + ['statistics ' + 'x'*1000]*8
+        alerts = ['🔔 异常与人工审核','OpenAI 本次提醒：3',
+                  'Gemini/Claude 本次需提醒：4','前置拦截冲突：2',
+                  '已批准共享依赖待复审：8','本次复审提醒：8']
+        url = 'https://github.com/example/actions/runs/1'
+        result = notify.fit_message(details,alerts,url)
+        self.assertLessEqual(len(result),3900)
+        for line in header + alerts + [url]:
+            self.assertIn(line,result)
+        self.assertIn('省略',result)
+        # A flood of examples must not hide the category summaries either.
+        result = notify.fit_message(details,alerts + ['· '+ 'x'*500]*20,url)
+        self.assertLessEqual(len(result),3900)
+        for line in alerts + [url]:
+            self.assertIn(line,result)
+
     def test_dependency_group_classification(self):
         self.assertEqual(test_groups.group_for('test_v2rayn.SafetyTests.test_no_change_no_commit'), 'shared')
         self.assertEqual(test_groups.group_for('test_release_remediation.PublishedBaselineTests.test_shadow_v2_auxiliary_tamper_is_detected'), 'shadowrocket')

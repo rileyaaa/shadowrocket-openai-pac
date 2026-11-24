@@ -4,6 +4,7 @@ Never changes order or routing policy. Opaque geosite/geoip datasets and
 arbitrary regex intersections cannot be proven by this check.
 """
 from __future__ import annotations
+from collections import defaultdict
 import ipaddress
 import re
 
@@ -43,10 +44,45 @@ def domain_overlap(a, b):
             return False
     return False
 
+def domain_ancestors(host):
+    labels = host.split('.')
+    return ['.'.join(labels[i:]) for i in range(len(labels))]
+
+
+def index_domains(domains):
+    """Index explicit matches once; keep regex/keyword checks conservative."""
+    exact, suffix, descendants = defaultdict(list), defaultdict(list), defaultdict(list)
+    patterns = []
+    for i, value in enumerate(domains):
+        kind, host = split_domain(value)
+        if kind in ('full', 'domain'):
+            (exact if kind == 'full' else suffix)[host].append(i)
+            for parent in domain_ancestors(host):
+                descendants[parent].append(i)
+        else:
+            patterns.append(i)
+    return exact, suffix, descendants, patterns
+
+
+def matching_domains(value, domains, index):
+    kind, host = split_domain(value)
+    if kind not in ('full', 'domain'):
+        # Rare reviewed pattern rules still use the original full scan.
+        return (other for other in domains if domain_overlap(value, other))
+    exact, suffix, descendants, patterns = index
+    matches = set(exact.get(host, ()) if kind == 'full' else descendants.get(host, ()))
+    for parent in domain_ancestors(host):
+        matches.update(suffix.get(parent, ()))
+    matches.update(i for i in patterns if domain_overlap(value, domains[i]))
+    # Preserve the previous order, including preview/receipt semantics.
+    return (domains[i] for i in sorted(matches))
+
+
 def detect(blocked, reviewed, *, limit=100):
     """All distinct provable pairs; the preview limit never truncates state."""
     domains = list(dict.fromkeys(value for field, value, action in blocked
                                  if field == 'domain' and action == 'block'))
+    index = index_domains(domains)
     ips = [(value, ipaddress.ip_network(value, strict=False))
            for field, value, action in dict.fromkeys(blocked)
            if field == 'ip' and action == 'block' and not value.startswith('geoip:')]
@@ -55,7 +91,7 @@ def detect(blocked, reviewed, *, limit=100):
         if action != 'proxy':
             continue
         if field == 'domain':
-            witnesses = (d for d in domains if domain_overlap(value, d))
+            witnesses = matching_domains(value, domains, index)
         elif field == 'ip' and not value.startswith('geoip:'):
             network = ipaddress.ip_network(value, strict=False)
             witnesses = (d for d, other in ips if other.version == network.version and other.overlaps(network))

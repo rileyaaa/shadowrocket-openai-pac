@@ -369,13 +369,15 @@ class BuildTest(unittest.TestCase):
             "openai.com", "sora.com",
             "full:openaiassets.blob.core.windows.net",
             r"regexp:^chatgpt-async-webps-prod-\S+-\d+\.webpubsub\.azure\.com$",
-            "full:openai.qualtrics.com @ads",
+            "full:openai.qualtrics.com @ads # official annotation",
             "full:browser-intake-datadoghq.com @ads",
+            "full:chat.openai.com\t# inline comment",
         ))
         parsed = build.parse_domain_list(source, "v2fly")
         self.assertIn("DOMAIN-SUFFIX,chatgpt.com", parsed)
         self.assertIn("DOMAIN,openaiassets.blob.core.windows.net", parsed)
         self.assertIn("DOMAIN,openai.qualtrics.com", parsed)
+        self.assertIn("DOMAIN,chat.openai.com", parsed)
         self.assertIn(
             "DOMAIN-WILDCARD,chatgpt-async-webps-prod-*.webpubsub.azure.com",
             parsed,
