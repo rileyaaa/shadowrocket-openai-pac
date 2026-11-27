@@ -8,9 +8,9 @@
     "gemini_v2fly": 50
   },
   "build_inputs_sha256": "8b26869e6e10c68d6a8c3b89b8ed3c89f4783870b2b5b7a73ca674612c653180",
-  "legacy_state_sha256": "7681adb8e14bd884a6f288d456e3eb269f97a22caa617d98afa2a60283d4e89b",
+  "legacy_state_sha256": "30bca2f4274a4b8e85b856d9928d3fcfa2d85bfc161f673b44bd5cb6edce37e9",
   "manual_ai_sha256": "cf235ecbf69984f2113c245f8ce137e679c3931fcae645bff620088836c9b60a",
-  "output_sha256": "669cf537d97aa20d647669e7a0655a5ecb26ae3bdbef0b42db565007acf4977c",
+  "output_sha256": "dd98b9c5d1c69706d0ec6a4125329204cb807ba56b4e1db5a2049bcde48e40a8",
   "review_candidates": [
     {
       "reason": "可能用于 Anthropic 内部预览或测试（社区客户端记录出现 *.ant.dev），但现行官方 Claude Code 生产网络必需端点未列该后缀；不能把所有子域一概认作用户必需流量。保留观察，暂不进入 Claude 专用节点。",
@@ -189,7 +189,7 @@
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google-deepmind"
     },
     "johnshall": {
-      "sha256": "a371bf8b37ec21af3cb792499a2be3dc23c065f9365ff678d16800746629dec1",
+      "sha256": "fe20a923cb67e6a50c80e691812c47fc444e7eb3fc9c441f2ec7cb943cae8d90",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -214,11 +214,11 @@
     "cross_layer_duplicate_rules_retained": 21,
     "embedded_ruleset_rules": 2,
     "excluded_shared_auto_domains": 24,
-    "johnshall_lines": 84010,
+    "johnshall_lines": 84395,
     "manual_backup_rules": 44,
     "manual_openai_rules": 44,
     "mapped_proxy_to_johnshall_node": 30264,
-    "retained_ad_rules": 53659,
+    "retained_ad_rules": 54044,
     "suppressed_redundant_auto_rules": 1,
     "suppressed_redundant_manual_rules": 0,
     "unparsed_upstream_rules": 3,

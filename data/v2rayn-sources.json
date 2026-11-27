@@ -16,7 +16,7 @@
     "manual_openai": "e124138afe19e5eef76aa611acdcf352edbe26eb46f2ac32b0e0e8f17b54561f",
     "verified_processes": "0c8e90d93dc0339dfe723ec971066236ba703a23b9532a5aa095ce08085c8413"
   },
-  "output_sha256": "b618680223571608db1e84ffa1aa921880ca358d3ee4987aca3d6361553bcbdc",
+  "output_sha256": "88947acfb2b85751b1f31a4185f0e3da948e63e92d1eb450a12af4d3e02434e4",
   "schema_version": 2,
   "sources": {
     "acl4ssr": {
@@ -55,7 +55,7 @@
       "url": "https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/google-deepmind"
     },
     "johnshall": {
-      "sha256": "a371bf8b37ec21af3cb792499a2be3dc23c065f9365ff678d16800746629dec1",
+      "sha256": "fe20a923cb67e6a50c80e691812c47fc444e7eb3fc9c441f2ec7cb943cae8d90",
       "url": "https://raw.githubusercontent.com/Johnshall/Shadowrocket-ADBlock-Rules-Forever/release/sr_top500_banlist_ad.conf"
     },
     "metacubex": {
@@ -80,21 +80,21 @@
     "bitbrowser_domains": 11,
     "bitbrowser_effective_domains": 11,
     "bitbrowser_input_domains": 11,
-    "block_rules": 53659,
+    "block_rules": 54044,
     "claude_domains": 20,
     "claude_metacubex": 21,
     "claude_v2fly": 21,
     "direct_rules": 6,
-    "domain_rules": 83947,
+    "domain_rules": 84332,
     "external_lists_embedded": 1,
     "gemini_domains": 61,
     "gemini_metacubex": 50,
     "gemini_v2fly": 50,
     "ip_rules": 606,
-    "johnshall_block_rules": 53659,
-    "johnshall_lines": 84010,
+    "johnshall_block_rules": 54044,
+    "johnshall_lines": 84395,
     "johnshall_proxy_rules": 30265,
-    "json_bytes": 2233049,
+    "json_bytes": 2243929,
     "manual_domains": 44,
     "official_bitbrowser_domains": 3,
     "openai_user_extras": 43,
